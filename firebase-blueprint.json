@@ -1,0 +1,131 @@
+{
+  "entities": {
+    "School": {
+      "title": "School",
+      "description": "School information",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "township": { "type": "string" },
+        "address": { "type": "string" },
+        "principalName": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "under_review", "inactive"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "township"]
+    },
+    "Contact": {
+      "title": "Contact",
+      "description": "Contact information",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "org": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "township": { "type": "string" },
+        "note": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "org"]
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "Announcements for schools",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "category": { "type": "string" },
+        "attachments": { "type": "array", "items": { "type": "string" } },
+        "authorUid": { "type": "string" },
+        "publishedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "body"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Chat messages",
+      "type": "object",
+      "properties": {
+        "roomId": { "type": "string" },
+        "text": { "type": "string" },
+        "senderUid": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderPhoto": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["roomId", "text", "senderUid"]
+    },
+    "Room": {
+      "title": "Room",
+      "description": "Chat rooms",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name"]
+    },
+    "Gallery": {
+      "title": "Gallery",
+      "description": "Gallery images",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "album": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "uploadedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "imageUrl"]
+    },
+    "Association": {
+      "title": "Association",
+      "description": "Association chapter and its executive committee members",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "township": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "description": { "type": "string" },
+        "members": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Audit log recording admin actions on database records",
+      "type": "object",
+      "properties": {
+        "adminEmail": { "type": "string" },
+        "action": { "type": "string", "enum": ["create", "update", "delete", "bulk_delete"] },
+        "entityType": { "type": "string" },
+        "entityId": { "type": "string" },
+        "entityName": { "type": "string" },
+        "details": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["adminEmail", "action", "entityType", "createdAt"]
+    }
+  },
+  "firestore": {
+    "schools": { "schema": "School", "description": "Schools collection" },
+    "contacts": { "schema": "Contact", "description": "Contacts collection" },
+    "announcements": { "schema": "Announcement", "description": "Announcements collection" },
+    "messages": { "schema": "Message", "description": "Messages collection" },
+    "rooms": { "schema": "Room", "description": "Rooms collection" },
+    "gallery": { "schema": "Gallery", "description": "Gallery collection" },
+    "associations": { "schema": "Association", "description": "Associations and EC members collection" },
+    "audit_logs": { "schema": "AuditLog", "description": "Audit trail logs for tracking data changes" }
+  }
+}

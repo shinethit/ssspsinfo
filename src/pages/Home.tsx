@@ -1,0 +1,345 @@
+import { useState, useEffect, useMemo } from 'react';
+import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { Link } from 'react-router-dom';
+import { Announcement, School, Association } from '../types';
+import { getCategoryBadge } from './Announcements';
+import {
+  BookOpen,
+  Users,
+  MessageSquare,
+  ArrowRight,
+  Calendar,
+  Newspaper,
+  Building2,
+  School as SchoolIcon,
+  Activity,
+  AlertCircle,
+  ShieldCheck,
+  Search,
+  Sparkles,
+  Award,
+  Layers,
+  PhoneCall,
+  CheckCircle2,
+  GraduationCap,
+  FileText,
+} from 'lucide-react';
+import { PWAInstallButton } from '../components/PWAInstallButton';
+
+export default function Home() {
+  const [latestAnnouncements, setLatestAnnouncements] = useState<Announcement[]>([]);
+  const [schools, setSchools] = useState<School[]>([]);
+  const [associations, setAssociations] = useState<Association[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [quickSearch, setQuickSearch] = useState('');
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        // Fetch announcements
+        const annQ = query(collection(db, 'announcements'), orderBy('publishedAt', 'desc'), limit(4));
+        const annSnap = await getDocs(annQ);
+        setLatestAnnouncements(
+          annSnap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() })) as Announcement[]
+        );
+
+        // Fetch schools
+        const schSnap = await getDocs(collection(db, 'schools'));
+        setSchools(schSnap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() })) as School[]);
+
+        // Fetch associations
+        const ascSnap = await getDocs(collection(db, 'associations'));
+        setAssociations(ascSnap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() })) as Association[]);
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboardData();
+  }, []);
+
+  // Dashboard Stats Calculations
+  const totalSchools = schools.length;
+  const activeSchools = useMemo(() => schools.filter(s => (s.status || 'active') === 'active').length, [schools]);
+  const underReviewSchools = useMemo(() => schools.filter(s => s.status === 'under_review').length, [schools]);
+  const highSchoolsCount = useMemo(() => schools.filter(s => s.level?.includes('အထက်တန်း')).length, [schools]);
+  const middleSchoolsCount = useMemo(() => schools.filter(s => s.level?.includes('အလယ်တန်း')).length, [schools]);
+  const primarySchoolsCount = useMemo(() => schools.filter(s => s.level?.includes('မူလတန်း')).length, [schools]);
+
+  // Quick searched schools preview
+  const filteredQuickSchools = useMemo(() => {
+    if (!quickSearch.trim()) return [];
+    const q = quickSearch.trim().toLowerCase();
+    return schools
+      .filter(s =>
+        (s.name && s.name.toLowerCase().includes(q)) ||
+        (s.founderName && s.founderName.toLowerCase().includes(q)) ||
+        (s.adminName && s.adminName.toLowerCase().includes(q)) ||
+        (s.level && s.level.toLowerCase().includes(q))
+      )
+      .slice(0, 6);
+  }, [schools, quickSearch]);
+
+  return (
+    <div className="space-y-6 max-w-5xl mx-auto pb-8">
+      {/* 1. HERO & BANNER SECTION */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-sky-950 via-sky-900 to-indigo-950 text-white rounded-3xl p-4 sm:p-6 shadow-xl border border-sky-800">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-sky-500/10 rounded-full blur-3xl pointer-events-none -mr-10 -mt-10" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none -ml-10 -mb-10" />
+
+        <div className="relative z-10 text-center space-y-3 max-w-3xl mx-auto">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-[10px] sm:text-xs font-semibold text-sky-200 shadow-xs">
+            <Sparkles className="w-3 h-3 text-amber-400" />
+            <span>ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း &bull; အသင်းချုပ် Dashboard</span>
+          </div>
+
+          <h1 className="text-xl sm:text-3xl md:text-4xl font-black tracking-tight leading-snug">
+            သတင်းနှင့် ပြန်ကြားရေးဌာန ပလက်ဖောင်း
+          </h1>
+
+          <p className="text-sky-100/90 text-xs sm:text-sm md:text-base leading-relaxed max-w-2xl mx-auto font-normal">
+            အသင်းဝင် ကိုယ်ပိုင်ကျောင်းများ၏ စာရင်းဇယားများ၊ ထုတ်ပြန်ကြေညာချက်များ၊ မြို့နယ်အသင်း အမှုဆောင်များနှင့် အရေးကြီး သတင်းအချက်အလက်များကို အချိန်နှင့်တစ်ပြေးညီ စုစည်းဖော်ပြပေးသော ဗဟို ဒက်ရှ်ဘုတ်။
+          </p>
+
+          {/* Quick Search on Hero Banner */}
+          <div className="pt-2 max-w-md mx-auto">
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={quickSearch}
+                onChange={(e) => setQuickSearch(e.target.value)}
+                placeholder="ကျောင်းအမည်၊ တာဝန်ခံ သို့မဟုတ် အဆင့်ဖြင့် ရှာဖွေပါ..."
+                className="w-full pl-10 pr-3 py-2 bg-white text-slate-900 rounded-xl text-xs sm:text-sm shadow-md focus:outline-hidden focus:ring-2 focus:ring-amber-400"
+              />
+              {quickSearch && (
+                <button
+                  type="button"
+                  onClick={() => setQuickSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            {/* Live Search Instant Results Dropdown (truncated for brevity in edit) */}
+            {quickSearch.trim() && (
+              <div className="mt-1 bg-white rounded-xl p-2 shadow-2xl border border-slate-200 text-left text-slate-900 animate-in fade-in zoom-in-95 max-h-64 overflow-y-auto">
+                <div className="text-[10px] font-bold text-slate-500 px-2 pb-1.5 border-b border-slate-100 flex items-center justify-between">
+                  <span>ရှာဖွေတွေ့ရှိ ({filteredQuickSchools.length})</span>
+                  <Link to={`/contacts?search=${encodeURIComponent(quickSearch)}`} className="text-sky-700 hover:underline">
+                    အားလုံးကြည့်မည် &rarr;
+                  </Link>
+                </div>
+                {filteredQuickSchools.length === 0 ? (
+                  <p className="text-[11px] text-slate-400 p-2 text-center">မတွေ့ပါ</p>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {filteredQuickSchools.map(s => (
+                      <Link
+                        key={s.id}
+                        to={`/schools/${s.id}`}
+                        className="p-1.5 hover:bg-slate-50 rounded-lg flex items-center justify-between gap-2 transition"
+                      >
+                        <div>
+                          <p className="font-bold text-[11px] sm:text-xs text-sky-950">{s.name}</p>
+                        </div>
+                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-800 border border-sky-200">
+                          အသေးစိတ်
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Quick Action Navigation Buttons */}
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-1.5 text-[11px] sm:text-xs font-semibold">
+            <Link
+              to="/dashboard"
+              className="px-3 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-lg transition flex items-center gap-1 shadow-md font-bold"
+            >
+              <Activity className="w-3.5 h-3.5" />
+              <span>စာရင်းအင်း</span>
+            </Link>
+            <Link
+              to="/contacts"
+              className="px-3 py-2 bg-sky-500 hover:bg-sky-400 text-sky-950 rounded-lg transition flex items-center gap-1 shadow-xs font-bold"
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>ကျောင်းစာရင်း</span>
+            </Link>
+            <Link
+              to="/announcements"
+              className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition flex items-center gap-1 backdrop-blur-xs border border-white/20"
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>ကြေညာချက်များ</span>
+            </Link>
+            <Link
+              to="/associations"
+              className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition flex items-center gap-1 backdrop-blur-xs border border-white/20"
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span>အသင်းများ</span>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* 2. TOP LATEST 2 ANNOUNCEMENTS */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <div className="p-1 rounded-md bg-rose-50 text-rose-600">
+              <Newspaper className="w-3 h-3" />
+            </div>
+            <h2 className="text-xs font-bold text-sky-950">
+              နောက်ဆုံးရ ကြေညာချက်များ
+            </h2>
+          </div>
+          <Link
+            to="/announcements"
+            className="text-[10px] text-sky-800 font-bold hover:underline flex items-center gap-0.5"
+          >
+            <span>အားလုံး</span> &rarr;
+          </Link>
+        </div>
+
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="h-16 bg-white rounded-lg border border-slate-100 animate-pulse" />
+            <div className="h-16 bg-white rounded-lg border border-slate-100 animate-pulse" />
+          </div>
+        ) : latestAnnouncements.length === 0 ? (
+          <div className="p-2 bg-white rounded-lg border border-slate-100 text-center text-slate-400 text-[10px]">
+            ကြေညာချက် မရှိသေးပါ
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {latestAnnouncements.slice(0, 2).map((a) => {
+              const badge = getCategoryBadge(a.category);
+              return (
+                <Link
+                  key={a.id}
+                  to={`/announcements/${a.id}`}
+                  className="bg-white p-2.5 rounded-lg border border-slate-100 shadow-none hover:border-sky-200 transition group flex flex-col justify-between space-y-1"
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <span className={`text-[8px] px-1 py-0.5 rounded-full font-semibold border ${badge.className}`}>
+                      {badge.label}
+                    </span>
+                    <span className="text-[9px] text-slate-400 flex items-center gap-0.5 shrink-0">
+                      <Calendar className="w-2.5 h-2.5" />
+                      {a.publishedAt ? new Date(a.publishedAt).toLocaleDateString('my-MM') : 'မကြာသေးမီက'}
+                    </span>
+                  </div>
+
+                  <h3 className="font-bold text-[11px] text-sky-950 group-hover:text-sky-700 transition leading-tight line-clamp-1">
+                    {a.title}
+                  </h3>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* 3. SCHOOL EDUCATION LEVELS BREAKDOWN */}
+      <section className="bg-white p-3 rounded-xl border border-slate-100 shadow-none space-y-2">
+        <div className="flex items-center justify-between border-b border-slate-50 pb-1">
+          <h3 className="font-bold text-xs text-sky-950 flex items-center gap-1.5">
+            <GraduationCap className="w-3.5 h-3.5 text-sky-600" />
+            <span>ကျောင်းအဆင့် ခွဲခြမ်းမှု</span>
+          </h3>
+          <Link to="/contacts" className="text-[10px] font-bold text-sky-700 hover:underline">
+            အသေးစိတ် &rarr;
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          {/* High School */}
+          <div className="p-2 rounded-lg bg-sky-50/50 border border-sky-50 space-y-0.5">
+            <div className="flex items-center justify-between text-[9px] font-bold text-sky-900">
+              <span>အထက်တန်း</span>
+              <span className="text-sky-700 font-extrabold">{highSchoolsCount}</span>
+            </div>
+            <div className="w-full bg-sky-100/50 rounded-full h-1 overflow-hidden">
+              <div
+                className="bg-sky-500 h-1 rounded-full transition-all"
+                style={{ width: `${totalSchools > 0 ? (highSchoolsCount / totalSchools) * 100 : 0}%` }}
+              />
+            </div>
+          </div>
+          {/* Middle School */}
+          <div className="p-2 rounded-lg bg-emerald-50/50 border border-emerald-50 space-y-0.5">
+            <div className="flex items-center justify-between text-[9px] font-bold text-emerald-900">
+              <span>အလယ်တန်း</span>
+              <span className="text-emerald-700 font-extrabold">{middleSchoolsCount}</span>
+            </div>
+            <div className="w-full bg-emerald-100/50 rounded-full h-1 overflow-hidden">
+              <div
+                className="bg-emerald-500 h-1 rounded-full transition-all"
+                style={{ width: `${totalSchools > 0 ? (middleSchoolsCount / totalSchools) * 100 : 0}%` }}
+              />
+            </div>
+          </div>
+          {/* Primary School */}
+          <div className="p-2 rounded-lg bg-amber-50/50 border border-amber-50 space-y-0.5">
+            <div className="flex items-center justify-between text-[9px] font-bold text-amber-900">
+              <span>မူလတန်း</span>
+              <span className="text-amber-700 font-extrabold">{primarySchoolsCount}</span>
+            </div>
+            <div className="w-full bg-amber-100/50 rounded-full h-1 overflow-hidden">
+              <div
+                className="bg-amber-500 h-1 rounded-full transition-all"
+                style={{ width: `${totalSchools > 0 ? (primarySchoolsCount / totalSchools) * 100 : 0}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 4. TOWNSHIP ASSOCIATIONS & QUICK SHORTCUTS BANNER */}
+      <section className="grid grid-cols-2 gap-2">
+        <div className="bg-gradient-to-br from-slate-900 to-sky-950 text-white p-3 rounded-xl space-y-1 shadow-sm">
+          <div className="flex items-center gap-1">
+            <Building2 className="w-3.5 h-3.5 text-sky-400" />
+            <h3 className="font-bold text-[10px]">မြို့နယ်အသင်းများ</h3>
+          </div>
+          <div className="pt-0.5">
+            <Link
+              to="/associations"
+              className="inline-flex items-center gap-1 px-2 py-1 bg-sky-500 hover:bg-sky-400 text-sky-950 font-bold text-[9px] rounded-md transition"
+            >
+              <span>ကြည့်မည်</span>
+              <ArrowRight className="w-2.5 h-2.5" />
+            </Link>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-emerald-950 to-slate-900 text-white p-3 rounded-xl space-y-1 shadow-sm">
+          <div className="flex items-center gap-1">
+            <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+            <h3 className="font-bold text-[10px]">ဆွေးနွေးခန်း</h3>
+          </div>
+          <div className="pt-0.5">
+            <Link
+              to="/chat"
+              className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold text-[9px] rounded-md transition"
+            >
+              <span>ဝင်မည်</span>
+              <ArrowRight className="w-2.5 h-2.5" />
+            </Link>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+

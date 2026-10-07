@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0369a1" />
+      <stop offset="100%" stop-color="#082f49" />
+    </linearGradient>
+    <linearGradient id="gold-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fde047" />
+      <stop offset="100%" stop-color="#ca8a04" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.3" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="104" fill="url(#bg-grad)" />
+
+  <!-- Outer subtle circular border -->
+  <circle cx="256" cy="256" r="216" fill="none" stroke="url(#gold-grad)" stroke-width="4" stroke-opacity="0.4" />
+
+  <!-- Inner Content with Shadow -->
+  <g filter="url(#shadow)">
+    <!-- Graduation Cap / Temple Peak Top -->
+    <path d="M256 100 L380 156 L256 212 L132 156 Z" fill="url(#gold-grad)" />
+    <path d="M380 156 L380 200 L368 206 L368 162 Z" fill="#ca8a04" />
+    <circle cx="256" cy="156" r="8" fill="#ffffff" />
+    <path d="M256 164 L256 240 L248 244 L248 164 Z" fill="#fde047" />
+
+    <!-- Open Book Base -->
+    <!-- Left Page -->
+    <path d="M256 248 C220 236 170 236 120 248 C115 250 112 254 112 260 L112 360 C112 366 117 372 124 370 C168 358 214 360 256 376 Z" fill="#ffffff" />
+    <!-- Right Page -->
+    <path d="M256 248 C292 236 342 236 392 248 C397 250 400 254 400 260 L400 360 C400 366 395 372 388 370 C344 358 298 360 256 376 Z" fill="#f1f5f9" />
+    <!-- Book Spine -->
+    <path d="M256 248 L256 376" stroke="#0284c7" stroke-width="6" stroke-linecap="round" />
+
+    <!-- Text Lines on Pages -->
+    <path d="M148 280 C180 274 216 276 240 286" stroke="#0369a1" stroke-width="5" stroke-linecap="round" />
+    <path d="M148 304 C180 298 216 300 240 310" stroke="#0369a1" stroke-width="5" stroke-linecap="round" />
+    <path d="M148 328 C180 322 216 324 240 334" stroke="#0369a1" stroke-width="5" stroke-linecap="round" />
+
+    <path d="M272 286 C296 276 332 274 364 280" stroke="#0369a1" stroke-width="5" stroke-linecap="round" />
+    <path d="M272 310 C296 300 332 298 364 304" stroke="#0369a1" stroke-width="5" stroke-linecap="round" />
+    <path d="M272 334 C296 324 332 322 364 328" stroke="#0369a1" stroke-width="5" stroke-linecap="round" />
+
+    <!-- Mountain / Shan State Hills Silhouette at Base -->
+    <path d="M176 392 L216 432 L256 398 L296 432 L336 392" fill="none" stroke="url(#gold-grad)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+  </g>
+</svg>
