@@ -86,26 +86,17 @@ export default function Home() {
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-8">
       {/* 1. HERO & BANNER SECTION */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-sky-950 via-sky-900 to-indigo-950 text-white rounded-3xl p-4 sm:p-6 shadow-xl border border-sky-800">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-sky-500/10 rounded-full blur-3xl pointer-events-none -mr-10 -mt-10" />
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none -ml-10 -mb-10" />
+      <section className="relative overflow-hidden bg-gradient-to-br from-sky-950 via-sky-900 to-indigo-950 text-white rounded-2xl p-4 sm:p-5 shadow-lg border border-sky-800">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-sky-500/10 rounded-full blur-3xl pointer-events-none -mr-10 -mt-10" />
+        <div className="absolute bottom-0 left-0 w-52 h-52 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none -ml-10 -mb-10" />
 
-        <div className="relative z-10 text-center space-y-3 max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-[10px] sm:text-xs font-semibold text-sky-200 shadow-xs">
-            <Sparkles className="w-3 h-3 text-amber-400" />
-            <span>ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း &bull; အသင်းချုပ် Dashboard</span>
-          </div>
-
-          <h1 className="text-xl sm:text-3xl md:text-4xl font-black tracking-tight leading-snug">
-            သတင်းနှင့် ပြန်ကြားရေးဌာန ပလက်ဖောင်း
+        <div className="relative z-10 text-center space-y-3 max-w-2xl mx-auto">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight leading-snug">
+            သတင်းနှင့် ပြန်ကြားရေးဌာန
           </h1>
 
-          <p className="text-sky-100/90 text-xs sm:text-sm md:text-base leading-relaxed max-w-2xl mx-auto font-normal">
-            အသင်းဝင် ကိုယ်ပိုင်ကျောင်းများ၏ စာရင်းဇယားများ၊ ထုတ်ပြန်ကြေညာချက်များ၊ မြို့နယ်အသင်း အမှုဆောင်များနှင့် အရေးကြီး သတင်းအချက်အလက်များကို အချိန်နှင့်တစ်ပြေးညီ စုစည်းဖော်ပြပေးသော ဗဟို ဒက်ရှ်ဘုတ်။
-          </p>
-
           {/* Quick Search on Hero Banner */}
-          <div className="pt-2 max-w-md mx-auto">
+          <div className="max-w-md mx-auto">
             <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
@@ -125,7 +116,7 @@ export default function Home() {
                 </button>
               )}
             </div>
-            {/* Live Search Instant Results Dropdown (truncated for brevity in edit) */}
+            {/* Live Search Instant Results Dropdown */}
             {quickSearch.trim() && (
               <div className="mt-1 bg-white rounded-xl p-2 shadow-2xl border border-slate-200 text-left text-slate-900 animate-in fade-in zoom-in-95 max-h-64 overflow-y-auto">
                 <div className="text-[10px] font-bold text-slate-500 px-2 pb-1.5 border-b border-slate-100 flex items-center justify-between">
@@ -159,7 +150,7 @@ export default function Home() {
           </div>
 
           {/* Quick Action Navigation Buttons */}
-          <div className="pt-2 flex flex-wrap items-center justify-center gap-1.5 text-[11px] sm:text-xs font-semibold">
+          <div className="pt-1 flex flex-wrap items-center justify-center gap-1.5 text-[11px] sm:text-xs font-semibold">
             <Link
               to="/dashboard"
               className="px-3 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-lg transition flex items-center gap-1 shadow-md font-bold"
