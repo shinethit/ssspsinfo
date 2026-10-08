@@ -47,8 +47,18 @@ import {
   Crown,
   Mail,
   ShieldCheck,
+  HardDriveDownload,
+  Database,
+  Save,
+  FileJson,
+  Check,
+  ArrowDownToLine,
+  Settings as SettingsIcon,
+  Cloud,
 } from 'lucide-react';
 import { downloadSchoolTemplate, normalizeSchoolRow, exportSchoolsToExcel } from '../lib/excel';
+import ImageUploadDropzone from '../components/ImageUploadDropzone';
+import { getCloudinaryConfig, saveCloudinaryConfig, isCloudinaryConfigured } from '../lib/cloudinary';
 
 const announcementSchema = z.object({
   title: z.string().min(1, 'ခေါင်းစဉ် လိုအပ်သည်'),
@@ -157,8 +167,21 @@ export default function Admin() {
     deleteSchoolLevel,
     resetSchoolLevelsToDefault,
   } = useData();
-  const [activeTab, setActiveTab] = useState<'announcements' | 'associations' | 'schools' | 'tickers' | 'audit_logs' | 'admins' | 'levels'>('announcements');
+  const [activeTab, setActiveTab] = useState<'announcements' | 'associations' | 'schools' | 'tickers' | 'audit_logs' | 'admins' | 'levels' | 'backup'>('announcements');
   const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
+
+  // Backup & Restore state
+  const [isExportingBackup, setIsExportingBackup] = useState(false);
+  const [isRestoringBackup, setIsRestoringBackup] = useState(false);
+  const [backupRestoreData, setBackupRestoreData] = useState<any | null>(null);
+  const [restoreMode, setRestoreMode] = useState<'merge' | 'skip'>('merge');
+  const [backupFileName, setBackupFileName] = useState('');
+
+  // Cloudinary settings state
+  const [cloudinaryCloudName, setCloudinaryCloudName] = useState(() => getCloudinaryConfig().cloudName);
+  const [cloudinaryPreset, setCloudinaryPreset] = useState(() => getCloudinaryConfig().uploadPreset);
+  const [cloudinaryFolder, setCloudinaryFolder] = useState(() => getCloudinaryConfig().folder || 'ssspsinfo');
+  const [isCloudinarySaved, setIsCloudinarySaved] = useState(false);
 
   // School Level Management form state
   const [editingLevelId, setEditingLevelId] = useState<string | null>(null);
@@ -594,6 +617,197 @@ export default function Admin() {
       toast.error('Reset ပြုလုပ်ရာတွင် အမှားဖြစ်ပွားပါသည်');
     }
   };
+
+  // Backup & Restore Handlers
+  const handleExportFullBackup = async () => {
+    try {
+      setIsExportingBackup(true);
+      toast.info('ဒေတာဘေ့စ် အချက်အလက်များ စုစည်းနေပါသည်...');
+
+      const [schoolsSnap, assocSnap, annSnap, tickSnap, levelsSnap, adminsSnap] = await Promise.all([
+        getDocs(collection(db, 'schools')),
+        getDocs(collection(db, 'associations')),
+        getDocs(collection(db, 'announcements')),
+        getDocs(collection(db, 'tickers')),
+        getDocs(collection(db, 'school_levels')),
+        getDocs(collection(db, 'admins')),
+      ]);
+
+      const backupPayload = {
+        meta: {
+          appName: 'ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း — သတင်းနှင့် ပြန်ကြားရေးဌာန',
+          version: '2.1',
+          exportedAt: new Date().toISOString(),
+          exportedBy: auth.currentUser?.email || 'Admin',
+        },
+        counts: {
+          schools: schoolsSnap.docs.length,
+          associations: assocSnap.docs.length,
+          announcements: annSnap.docs.length,
+          tickers: tickSnap.docs.length,
+          schoolLevels: levelsSnap.docs.length,
+          admins: adminsSnap.docs.length,
+        },
+        collections: {
+          schools: schoolsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+          associations: assocSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+          announcements: annSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+          tickers: tickSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+          school_levels: levelsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+          admins: adminsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+        },
+      };
+
+      const jsonStr = JSON.stringify(backupPayload, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const dateStr = new Date().toISOString().split('T')[0];
+      a.href = url;
+      a.download = `shan-south-ps-backup-${dateStr}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      await recordAuditLog({
+        action: 'create',
+        entityType: 'school',
+        details: `ဒေတာဘေ့စ် တစ်ခုလုံး Full Backup (JSON) အဖြစ် အရန်သိမ်းဆည်း ဒေါင်းလုဒ် ရယူခဲ့သည် (ကျောင်း: ${backupPayload.counts.schools}၊ ကြေညာချက်: ${backupPayload.counts.announcements})`,
+      });
+
+      toast.success('Full Database Backup (JSON) အောင်မြင်စွာ ဒေါင်းလုဒ် ဆွဲပြီးပါပြီ');
+      fetchAuditLogs();
+    } catch (err: any) {
+      console.error(err);
+      toast.error('Backup ပြုလုပ်ရာတွင် အမှားဖြစ်ပွားပါသည်');
+    } finally {
+      setIsExportingBackup(false);
+    }
+  };
+
+  const handleSelectBackupFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.json')) {
+      toast.error('ကျေးဇူးပြု၍ .json Backup ဖိုင်ကိုသာ ရွေးချယ်ပေးပါ');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result as string);
+        const collections = parsed.collections || {
+          schools: parsed.schools || [],
+          associations: parsed.associations || [],
+          announcements: parsed.announcements || [],
+          tickers: parsed.tickers || [],
+          school_levels: parsed.schoolLevels || parsed.school_levels || [],
+          admins: parsed.admins || [],
+        };
+
+        if (!collections.schools && !collections.announcements && !collections.associations) {
+          toast.error('မှားယွင်းသော Backup ဖိုင် ပုံစံ ဖြစ်နေပါသည်');
+          return;
+        }
+
+        setBackupRestoreData({
+          meta: parsed.meta || {
+            exportedAt: parsed.exportedAt || 'မသိရှိပါ',
+            exportedBy: parsed.exportedBy || 'Admin',
+          },
+          counts: {
+            schools: collections.schools?.length || 0,
+            associations: collections.associations?.length || 0,
+            announcements: collections.announcements?.length || 0,
+            tickers: collections.tickers?.length || 0,
+            schoolLevels: collections.school_levels?.length || 0,
+            admins: collections.admins?.length || 0,
+          },
+          collections,
+        });
+        setBackupFileName(file.name);
+        toast.success(`Backup ဖိုင် "${file.name}" ကို ဖတ်ရှုစစ်ဆေးပြီးပါပြီ`);
+      } catch (err) {
+        toast.error('JSON ဖိုင် ဖတ်ရှုရာတွင် အမှားဖြစ်ပွားပါသည်');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const handleExecuteRestore = async () => {
+    if (!backupRestoreData) return;
+    const confirmMsg = `သတိပေးချက်: Backup ဖိုင်မှ ကျောင်း (${backupRestoreData.counts.schools}) ခု၊ ကြေညာချက် (${backupRestoreData.counts.announcements}) ခု၊ အသင်း (${backupRestoreData.counts.associations}) ခုကို Firestore ဒေတာဘေ့စ်သို့ ပြန်လည်သွင်းယူပါမည်။ သေချာပါသလား?`;
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      setIsRestoringBackup(true);
+      toast.info('ဒေတာများ ပြန်လည် ရေးသွင်းနေပါသည်...');
+
+      const collections = backupRestoreData.collections;
+
+      const restoreCollection = async (collName: string, items: any[]) => {
+        if (!items || items.length === 0) return;
+        const chunkSize = 350;
+        for (let i = 0; i < items.length; i += chunkSize) {
+          const chunk = items.slice(i, i + chunkSize);
+          const batch = writeBatch(db);
+          for (const item of chunk) {
+            const { id, ...data } = item;
+            const docRef = id ? doc(db, collName, id) : doc(collection(db, collName));
+            if (restoreMode === 'merge') {
+              batch.set(docRef, data, { merge: true });
+            } else {
+              batch.set(docRef, data);
+            }
+          }
+          await batch.commit();
+        }
+      };
+
+      if (collections.schools) await restoreCollection('schools', collections.schools);
+      if (collections.associations) await restoreCollection('associations', collections.associations);
+      if (collections.announcements) await restoreCollection('announcements', collections.announcements);
+      if (collections.tickers) await restoreCollection('tickers', collections.tickers);
+      if (collections.school_levels) await restoreCollection('school_levels', collections.school_levels);
+      if (collections.admins && collections.admins.length > 0) {
+        await restoreCollection('admins', collections.admins);
+      }
+
+      await recordAuditLog({
+        action: 'create',
+        entityType: 'school',
+        details: `Backup ဖိုင် "${backupFileName}" မှ ဒေတာဘေ့စ် အချက်အလက်များအား Restore ပြန်လည်သွင်းယူခဲ့သည် (ကျောင်း: ${backupRestoreData.counts.schools}၊ ကြေညာချက်: ${backupRestoreData.counts.announcements})`,
+      });
+
+      toast.success('ဒေတာဘေ့စ် Restore အောင်မြင်စွာ ပြီးဆုံးပါပြီ');
+      setBackupRestoreData(null);
+      setBackupFileName('');
+      fetchSchools();
+      fetchAnnouncements();
+      fetchAssociations();
+      fetchTickers();
+      fetchAdmins();
+      fetchAuditLogs();
+    } catch (err: any) {
+      console.error(err);
+      toast.error('Restore ပြုလုပ်ရာတွင် အမှားဖြစ်ပွားပါသည်');
+    } finally {
+      setIsRestoringBackup(false);
+    }
+  };
+
+  const handleSaveCloudinary = (e: React.FormEvent) => {
+    e.preventDefault();
+    saveCloudinaryConfig(cloudinaryCloudName, cloudinaryPreset, cloudinaryFolder);
+    setIsCloudinarySaved(true);
+    toast.success('Cloudinary Settings အောင်မြင်စွာ သိမ်းဆည်းပြီးပါပြီ');
+    setTimeout(() => setIsCloudinarySaved(false), 3000);
+  };
+
 
   // Dashboard & School Summary Calculations
   const totalSchoolsCount = schools.length;
@@ -1574,6 +1788,18 @@ export default function Admin() {
               {admins.length + 1}
             </span>
           </button>
+          <button
+            onClick={() => setActiveTab('backup')}
+            type="button"
+            className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer col-span-2 sm:col-span-1 ${
+              activeTab === 'backup'
+                ? 'bg-white text-emerald-950 shadow-xs ring-1 ring-emerald-400 font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <HardDriveDownload className="w-4 h-4 shrink-0 text-emerald-600" />
+            <span>အရန်သိမ်း/ပြန်ယူ (Backup)</span>
+          </button>
         </div>
       </div>
 
@@ -1797,14 +2023,14 @@ export default function Admin() {
                 )}
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  ပူးတွဲဖိုင် / ပုံလိပ်စာ (Attachment URL - စိတ်ကြိုက်)
-                </label>
-                <input
-                  {...announcementForm.register('attachmentUrl')}
-                  placeholder="https://..."
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-sm focus:border-sky-500 outline-hidden"
+              <div className="sm:col-span-2">
+                <ImageUploadDropzone
+                  value={announcementForm.watch('attachmentUrl') || ''}
+                  onChange={(url) => announcementForm.setValue('attachmentUrl', url)}
+                  label="ပူးတွဲဖိုင် / ဓာတ်ပုံ (Attachment Image - စိတ်ကြိုက်)"
+                  helperText="ကြေညာချက်နှင့် သက်ဆိုင်သော ဓာတ်ပုံ (JPG, PNG) တင်နိုင်ပါသည်"
+                  folder="shan-state-announcements"
+                  onOpenSettings={() => setActiveTab('backup')}
                 />
               </div>
 
@@ -1964,11 +2190,13 @@ export default function Admin() {
                 />
               </div>
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-slate-600 mb-1">အသင်း Logo / အမှတ်တံဆိပ် URL</label>
-                <input
-                  {...associationForm.register('logoUrl')}
-                  placeholder="https://..."
-                  className="w-full p-2.5 border rounded-lg text-sm"
+                <ImageUploadDropzone
+                  value={associationForm.watch('logoUrl') || ''}
+                  onChange={(url) => associationForm.setValue('logoUrl', url)}
+                  label="အသင်း Logo / အမှတ်တံဆိပ် (Association Logo)"
+                  helperText="အသင်း၏ တံဆိပ်တုံး သို့မဟုတ် Logo ပုံဖိုင် တင်နိုင်ပါသည်"
+                  folder="shan-state-associations"
+                  onOpenSettings={() => setActiveTab('backup')}
                 />
               </div>
               <div className="sm:col-span-2">
@@ -2326,8 +2554,14 @@ export default function Admin() {
 
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-slate-600 mb-1">ကျောင်း Logo URL</label>
-                <input {...schoolForm.register('logoUrl')} placeholder="https://..." className="w-full p-2.5 border rounded-lg text-sm" />
+                <ImageUploadDropzone
+                  value={schoolForm.watch('logoUrl') || ''}
+                  onChange={(url) => schoolForm.setValue('logoUrl', url)}
+                  label="ကျောင်း Logo / အမှတ်တံဆိပ် (School Logo)"
+                  helperText="ကျောင်း၏ တံဆိပ်တုံး သို့မဟုတ် Logo ပုံဖိုင် တင်နိုင်ပါသည်"
+                  folder="shan-state-schools"
+                  onOpenSettings={() => setActiveTab('backup')}
+                />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">ကျောင်းအမည် *</label>
@@ -4508,6 +4742,330 @@ export default function Admin() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* BACKUP & RESTORE / CLOUDINARY TAB */}
+      {activeTab === 'backup' && (
+        <div className="space-y-8 animate-in fade-in">
+          {/* Header Description */}
+          <div className="bg-gradient-to-r from-emerald-950 via-teal-900 to-sky-950 text-white p-6 sm:p-8 rounded-3xl shadow-md border border-emerald-800 space-y-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-200 text-xs font-semibold backdrop-blur-xs border border-emerald-400/30">
+              <Database className="w-3.5 h-3.5 text-emerald-300" />
+              <span>ဒေတာလုံခြုံရေးနှင့် Backup စီမံခန့်ခွဲမှု</span>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-black">
+              ဒေတာ အရန်သိမ်းဆည်းခြင်းနှင့် Cloudinary ချိန်ညှိမှု (Backup & Media Storage)
+            </h3>
+            <p className="text-emerald-100/90 text-xs sm:text-sm leading-relaxed max-w-2xl">
+              မတော်တဆ အချက်အလက် ပျောက်ဆုံးမှုများမှ ကာကွယ်ရန် ကျောင်းများ၊ အသင်းဝင်များ၊ ကြေညာချက်များအားလုံးကို ကလစ်တစ်ချက်ဖြင့် Full Backup (.json) ရယူထားနိုင်ပြီး လိုအပ်ပါက ပြန်လည် Restore သွင်းယူနိုင်ပါသည်။
+            </p>
+          </div>
+
+          {/* Current Database Status Overview */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-200 text-center space-y-1">
+              <span className="text-[11px] text-slate-500 font-semibold block">ကျောင်းများ</span>
+              <strong className="text-xl font-black text-sky-950">{schools.length}</strong>
+            </div>
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-200 text-center space-y-1">
+              <span className="text-[11px] text-slate-500 font-semibold block">ကြေညာချက်များ</span>
+              <strong className="text-xl font-black text-sky-950">{announcements.length}</strong>
+            </div>
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-200 text-center space-y-1">
+              <span className="text-[11px] text-slate-500 font-semibold block">အသင်းများ</span>
+              <strong className="text-xl font-black text-sky-950">{associations.length}</strong>
+            </div>
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-200 text-center space-y-1">
+              <span className="text-[11px] text-slate-500 font-semibold block">ကျောင်းအဆင့်များ</span>
+              <strong className="text-xl font-black text-sky-950">{schoolLevels.length}</strong>
+            </div>
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-200 text-center space-y-1">
+              <span className="text-[11px] text-slate-500 font-semibold block">စာတန်းပြေး</span>
+              <strong className="text-xl font-black text-sky-950">{tickers.length}</strong>
+            </div>
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-200 text-center space-y-1">
+              <span className="text-[11px] text-slate-500 font-semibold block">အက်ဒမင်များ</span>
+              <strong className="text-xl font-black text-sky-950">{admins.length + 1}</strong>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* SECTION 1: Full System Backup (Download) */}
+            <div className="bg-white p-6 sm:p-7 rounded-2xl border border-slate-200 shadow-xs space-y-5">
+              <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+                <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-700">
+                  <HardDriveDownload className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-base text-slate-900">
+                    ၁။ ဒေတာဘေ့စ် အရန်သိမ်းဆည်းခြင်း (Export Backup)
+                  </h4>
+                  <p className="text-xs text-slate-500">
+                    လက်ရှိ ဒေတာဘေ့စ်တစ်ခုလုံးရှိ ဒေတာအားလုံးကို တစ်ပြိုင်နက် Download ဆွဲယူခြင်း
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3 text-xs text-slate-600">
+                <p className="leading-relaxed">
+                  အသင်းဝင်ကျောင်းများ၊ တာဝန်ခံ (၁)၊ (၂) ဖုန်းနံပါတ်များ၊ တည်ထောင်သူ/စီမံအုပ်ချုပ်သူ အချက်အလက်များ၊ ကြေညာချက်များနှင့် အသင်းဖွဲ့စည်းပုံများကို လုံခြုံသော JSON format ဖြင့် ကွန်ပျူတာ/ဖုန်းထဲသို့ သိမ်းဆည်းပေးမည် ဖြစ်ပါသည်။
+                </p>
+
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1.5 text-[11px]">
+                  <div className="flex justify-between text-slate-700">
+                    <span>အရန်သိမ်းမည့် အကြောင်းအရာ:</span>
+                    <strong className="text-slate-900">Collections (၆) ခု စလုံး</strong>
+                  </div>
+                  <div className="flex justify-between text-slate-700">
+                    <span>ဖိုင်အမျိုးအစား:</span>
+                    <strong className="text-slate-900">.json (Universal Format)</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  onClick={handleExportFullBackup}
+                  disabled={isExportingBackup}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-xs cursor-pointer disabled:opacity-60"
+                >
+                  <ArrowDownToLine className="w-4 h-4" />
+                  <span>{isExportingBackup ? 'အရန်သိမ်းနေပါသည်...' : 'Full Backup ဒေါင်းလုဒ်ဆွဲမည် (.json)'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => exportSchoolsToExcel(schools)}
+                  className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-3 px-4 rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+                  title="ကျောင်းစာရင်းများကို Excel ဖိုင်အဖြစ် ဒေါင်းလုဒ်ဆွဲရန်"
+                >
+                  <Download className="w-4 h-4 text-emerald-600" />
+                  <span>Excel စာရင်း (.xlsx)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* SECTION 2: Restore from Backup */}
+            <div className="bg-white p-6 sm:p-7 rounded-2xl border border-slate-200 shadow-xs space-y-5">
+              <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+                <div className="p-2.5 rounded-xl bg-sky-50 text-sky-700">
+                  <Upload className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-base text-slate-900">
+                    ၂။ Backup ဖိုင်မှ ပြန်လည်သွင်းယူခြင်း (Restore Database)
+                  </h4>
+                  <p className="text-xs text-slate-500">
+                    ယခင် သိမ်းဆည်းထားသော .json Backup ဖိုင်မှ ဒေတာများ ပြန်ယူခြင်း
+                  </p>
+                </div>
+              </div>
+
+              {backupRestoreData ? (
+                /* Restore File Preview & Confirmation */
+                <div className="p-4 bg-sky-50/70 border border-sky-200 rounded-xl space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-sky-700 block">ရွေးချယ်ထားသော ဖိုင်</span>
+                      <strong className="text-xs sm:text-sm text-slate-900 block truncate max-w-xs">{backupFileName}</strong>
+                      <span className="text-[10px] text-slate-500">
+                        ထုတ်ယူခဲ့သည့်ရက်: {new Date(backupRestoreData.meta.exportedAt).toLocaleString('my-MM')}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setBackupRestoreData(null)}
+                      className="text-xs text-rose-600 hover:underline font-semibold cursor-pointer"
+                    >
+                      ဖယ်ရှားမည်
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs bg-white p-2.5 rounded-lg border border-sky-100">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">ကျောင်းများ</span>
+                      <strong className="text-sky-900 font-bold">{backupRestoreData.counts.schools}</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">ကြေညာချက်</span>
+                      <strong className="text-sky-900 font-bold">{backupRestoreData.counts.announcements}</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">အသင်းများ</span>
+                      <strong className="text-sky-900 font-bold">{backupRestoreData.counts.associations}</strong>
+                    </div>
+                  </div>
+
+                  {/* Restore Mode selection */}
+                  <div className="space-y-1.5 pt-1">
+                    <label className="text-[11px] font-bold text-slate-700 block">Restore ပြုလုပ်မည့် ပုံစံ:</label>
+                    <div className="flex items-center gap-4 text-xs">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="restoreMode"
+                          checked={restoreMode === 'merge'}
+                          onChange={() => setRestoreMode('merge')}
+                          className="text-sky-600 cursor-pointer"
+                        />
+                        <span>Merge (ရှိပြီးသားကို မဖျက်ဘဲ ပေါင်းထည့်မည်)</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="restoreMode"
+                          checked={restoreMode === 'skip'}
+                          onChange={() => setRestoreMode('skip')}
+                          className="text-sky-600 cursor-pointer"
+                        />
+                        <span>Replace (အသစ်ဖြင့် အစားထိုးမည်)</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleExecuteRestore}
+                    disabled={isRestoringBackup}
+                    className="w-full bg-sky-900 hover:bg-sky-800 text-white font-bold py-2.5 px-4 rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
+                  >
+                    <CheckCircle className="w-4 h-4 text-emerald-400" />
+                    <span>{isRestoringBackup ? 'ဒေတာများ ပြန်သွင်းနေပါသည်...' : 'Restore အတည်ပြု စတင်မည်'}</span>
+                  </button>
+                </div>
+              ) : (
+                /* Select JSON file */
+                <div className="space-y-3">
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    ယခင်ရယူထားသော <code>.json</code> Backup ဖိုင်ကို ရွေးချယ်ပေးပါက ဖိုင်အတွင်းပါရှိသော ဒေတာအရေအတွက်ကို ဦးစွာ စစ်ဆေးပြသပေးမည် ဖြစ်ပါသည်။
+                  </p>
+
+                  <label className="border-2 border-dashed border-slate-300 hover:border-sky-400 rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition bg-slate-50/50 hover:bg-sky-50/30">
+                    <FileJson className="w-8 h-8 text-sky-600" />
+                    <span className="text-xs font-bold text-slate-800">
+                      .json Backup ဖိုင် ရွေးချယ်ပါ
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      (ကွန်ပျူတာ သို့မဟုတ် ဖုန်းထဲမှ ဖိုင်အား နှိပ်၍ ရွေးချယ်ပါ)
+                    </span>
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={handleSelectBackupFile}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* SECTION 3: Cloudinary Setup Form */}
+          <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-amber-50 text-amber-700">
+                  <Cloud className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-base sm:text-lg text-slate-900 flex items-center gap-2">
+                    <span>၃။ Cloudinary Media Storage ချိန်ညှိမှု (Image Upload Setup)</span>
+                    {isCloudinaryConfigured() ? (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                        ချိတ်ဆက်ထားပြီး ✓
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                        မသတ်မှတ်ရသေး
+                      </span>
+                    )}
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    ကျောင်း Logo၊ အသင်းတံဆိပ်နှင့် ကြေညာချက် ဓာတ်ပုံများကို ကွန်ပျူတာ/ဖုန်းထဲမှ တိုက်ရိုက် Upload တင်နိုင်စေရန် Cloudinary နှင့် ချိတ်ဆက်ခြင်း
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveCloudinary} className="space-y-4 max-w-2xl">
+              <div className="grid sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    Cloud Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={cloudinaryCloudName}
+                    onChange={(e) => setCloudinaryCloudName(e.target.value)}
+                    placeholder="ဥပမာ - dhmc9ikzl"
+                    className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-amber-500 outline-hidden font-mono"
+                  />
+                  <span className="text-[11px] text-slate-400 mt-1 block">
+                    Cloudinary ရှိ Cloud Name (သင့်အကောင့်: dhmc9ikzl)
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    Upload Preset (Unsigned) *
+                  </label>
+                  <input
+                    type="text"
+                    value={cloudinaryPreset}
+                    onChange={(e) => setCloudinaryPreset(e.target.value)}
+                    placeholder="ဥပမာ - ssspsinfo_preset"
+                    className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-amber-500 outline-hidden font-mono"
+                  />
+                  <span className="text-[11px] text-slate-400 mt-1 block">
+                    Settings &gt; Upload &gt; Upload presets (Unsigned)
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    Folder Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={cloudinaryFolder}
+                    onChange={(e) => setCloudinaryFolder(e.target.value)}
+                    placeholder="ssspsinfo"
+                    className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-amber-500 outline-hidden font-mono"
+                  />
+                  <span className="text-[11px] text-slate-400 mt-1 block">
+                    ပုံများ စုစည်းသိမ်းမည့် Folder (ဥပမာ - ssspsinfo)
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-4 bg-sky-50/70 border border-sky-200 rounded-xl text-xs text-sky-950 space-y-2">
+                <span className="font-bold text-sky-900 block flex items-center gap-1.5">
+                  <span>💡</span>
+                  <span>Cloudinary ထဲရှိ "{cloudinaryFolder || 'ssspsinfo'}" Folder နှင့် ချိတ်ဆက်ရန် လမ်းညွှန်:</span>
+                </span>
+                <ol className="list-decimal list-inside space-y-1.5 text-[11px] text-sky-900/90 leading-relaxed">
+                  <li>Cloudinary မျက်နှာပြင် ဘယ်ဘက်အောက်ထောင့်ရှိ <strong>⚙️ Settings (စက်သွားပုံ)</strong> ကို နှိပ်ပါ။</li>
+                  <li>ဘယ်ဘက် Menu ရှိ <strong>Upload</strong> (သို့မဟုတ် <strong>Upload Presets</strong>) သို့ သွားပါ။</li>
+                  <li><strong>Add upload preset</strong> ခလုတ်ကို နှိပ်ပါ။</li>
+                  <li>
+                    <strong>Signing Mode</strong> ကို မဖြစ်မနေ <span className="font-bold text-amber-700 bg-amber-100 px-1 py-0.5 rounded">Unsigned</span> သို့ ရွေးချယ်ပြောင်းလဲပါ (Signed မထားရပါ)။
+                  </li>
+                  <li><strong>Folder</strong> အကွက်တွင် <span className="font-mono font-bold bg-white px-1.5 py-0.5 rounded border border-sky-300">{cloudinaryFolder || 'ssspsinfo'}</span> ဟု ရိုက်ထည့်ပါ။</li>
+                  <li>ညာဘက်အပေါ်ရှိ <strong>Save</strong> ကို နှိပ်ပြီး ထွက်လာသော Preset အမည် (ဥပမာ - ssspsinfo_preset) ကို အထက်ပါ Upload Preset အကွက်တွင် ထည့်သွင်းသိမ်းဆည်းပါ။</li>
+                </ol>
+              </div>
+
+              <button
+                type="submit"
+                className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-6 py-2.5 rounded-xl text-xs sm:text-sm transition cursor-pointer flex items-center gap-2 shadow-xs"
+              >
+                {isCloudinarySaved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                <span>{isCloudinarySaved ? 'သိမ်းဆည်းပြီးပါပြီ!' : 'Cloudinary ချိန်ညှိချက် သိမ်းမည်'}</span>
+              </button>
+            </form>
           </div>
         </div>
       )}
