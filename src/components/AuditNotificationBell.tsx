@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth, db } from '../lib/firebase';
 import { AuditLog } from '../types';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -19,12 +20,26 @@ import {
   Check,
 } from 'lucide-react';
 
+import { getAdminSession } from '../lib/adminAuth';
+
 const STORAGE_READ_KEY = 'pss_last_read_audit_timestamp';
 
 export const AuditNotificationBell: React.FC = () => {
+  const [user] = useAuthState(auth);
+  const [session, setSession] = useState(getAdminSession());
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const handleAuthChange = () => {
+      setSession(getAdminSession());
+    };
+    window.addEventListener('sssps_admin_auth_changed', handleAuthChange);
+    return () => window.removeEventListener('sssps_admin_auth_changed', handleAuthChange);
+  }, []);
+
+  const isAuthed = session.isLoggedIn || !!user;
   const [lastReadTimestamp, setLastReadTimestamp] = useState<string>(() => {
     try {
       return localStorage.getItem(STORAGE_READ_KEY) || '';
@@ -36,8 +51,14 @@ export const AuditNotificationBell: React.FC = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  // Real-time listener for recent 10 audit logs
+  // Real-time listener for recent 10 audit logs (only active for authenticated users)
   useEffect(() => {
+    if (!isAuthed) {
+      setLogs([]);
+      setUnreadCount(0);
+      return;
+    }
+
     const q = query(collection(db, 'audit_logs'), orderBy('createdAt', 'desc'), limit(10));
 
     const unsubscribe = onSnapshot(
@@ -63,13 +84,18 @@ export const AuditNotificationBell: React.FC = () => {
         }
       },
       (error) => {
-        // Benign error handler
-        console.warn('Audit logs subscription error:', error);
+        // Silently handle if permission is not yet granted or during signout transition
+        if (error.code === 'permission-denied') {
+          setLogs([]);
+          setUnreadCount(0);
+          return;
+        }
+        console.warn('Audit logs subscription notice:', error.message || error);
       }
     );
 
     return () => unsubscribe();
-  }, [lastReadTimestamp]);
+  }, [user, lastReadTimestamp]);
 
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -86,6 +112,11 @@ export const AuditNotificationBell: React.FC = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isOpen]);
+
+  // If visitor is not signed in, do not render administrative notification bell
+  if (!isAuthed) {
+    return null;
+  }
 
   const handleToggle = () => {
     if (!isOpen) {

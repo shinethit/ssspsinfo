@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { collection, getDocs, addDoc, deleteDoc, doc, setDoc, writeBatch, updateDoc, query, orderBy } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -55,7 +55,9 @@ import {
   ArrowDownToLine,
   Settings as SettingsIcon,
   Cloud,
+  LogOut,
 } from 'lucide-react';
+import { getAdminSession, clearAdminSession } from '../lib/adminAuth';
 import { downloadSchoolTemplate, normalizeSchoolRow, exportSchoolsToExcel } from '../lib/excel';
 import ImageUploadDropzone from '../components/ImageUploadDropzone';
 import { getCloudinaryConfig, saveCloudinaryConfig, isCloudinaryConfigured } from '../lib/cloudinary';
@@ -243,8 +245,16 @@ export default function Admin() {
   const [editingTickerId, setEditingTickerId] = useState<string | null>(null);
   const [submittingTicker, setSubmittingTicker] = useState(false);
 
-  // Router search params
+  // Router search params & navigation
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [adminSession, setAdminSessionState] = useState(getAdminSession());
+
+  const handleLogout = () => {
+    clearAdminSession();
+    toast.info('Admin အကောင့်မှ အောင်မြင်စွာ ထွက်ခွာပြီးပါပြီ');
+    navigate('/login');
+  };
 
   // School editing & search state
   const [editingSchoolId, setEditingSchoolId] = useState<string | null>(null);
@@ -466,7 +476,7 @@ export default function Admin() {
         contactNumbers: cleanPhones,
         adminPhones: cleanPhones,
         note: newAdminNote.trim(),
-        addedBy: auth.currentUser?.email || 'Super Admin',
+        addedBy: auth.currentUser?.email || adminSession.email || 'Super Admin',
         createdAt: new Date().toISOString(),
       });
       await recordAuditLog({
@@ -638,7 +648,7 @@ export default function Admin() {
           appName: 'ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း — သတင်းနှင့် ပြန်ကြားရေးဌာန',
           version: '2.1',
           exportedAt: new Date().toISOString(),
-          exportedBy: auth.currentUser?.email || 'Admin',
+          exportedBy: auth.currentUser?.email || adminSession.email || 'Admin',
         },
         counts: {
           schools: schoolsSnap.docs.length,
@@ -1695,9 +1705,33 @@ export default function Admin() {
       {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
-          <h2 className="text-3xl font-extrabold text-sky-950">အက်ဒမင် ဧရိယာ (Admin Area)</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-sky-950">အက်ဒမင် ဧရိယာ (Admin Area)</h2>
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+              <ShieldCheck className="w-3.5 h-3.5" /> Super Admin
+            </span>
+          </div>
           <p className="text-slate-500 text-sm mt-1">အသင်းများ၊ ကြေညာချက်များ၊ အသင်းဝင်ကျောင်းများ၊ အက်ဒမင်များနှင့် လုပ်ဆောင်ချက် မှတ်တမ်းများ</p>
+          <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-500">
+            <span className="font-semibold text-sky-900">{adminSession.email || 'khunthanshwe@gmail.com'}</span>
+            <span>•</span>
+            <span className="text-slate-400">စနစ်ထိန်းချုပ်ခွင့် အပြည့်အစုံ ရရှိထားပါသည်</span>
+          </div>
         </div>
+
+        {/* Header Right Actions */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition cursor-pointer shadow-2xs"
+            title="Admin အကောင့်မှ ထွက်ခွာမည်"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>အကောင့်ထွက်မည် (Logout)</span>
+          </button>
+        </div>
+      </div>
 
         {/* Tab Buttons */}
         <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200 w-full sm:w-auto">
@@ -1805,7 +1839,6 @@ export default function Admin() {
             <span>အရန်သိမ်း/ပြန်ယူ (Backup)</span>
           </button>
         </div>
-      </div>
 
       {/* Summary Stat Cards for Quick Overview */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
