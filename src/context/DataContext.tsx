@@ -17,8 +17,8 @@ import { School, Announcement, Association, DEFAULT_SCHOOL_LEVELS, SchoolLevelIt
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { toast } from 'sonner';
 
-const CACHE_KEY = 'pss_offline_data_cache_v3';
-const CACHE_TIMESTAMP_KEY = 'pss_last_sync_timestamp_v3';
+const CACHE_KEY = 'pss_offline_data_cache_v5';
+const CACHE_TIMESTAMP_KEY = 'pss_last_sync_timestamp_v5';
 const LEVELS_CACHE_KEY = 'pss_school_levels_cache_v2';
 
 export const getDefaultSchoolLevels = (): SchoolLevelItem[] => {
@@ -140,25 +140,29 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // 1. Initial Load: Read from LocalStorage immediately (0ms delay)
   useEffect(() => {
     try {
-      // Check v3 cache first, fallback to v2 if present
-      const cachedRaw = localStorage.getItem(CACHE_KEY) || localStorage.getItem('pss_offline_data_cache_v2');
-      const cachedTime = localStorage.getItem(CACHE_TIMESTAMP_KEY) || localStorage.getItem('pss_last_sync_timestamp');
+      // Note: Do NOT delete v2 or prior caches, as they might hold the user's authentic offline data!
+      // Only remove the temporary v3/v4 dummy caches if needed
+      localStorage.removeItem('pss_offline_data_cache_v3');
+      localStorage.removeItem('pss_offline_data_cache_v4');
+
+      const cachedRaw = localStorage.getItem(CACHE_KEY);
+      const cachedTime = localStorage.getItem(CACHE_TIMESTAMP_KEY);
 
       if (cachedRaw) {
         const parsed: CachePayload = JSON.parse(cachedRaw);
-        if (Array.isArray(parsed.schools) && parsed.schools.length > 0) {
+        if (Array.isArray(parsed.schools)) {
           setSchools(parsed.schools);
         }
-        if (Array.isArray(parsed.announcements) && parsed.announcements.length > 0) {
+        if (Array.isArray(parsed.announcements)) {
           setAnnouncements(sortAnnouncementsByEventDate(parsed.announcements));
         }
-        if (Array.isArray(parsed.associations) && parsed.associations.length > 0) {
+        if (Array.isArray(parsed.associations)) {
           setAssociations(parsed.associations);
         }
+
         if (cachedTime) {
           setLastSyncTime(parseInt(cachedTime, 10));
         }
-        // Data present, unblock immediately
         setLoading(false);
       }
     } catch (e) {

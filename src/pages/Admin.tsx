@@ -62,6 +62,7 @@ import { getAdminSession, clearAdminSession, changeAdminPassword } from '../lib/
 import { downloadSchoolTemplate, normalizeSchoolRow, exportSchoolsToExcel } from '../lib/excel';
 import ImageUploadDropzone from '../components/ImageUploadDropzone';
 import { getCloudinaryConfig, saveCloudinaryConfig, isCloudinaryConfigured } from '../lib/cloudinary';
+import { findRecoverableCache, restoreRecoveredCacheToFirestore, RecoverableCacheData } from '../lib/cacheRecovery';
 
 const announcementSchema = z.object({
   title: z.string().min(1, 'ခေါင်းစဉ် လိုအပ်သည်'),
@@ -179,6 +180,8 @@ export default function Admin() {
   const [backupRestoreData, setBackupRestoreData] = useState<any | null>(null);
   const [restoreMode, setRestoreMode] = useState<'merge' | 'skip'>('merge');
   const [backupFileName, setBackupFileName] = useState('');
+  const [recoverableCache, setRecoverableCache] = useState<RecoverableCacheData | null>(null);
+  const [isRestoringCache, setIsRestoringCache] = useState(false);
 
   // Cloudinary settings state
   const [cloudinaryCloudName, setCloudinaryCloudName] = useState(() => getCloudinaryConfig().cloudName);
@@ -843,6 +846,52 @@ export default function Admin() {
       toast.error('Restore ပြုလုပ်ရာတွင် အမှားဖြစ်ပွားပါသည်');
     } finally {
       setIsRestoringBackup(false);
+    }
+  };
+
+  // Check for any recoverable cache from previous sessions
+  useEffect(() => {
+    const found = findRecoverableCache();
+    if (found) {
+      setRecoverableCache(found);
+    }
+  }, []);
+
+  const handleScanCacheManually = () => {
+    const found = findRecoverableCache();
+    if (found) {
+      setRecoverableCache(found);
+      toast.success(`Browser Cache ထဲမှ ကျောင်း (${found.schools.length}) ခု၊ ကြေညာချက် (${found.announcements.length}) ခု ရှာတွေ့ပါသည်!`);
+    } else {
+      toast.info('Browser Cache ထဲတွင် သိမ်းဆည်းထားသော အချက်အလက် မတွေ့ရှိပါ');
+    }
+  };
+
+  const handleRestoreFromCache = async () => {
+    if (!recoverableCache) return;
+    const confirmMsg = `သတိပေးချက်: Browser Cache ထဲမှ ရှာတွေ့ထားသော ကျောင်း (${recoverableCache.schools.length}) ခု၊ ကြေညာချက် (${recoverableCache.announcements.length}) ခုကို Database သို့ ပြန်လည် သိမ်းဆည်းပါမည်။ သေချာပါသလား?`;
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      setIsRestoringCache(true);
+      toast.info('Cache မှ ဒေတာများ ပြန်လည်ရေးသွင်းနေပါသည်...');
+      const res = await restoreRecoveredCacheToFirestore(recoverableCache);
+      await recordAuditLog({
+        action: 'create',
+        entityType: 'school',
+        details: `Browser Cache (${recoverableCache.sourceKey}) မှ ဒေတာများအား Restore ပြန်လည်ဆယ်ယူခဲ့သည် (ကျောင်း: ${res.schoolsRestored}၊ ကြေညာချက်: ${res.announcementsRestored})`,
+      });
+      toast.success(`ကျောင်း (${res.schoolsRestored}) ခုအား Database သို့ အောင်မြင်စွာ ပြန်လည် သိမ်းဆည်းပြီးပါပြီ!`);
+      setRecoverableCache(null);
+      fetchSchools();
+      fetchAnnouncements();
+      fetchAssociations();
+      fetchAuditLogs();
+    } catch (err: any) {
+      console.error(err);
+      toast.error('Cache မှ ဒေတာ ပြန်ယူရာတွင် အမှားဖြစ်ပွားပါသည်');
+    } finally {
+      setIsRestoringCache(false);
     }
   };
 
@@ -5076,6 +5125,66 @@ export default function Admin() {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* SECTION 2.5: Emergency LocalStorage Cache Recovery */}
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 p-6 sm:p-7 rounded-2xl shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200/60 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-amber-100 text-amber-800">
+                  <ShieldAlert className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-base sm:text-lg text-amber-950 flex items-center gap-2">
+                    အရေးပေါ် Browser Cache မှ ဒေတာ ပြန်လည်ရှာဖွေခြင်း (Emergency Cache Recovery)
+                  </h4>
+                  <p className="text-xs text-amber-800/80 mt-0.5">
+                    အကယ်၍ လူကြီးမင်းသည် ယခင်က ဒေတာများ သွင်းယူထားဖူးပါက Browser ၏ Local Storage ထဲတွင် ကျန်ရှိနေသော ဒေတာများအား အလိုအလျောက် ရှာဖွေပြီး Database ထဲသို့ ပြန်လည် ကယ်တင်နိုင်ပါသည်
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleScanCacheManually}
+                className="px-4 py-2 bg-white border border-amber-300 text-amber-900 text-xs font-bold rounded-xl hover:bg-amber-100/50 transition flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Browser Cache စစ်ဆေးရန်
+              </button>
+            </div>
+
+            {recoverableCache ? (
+              <div className="bg-white border border-amber-300 p-5 rounded-xl space-y-3">
+                <div className="flex items-center gap-2 text-emerald-700 font-bold text-sm">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                  <span>Browser Cache ထဲမှ ကျောင်းစာရင်း ({recoverableCache.schools.length}) ခု၊ ကြေညာချက် ({recoverableCache.announcements.length}) ခု တွေ့ရှိထားပါသည်!</span>
+                </div>
+                <p className="text-xs text-slate-600">
+                  ဤဒေတာများသည် ယခင် session မှ Browser Local Storage ထဲတွင် သိမ်းဆည်းကျန်ရှိနေခဲ့သော အချက်အလက်များ ဖြစ်ပါသည်။ အောက်ပါခလုတ်ကို နှိပ်၍ Cloud Firestore Database ထဲသို့ တိုက်ရိုက် ပြန်လည်သိမ်းဆည်းနိုင်ပါသည်။
+                </p>
+                <div className="flex flex-wrap items-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleRestoreFromCache}
+                    disabled={isRestoringCache}
+                    className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-xs flex items-center gap-2 cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    {isRestoringCache ? 'Database သို့ ပြန်လည် ရေးသွင်းနေပါသည်...' : 'Database သို့ ယခု ပြန်လည် သိမ်းဆည်းမည် (Restore)'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRecoverableCache(null)}
+                    className="px-4 py-2 bg-slate-100 text-slate-600 font-medium text-xs rounded-xl hover:bg-slate-200 transition cursor-pointer"
+                  >
+                    ပိတ်မည်
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-xs text-amber-900/70 bg-white/60 p-4 rounded-xl border border-amber-200/50">
+                အချက်အလက်များကို Database သို့ အချိန်မရွေး လုံခြုံစွာ ပြန်လည်သွင်းယူနိုင်ရန် လူကြီးမင်းထံရှိသော မူလ <strong>.xlsx Excel ဖိုင်</strong> သို့မဟုတ် <strong>.json Backup ဖိုင်</strong> ကို အထက်ပါ ကဏ္ဍများမှတစ်ဆင့် ပြန်လည် ရွေးချယ်တင်သွင်းနိုင်ပါသည်။
+              </div>
+            )}
           </div>
 
           {/* SECTION 3: Cloudinary Setup Form */}
