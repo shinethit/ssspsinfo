@@ -56,8 +56,9 @@ import {
   Settings as SettingsIcon,
   Cloud,
   LogOut,
+  KeyRound,
 } from 'lucide-react';
-import { getAdminSession, clearAdminSession } from '../lib/adminAuth';
+import { getAdminSession, clearAdminSession, changeAdminPassword } from '../lib/adminAuth';
 import { downloadSchoolTemplate, normalizeSchoolRow, exportSchoolsToExcel } from '../lib/excel';
 import ImageUploadDropzone from '../components/ImageUploadDropzone';
 import { getCloudinaryConfig, saveCloudinaryConfig, isCloudinaryConfigured } from '../lib/cloudinary';
@@ -254,6 +255,41 @@ export default function Admin() {
     clearAdminSession();
     toast.info('Admin အကောင့်မှ အောင်မြင်စွာ ထွက်ခွာပြီးပါပြီ');
     navigate('/login');
+  };
+
+  // Admin Password Management Modal State
+  const [isChangingPassModal, setIsChangingPassModal] = useState(false);
+  const [targetChangePassEmail, setTargetChangePassEmail] = useState('khunthanshwe@gmail.com');
+  const [newAdminPasswordInput, setNewAdminPasswordInput] = useState('');
+  const [savingNewPassword, setSavingNewPassword] = useState(false);
+
+  const handleSaveNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAdminPasswordInput.trim() || newAdminPasswordInput.trim().length < 4) {
+      toast.error('စကားဝှက်သည် အနည်းဆုံး စာလုံး ၄ လုံး ရှိရပါမည်');
+      return;
+    }
+    setSavingNewPassword(true);
+    try {
+      const res = await changeAdminPassword(targetChangePassEmail, newAdminPasswordInput);
+      if (!res.success) {
+        toast.error(res.error || 'စကားဝှက် ပြောင်း၍ မရပါ');
+        return;
+      }
+      await recordAuditLog({
+        action: 'update',
+        entityType: 'admin',
+        entityName: targetChangePassEmail,
+        details: `"${targetChangePassEmail}" ၏ စကားဝှက် (Password) အား အသစ်ပြောင်းလဲခဲ့သည်`,
+      });
+      toast.success(`"${targetChangePassEmail}" ၏ စကားဝှက်ကို အောင်မြင်စွာ ပြောင်းလဲလိုက်ပါပြီ`);
+      setIsChangingPassModal(false);
+      setNewAdminPasswordInput('');
+    } catch (err: any) {
+      toast.error('စကားဝှက် ပြောင်းလဲရာတွင် အမှားဖြစ်ပွားပါသည်');
+    } finally {
+      setSavingNewPassword(false);
+    }
   };
 
   // School editing & search state
@@ -4399,9 +4435,23 @@ export default function Admin() {
                     </p>
                   </div>
                 </div>
-                <span className="text-[11px] font-semibold text-amber-800 bg-amber-100/80 px-3 py-1 rounded-lg self-start sm:self-center">
-                  Protected System Admin
-                </span>
+                <div className="flex items-center gap-2 self-start sm:self-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTargetChangePassEmail('khunthanshwe@gmail.com');
+                      setNewAdminPasswordInput('');
+                      setIsChangingPassModal(true);
+                    }}
+                    className="text-xs font-bold text-sky-900 bg-sky-100 hover:bg-sky-200 px-3 py-1.5 rounded-xl border border-sky-300 transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <KeyRound className="w-3.5 h-3.5" />
+                    <span>စကားဝှက် ပြောင်းမည်</span>
+                  </button>
+                  <span className="text-[11px] font-semibold text-amber-800 bg-amber-100/80 px-3 py-1 rounded-lg">
+                    Protected Super Admin
+                  </span>
+                </div>
               </div>
 
               {/* Dynamic Added Admins List */}
@@ -4483,15 +4533,30 @@ export default function Admin() {
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteAdmin(adm)}
-                      className="text-xs px-3 py-1.5 rounded-xl font-bold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition cursor-pointer flex items-center gap-1.5 shadow-2xs self-start sm:self-center"
-                      title="အက်ဒမင် စီမံခွင့် ပယ်ဖျက်ရန်"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>ဖယ်ရှားမည်</span>
-                    </button>
+                    <div className="flex items-center gap-2 self-start sm:self-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTargetChangePassEmail(adm.email);
+                          setNewAdminPasswordInput('');
+                          setIsChangingPassModal(true);
+                        }}
+                        className="text-xs px-3 py-1.5 rounded-xl font-bold bg-sky-50 text-sky-800 border border-sky-200 hover:bg-sky-100 transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                        title="စကားဝှက် ပြောင်းလဲရန်"
+                      >
+                        <KeyRound className="w-3.5 h-3.5" />
+                        <span>စကားဝှက်</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteAdmin(adm)}
+                        className="text-xs px-3 py-1.5 rounded-xl font-bold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                        title="အက်ဒမင် စီမံခွင့် ပယ်ဖျက်ရန်"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>ဖယ်ရှားမည်</span>
+                      </button>
+                    </div>
                   </div>
                 ))
               )}
@@ -5102,6 +5167,80 @@ export default function Admin() {
                 {isCloudinarySaved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
                 <span>{isCloudinarySaved ? 'သိမ်းဆည်းပြီးပါပြီ!' : 'Cloudinary ချိန်ညှိချက် သိမ်းမည်'}</span>
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Password Management Modal */}
+      {isChangingPassModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-sky-100 text-sky-800 rounded-xl">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900">
+                    စကားဝှက် ပြောင်းလဲရန် (Change Password)
+                  </h3>
+                  <p className="text-xs text-slate-500 font-mono mt-0.5">
+                    {targetChangePassEmail}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsChangingPassModal(false);
+                  setNewAdminPasswordInput('');
+                }}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveNewPassword} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  စကားဝှက် အသစ် (New Password)
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="စကားဝှက်အသစ် ရိုက်ထည့်ပါ (အနည်းဆုံး ၄ လုံး)"
+                  value={newAdminPasswordInput}
+                  onChange={(e) => setNewAdminPasswordInput(e.target.value)}
+                  className="w-full p-3 bg-white border border-slate-300 rounded-xl text-sm text-slate-900 focus:border-sky-500 outline-hidden font-mono"
+                  autoFocus
+                />
+                <span className="text-[11px] text-slate-500 mt-1 block">
+                  အနည်းဆုံး စာလုံး ၄ လုံး သတ်မှတ်ပေးပါ။ သိမ်းဆည်းပြီးပါက ဤစကားဝှက်ဖြင့် ဝင်ရောက်နိုင်ပါမည်။
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsChangingPassModal(false);
+                    setNewAdminPasswordInput('');
+                  }}
+                  className="flex-1 py-2.5 px-4 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                >
+                  မလုပ်တော့ပါ (Cancel)
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingNewPassword}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-sky-900 hover:bg-sky-950 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md disabled:opacity-60"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{savingNewPassword ? 'သိမ်းဆည်းနေပါသည်...' : 'စကားဝှက် သိမ်းမည်'}</span>
+                </button>
+              </div>
             </form>
           </div>
         </div>
