@@ -1298,12 +1298,16 @@ export default function Admin() {
 
   const onSchoolSubmit = async (data: any) => {
     try {
-      const cleanStudentCount = data.studentCount !== undefined && data.studentCount !== ''
+      const rawCount = (data.studentCount !== undefined && data.studentCount !== '' && data.studentCount !== null)
         ? Number(String(data.studentCount).replace(/[^0-9]/g, ''))
-        : undefined;
+        : null;
+      const cleanStudentCount = (rawCount !== null && !isNaN(rawCount)) ? rawCount : null;
 
-      const cleanFeeAmount = data.feeAmount !== undefined && data.feeAmount !== ''
+      const rawFee = (data.feeAmount !== undefined && data.feeAmount !== '' && data.feeAmount !== null)
         ? Number(String(data.feeAmount).replace(/[^0-9]/g, ''))
+        : null;
+      const cleanFeeAmount = (rawFee !== null && !isNaN(rawFee))
+        ? rawFee
         : (getStudentRangeTier(data.studentRange)?.defaultFee ?? 200000);
 
       const cleanSchoolPhones = extraSchoolPhones.map(p => p.trim()).filter(Boolean);

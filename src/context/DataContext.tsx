@@ -12,7 +12,7 @@ import {
   setDoc,
   getDoc,
 } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, cleanFirestoreData } from '../lib/firebase';
 import { School, Announcement, Association, DEFAULT_SCHOOL_LEVELS, SchoolLevelItem } from '../types';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { toast } from 'sonner';
@@ -351,7 +351,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
 
       // 1. Write to Firestore
-      const docRef = await addDoc(collection(db, 'schools'), payload);
+      const cleanPayload = cleanFirestoreData(payload);
+      const docRef = await addDoc(collection(db, 'schools'), cleanPayload);
       const newSchool: School = {
         id: docRef.id,
         ...payload,
@@ -384,7 +385,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       // 2. Write to Firestore
-      await updateDoc(doc(db, 'schools', id), payload);
+      const cleanPayload = cleanFirestoreData(payload);
+      await updateDoc(doc(db, 'schools', id), cleanPayload);
     },
     [announcements, associations, persistCache]
   );
@@ -406,7 +408,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const addAnnouncement = useCallback(
     async (data: Omit<Announcement, 'id'>): Promise<string> => {
-      const docRef = await addDoc(collection(db, 'announcements'), data);
+      const cleanData = cleanFirestoreData(data);
+      const docRef = await addDoc(collection(db, 'announcements'), cleanData);
       const newAnnouncement: Announcement = {
         id: docRef.id,
         ...data,
@@ -431,7 +434,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return next;
       });
 
-      await updateDoc(doc(db, 'announcements', id), data);
+      const cleanData = cleanFirestoreData(data);
+      await updateDoc(doc(db, 'announcements', id), cleanData);
     },
     [schools, associations, persistCache]
   );

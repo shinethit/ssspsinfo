@@ -1,9 +1,12 @@
 {
-  "apiKey": "AIzaSyBfH74OIc-8mJIPTjjFhD7JDwkMWBWcC_E",
-  "authDomain": "southernshanstatepsinfo.firebaseapp.com",
-  "projectId": "southernshanstatepsinfo",
-  "storageBucket": "southernshanstatepsinfo.firebasestorage.app",
-  "messagingSenderId": "474970491001",
-  "appId": "1:474970491001:web:4bb740401f9e9fb73aaca8",
-  "firestoreDatabaseId": "(default)"
+  "projectId": "micro-atom-nds98",
+  "appId": "1:888610679803:web:5f58274effd6a42086f95e",
+  "apiKey": "AIzaSyAgW-MsEAc-DZS5Us9jXStlllffbxoMlx8",
+  "authDomain": "micro-atom-nds98.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-infosharingwebap-de10e69b-8947-4878-984a-92e5987456f1",
+  "storageBucket": "micro-atom-nds98.firebasestorage.app",
+  "messagingSenderId": "888610679803",
+  "measurementId": "",
+  "oAuthClientId": "888610679803-rt0mjeijiu201qf0i4ultedci1psjsv9.apps.googleusercontent.com",
+  "recaptchaSiteKey": ""
 }
