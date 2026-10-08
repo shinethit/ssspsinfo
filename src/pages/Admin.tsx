@@ -1759,6 +1759,19 @@ export default function Admin() {
         <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
+            onClick={() => {
+              setTargetChangePassEmail(adminSession.email || 'khunthanshwe@gmail.com');
+              setNewAdminPasswordInput('');
+              setIsChangingPassModal(true);
+            }}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-300 rounded-xl transition cursor-pointer shadow-2xs"
+            title="အက်ဒမင် စကားဝှက် ပြောင်းလဲမည်"
+          >
+            <KeyRound className="w-4 h-4 text-sky-700" />
+            <span>စကားဝှက် ပြောင်းမည်</span>
+          </button>
+          <button
+            type="button"
             onClick={handleLogout}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition cursor-pointer shadow-2xs"
             title="Admin အကောင့်မှ ထွက်ခွာမည်"

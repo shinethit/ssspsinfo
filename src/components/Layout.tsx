@@ -37,7 +37,7 @@ export default function Layout() {
 
   const utilityLinks = [
     { to: '/admin', label: 'အက်ဒမင် ဧရိယာ', labelEn: 'Admin Portal', icon: ShieldCheck, badge: 'Admin' },
-    { to: '/versions', label: 'ဗားရှင်းမှတ်တမ်း', labelEn: 'Version History', icon: History, badge: 'v2.1' },
+    { to: '/versions', label: 'ဗားရှင်းမှတ်တမ်း', labelEn: 'Version History', icon: History, badge: 'v2.3' },
   ];
 
   const closeSidebar = () => setSidebarOpen(false);
@@ -95,7 +95,7 @@ export default function Layout() {
               onClick={closeSidebar}
               className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition shadow-2xs"
             >
-              <Sparkles className="w-3.5 h-3.5" /> v2.1
+              <Sparkles className="w-3.5 h-3.5" /> v2.3
             </Link>
 
             <Link
@@ -220,7 +220,7 @@ export default function Layout() {
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-sky-950">System Version</span>
               <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
-                v2.1 (Fee Analytics & Realtime Sync)
+                v2.3 (Admin Security & Password Control)
               </span>
             </div>
             <p className="text-[11px] text-slate-500 leading-normal">
@@ -260,7 +260,7 @@ export default function Layout() {
             </p>
             <div className="flex items-center gap-4 text-xs text-slate-500">
               <Link to="/versions" className="hover:text-sky-800 transition underline">
-                Version v2.1
+                Version v2.3
               </Link>
               <span>•</span>
               <p>© 2026 All rights reserved</p>
