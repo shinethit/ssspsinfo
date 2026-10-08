@@ -18,6 +18,7 @@ import {
 import NewsTickerBar from './NewsTickerBar';
 import { PWAInstallButton } from './PWAInstallButton';
 import { OfflineIndicator } from './OfflineIndicator';
+import { OfflineSyncStatusBadge } from './OfflineSyncStatusBadge';
 import { VersionUpdateModal } from './VersionUpdateModal';
 import { AuditNotificationBell } from './AuditNotificationBell';
 
@@ -36,7 +37,7 @@ export default function Layout() {
 
   const utilityLinks = [
     { to: '/admin', label: 'အက်ဒမင် ဧရိယာ', labelEn: 'Admin Portal', icon: ShieldCheck, badge: 'Admin' },
-    { to: '/versions', label: 'ဗားရှင်းမှတ်တမ်း', labelEn: 'Version History', icon: History, badge: 'v1.9' },
+    { to: '/versions', label: 'ဗားရှင်းမှတ်တမ်း', labelEn: 'Version History', icon: History, badge: 'v2.1' },
   ];
 
   const closeSidebar = () => setSidebarOpen(false);
@@ -78,8 +79,11 @@ export default function Layout() {
             </Link>
           </div>
 
-          {/* Right: Notification Bell, PWA Install, Quick Version Tag & Admin Shortcut */}
+          {/* Right: Offline Sync, Notification Bell, PWA Install, Quick Version Tag & Admin Shortcut */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Offline Sync State Badge & Manual Sync */}
+            <OfflineSyncStatusBadge compact />
+
             {/* Audit Logs Notification Bell Icon */}
             <AuditNotificationBell />
 
@@ -91,7 +95,7 @@ export default function Layout() {
               onClick={closeSidebar}
               className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition shadow-2xs"
             >
-              <Sparkles className="w-3.5 h-3.5" /> v1.9
+              <Sparkles className="w-3.5 h-3.5" /> v2.1
             </Link>
 
             <Link
@@ -216,7 +220,7 @@ export default function Layout() {
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-sky-950">System Version</span>
               <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
-                v1.9 (PWA)
+                v2.1 (Fee Analytics & Realtime Sync)
               </span>
             </div>
             <p className="text-[11px] text-slate-500 leading-normal">
@@ -256,7 +260,7 @@ export default function Layout() {
             </p>
             <div className="flex items-center gap-4 text-xs text-slate-500">
               <Link to="/versions" className="hover:text-sky-800 transition underline">
-                Version v1.9
+                Version v2.1
               </Link>
               <span>•</span>
               <p>© 2026 All rights reserved</p>

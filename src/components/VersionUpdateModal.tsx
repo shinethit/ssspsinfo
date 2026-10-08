@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, X, ArrowRight, CheckCircle2, History, Smartphone, Megaphone, CheckSquare, Shield, Activity, Layers, Crown, LayoutDashboard, Bell, Newspaper } from 'lucide-react';
+import { Sparkles, X, ArrowRight, CheckCircle2, History, Smartphone, Megaphone, CheckSquare, Shield, Activity, Layers, Crown, LayoutDashboard, Bell, Newspaper, Coins } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-export const CURRENT_VERSION = 'v1.9';
+export const CURRENT_VERSION = 'v2.1';
 const STORAGE_KEY = 'pss_last_viewed_version';
 
 export const VersionUpdateModal: React.FC = () => {
@@ -72,47 +72,47 @@ export const VersionUpdateModal: React.FC = () => {
         {/* Feature Highlights Body */}
         <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
           <div className="space-y-3">
-            {/* Feature 0: Latest Announcements on Top */}
+            {/* Feature 1: Annual Fee & Student Range Analytics */}
+            <div className="flex items-start gap-3 p-3 rounded-2xl bg-indigo-50/80 border border-indigo-100">
+              <div className="p-2 rounded-xl bg-indigo-600 text-white shrink-0 mt-0.5">
+                <Coins className="w-5 h-5" />
+              </div>
+              <div className="space-y-0.5 text-xs">
+                <h4 className="font-bold text-indigo-950 text-sm">
+                  နှစ်စဉ်ကြေး စာရင်းအင်းနှင့် ကျောင်းသားဦးရေ Range ခွဲခြမ်းမှု
+                </h4>
+                <p className="text-slate-600 leading-normal">
+                  Dashboard တွင် နှစ်စဉ်ကြေး ထည့်ဝင်ထားသော ကျောင်းများကို ကျောင်းအဆင့်၊ ကျောင်းသားဦးရေ Range (၁-၁၀၀၊ ၁၀၁-၃၀၀၊ ၃၀၁-၅၀၀၊ ၅၀၁-၁၀၀၀၊ ၁၀၀၀+ ဦး) နှင့် သတ်မှတ်နှုန်းထားအလိုက် အသေးစိတ် စာရင်းအင်းနှင့် ပေါင်းစပ်ဇယားဖြင့် ကြည့်ရှုနိုင်ခြင်း။
+                </p>
+              </div>
+            </div>
+
+            {/* Feature 2: Real-time Snapshot & Instant Local Cache */}
+            <div className="flex items-start gap-3 p-3 rounded-2xl bg-emerald-50/80 border border-emerald-100">
+              <div className="p-2 rounded-xl bg-emerald-600 text-white shrink-0 mt-0.5">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div className="space-y-0.5 text-xs">
+                <h4 className="font-bold text-emerald-950 text-sm">
+                  ကျောင်းစာရင်း အသစ်ထည့်/ပြင်/ဖျက်ခြင်း Real-Time Instant Sync
+                </h4>
+                <p className="text-slate-600 leading-normal">
+                  ကျောင်းစာရင်း ထည့်သွင်း၊ ပြင်ဆင် သို့မဟုတ် ဖျက်ပစ်ပြီးနောက် Hard Refresh ပြုလုပ်သော်လည်း ချက်ချင်း (0ms) ဆက်လက်တည်ရှိနေစေရန် Real-time Firestore Listeners နှင့် Instant Optimistic Storage စနစ်သစ် ထည့်သွင်းထားပါသည်။
+                </p>
+              </div>
+            </div>
+
+            {/* Feature 3: Myanmar Alphabetical & Level Sorting */}
             <div className="flex items-start gap-3 p-3 rounded-2xl bg-amber-50/80 border border-amber-100">
               <div className="p-2 rounded-xl bg-amber-600 text-white shrink-0 mt-0.5">
-                <Newspaper className="w-5 h-5" />
+                <Sparkles className="w-5 h-5" />
               </div>
               <div className="space-y-0.5 text-xs">
                 <h4 className="font-bold text-amber-950 text-sm">
-                  Dashboard ထိပ်ဆုံးတွင် နောက်ဆုံးရ ကြေညာချက် ၂ ခု ဖော်ပြပေးခြင်း
+                  မြန်မာအက္ခရာစဉ် (က မှ အ ထိ) နှင့် Sorting Controls များ
                 </h4>
                 <p className="text-slate-600 leading-normal">
-                  အသင်းချုပ် ဒက်ရှ်ဘုတ်နှင့် ပင်မစာမျက်နှာတို့တွင် နောက်ဆုံးရ အရေးကြီး ထုတ်ပြန်ကြေညာချက် ၂ ခုကို အပေါ်ဆုံးတွင် ချက်ချင်းဖတ်ရှုနိုင်စေရန် နေရာချထားပေးခြင်း။
-                </p>
-              </div>
-            </div>
-
-            {/* Feature 1: Audit Notification Bell */}
-            <div className="flex items-start gap-3 p-3 rounded-2xl bg-rose-50/80 border border-rose-100">
-              <div className="p-2 rounded-xl bg-rose-600 text-white shrink-0 mt-0.5">
-                <Bell className="w-5 h-5" />
-              </div>
-              <div className="space-y-0.5 text-xs">
-                <h4 className="font-bold text-rose-950 text-sm">
-                  Audit Log အသိပေးချက် ခေါင်းလောင်း (Notification Bell)
-                </h4>
-                <p className="text-slate-600 leading-normal">
-                  Dashboard Header တွင် အက်ဒမင်များ၏ မကြာသေးမီက ပြင်ဆင်/ဖျက်ပစ်ခဲ့သော စနစ်မှတ်တမ်းများကို အချိန်နှင့်တပြေးညီ ကြည့်ရှုနိုင်သည့် အသိပေးချက် ခေါင်းလောင်း အသစ်။
-                </p>
-              </div>
-            </div>
-
-            {/* Feature 2: Association Overview Dashboard */}
-            <div className="flex items-start gap-3 p-3 rounded-2xl bg-sky-50/80 border border-sky-100">
-              <div className="p-2 rounded-xl bg-sky-600 text-white shrink-0 mt-0.5">
-                <LayoutDashboard className="w-5 h-5" />
-              </div>
-              <div className="space-y-0.5 text-xs">
-                <h4 className="font-bold text-sky-950 text-sm">
-                  အသင်းချုပ် ဒက်ရှ်ဘုတ် အသစ် (Association Dashboard)
-                </h4>
-                <p className="text-slate-600 leading-normal">
-                  အသင်းဝင်ကျောင်းများ၊ ပညာသင်ကြားမှုအဆင့် ခွဲခြမ်းမှု (High/Middle/Primary) နှင့် ပင်မစာမျက်နှာမှ ချက်ချင်းရှာဖွေနိုင်သော Instant Search စနစ်။
+                  ကျောင်းအမည်များကို မြန်မာအက္ခရာစဉ်အတိုင်းဖြစ်စေ၊ အသစ်ဆုံး/ရှေးအကျဆုံးဖြစ်စေ စိတ်ကြိုက် ပြောင်းလဲစီစဉ်ကြည့်ရှုနိုင်သော Sorting Dropdown ထည့်သွင်းခြင်း။
                 </p>
               </div>
             </div>

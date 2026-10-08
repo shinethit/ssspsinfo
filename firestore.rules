@@ -25,27 +25,27 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Schools
+    // Schools (Public read for member directory, write restricted to admins)
     match /schools/{schoolId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if isAdmin();
     }
 
     // Contacts
     match /contacts/{contactId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if isAdmin();
     }
 
     // Announcements
     match /announcements/{announcementId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if isAdmin();
     }
 
     // Tickers (Marquee / Running Announcement Bar)
     match /tickers/{tickerId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if isAdmin();
     }
 
@@ -63,13 +63,13 @@ service cloud.firestore {
 
     // Gallery
     match /gallery/{galleryId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if isAdmin();
     }
 
     // Associations & Committee members
     match /associations/{associationId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if isAdmin();
     }
 

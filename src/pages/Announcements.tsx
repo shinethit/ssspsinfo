@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
-import { db } from '../lib/firebase';
 import { Link } from 'react-router-dom';
 import { Announcement } from '../types';
+import { useData, getAnnouncementTimestamp } from '../context/DataContext';
+import { OfflineSyncStatusBadge } from '../components/OfflineSyncStatusBadge';
 import { Tag, Calendar, ChevronLeft, ChevronRight, Search, FileText } from 'lucide-react';
 
 export const ANNOUNCEMENT_CATEGORIES = [
@@ -31,35 +31,15 @@ export function getCategoryBadge(categoryId?: string) {
 }
 
 export default function Announcements() {
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { announcements, loading } = useData();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  useEffect(() => {
-    const fetchAnnouncements = async () => {
-      try {
-        setLoading(true);
-        const q = query(collection(db, 'announcements'), orderBy('publishedAt', 'desc'));
-        const snapshot = await getDocs(q);
-        const list = snapshot.docs.map(docSnap => ({
-          id: docSnap.id,
-          ...docSnap.data(),
-        })) as Announcement[];
-        setAnnouncements(list);
-      } catch (err) {
-        console.error('Error fetching announcements:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAnnouncements();
-  }, []);
-
   const filteredAnnouncements = useMemo(() => {
-    return announcements.filter(a => {
+    const list = announcements.filter(a => {
       const matchCategory =
         selectedCategory === 'all' ||
         a.category === selectedCategory ||
@@ -77,12 +57,19 @@ export default function Announcements() {
 
       return matchCategory && matchSearch;
     });
-  }, [announcements, selectedCategory, searchQuery]);
+
+    // Sort strictly by Admin Set Date (eventDate), fallback to publishedAt
+    return list.sort((a, b) => {
+      const timeA = getAnnouncementTimestamp(a);
+      const timeB = getAnnouncementTimestamp(b);
+      return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+    });
+  }, [announcements, selectedCategory, searchQuery, sortOrder]);
 
   // Reset page when category or search changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedCategory, searchQuery]);
+  }, [selectedCategory, searchQuery, sortOrder]);
 
   const totalPages = Math.ceil(filteredAnnouncements.length / itemsPerPage);
   const currentItems = useMemo(() => {
@@ -93,14 +80,19 @@ export default function Announcements() {
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
       {/* Header */}
-      <div className="border-b border-slate-200 pb-5">
-        <h2 className="text-3xl font-extrabold text-sky-950 flex items-center gap-3">
-          <FileText className="w-8 h-8 text-sky-600" />
-          ကြေညာချက်များ <span className="text-lg font-normal text-slate-500">(Announcements)</span>
-        </h2>
-        <p className="text-slate-600 mt-2 text-sm sm:text-base">
-          ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း၏ တရားဝင် ထုတ်ပြန်ချက်များနှင့် သတင်းအချက်အလက်များ
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
+        <div>
+          <h2 className="text-3xl font-extrabold text-sky-950 flex items-center gap-3">
+            <FileText className="w-8 h-8 text-sky-600" />
+            ကြေညာချက်များ <span className="text-lg font-normal text-slate-500">(Announcements)</span>
+          </h2>
+          <p className="text-slate-600 mt-2 text-sm sm:text-base">
+            ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း၏ တရားဝင် ထုတ်ပြန်ချက်များနှင့် သတင်းအချက်အလက်များ
+          </p>
+        </div>
+        <div className="shrink-0">
+          <OfflineSyncStatusBadge />
+        </div>
       </div>
 
       {/* Filter & Search Bar */}
@@ -142,6 +134,24 @@ export default function Announcements() {
             })}
           </div>
         </div>
+
+        {/* Sort & Stats Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-slate-500">စီစဉ်မှု (Sort by Date):</span>
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as 'desc' | 'asc')}
+              className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 font-bold text-slate-800 outline-hidden cursor-pointer"
+            >
+              <option value="desc">ရက်စွဲ (အသစ်ဆုံး မှ အဟောင်း - Newest Event First)</option>
+              <option value="asc">ရက်စွဲ (အဟောင်း မှ အသစ် - Oldest Event First)</option>
+            </select>
+          </div>
+          <span className="text-slate-500">
+            ရှာဖွေတွေ့ရှိသည့် ကြေညာချက်: <strong>{filteredAnnouncements.length}</strong> ခု
+          </span>
+        </div>
       </div>
 
       {/* Announcement List */}
@@ -169,11 +179,16 @@ export default function Announcements() {
         <div className="space-y-4">
           {currentItems.map(a => {
             const badge = getCategoryBadge(a.category);
-            const dateStr = a.publishedAt ? new Date(a.publishedAt).toLocaleDateString('my-MM', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            }) : '';
+            const rawDate = a.eventDate || (a.publishedAt ? a.publishedAt.split('T')[0] : '');
+            let dateStr = '';
+            if (rawDate) {
+              const d = new Date(rawDate.includes('T') ? rawDate : `${rawDate}T12:00:00`);
+              dateStr = !isNaN(d.getTime()) ? d.toLocaleDateString('my-MM', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              }) : rawDate;
+            }
 
             return (
               <article
@@ -184,9 +199,9 @@ export default function Announcements() {
                   <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold border ${badge.className}`}>
                     {badge.label}
                   </span>
-                  <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                    <Calendar className="w-3.5 h-3.5" />
-                    <span>{dateStr || (a.publishedAt ? new Date(a.publishedAt).toLocaleDateString() : '')}</span>
+                  <div className="flex items-center gap-1.5 text-xs text-sky-800 font-semibold bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-100">
+                    <Calendar className="w-3.5 h-3.5 text-sky-600" />
+                    <span>ရက်စွဲ: {dateStr || rawDate || 'မဖော်ပြထားပါ'}</span>
                   </div>
                 </div>
 

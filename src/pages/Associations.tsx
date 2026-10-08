@@ -1,34 +1,13 @@
-import { useState, useEffect, useMemo } from 'react';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { useState, useMemo } from 'react';
 import { Association, CommitteeMember } from '../types';
+import { useData } from '../context/DataContext';
+import { OfflineSyncStatusBadge } from '../components/OfflineSyncStatusBadge';
 import { Building2, Users, Phone, MapPin, Search, Mail, Send, Award, School as SchoolIcon } from 'lucide-react';
 
 export default function Associations() {
-  const [associations, setAssociations] = useState<Association[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { associations, loading } = useData();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTownship, setSelectedTownship] = useState<string>('all');
-
-  useEffect(() => {
-    const fetchAssociations = async () => {
-      try {
-        setLoading(true);
-        const q = query(collection(db, 'associations'), orderBy('createdAt', 'desc'));
-        const snapshot = await getDocs(q);
-        const list = snapshot.docs.map(docSnap => ({
-          id: docSnap.id,
-          ...docSnap.data(),
-        })) as Association[];
-        setAssociations(list);
-      } catch (err) {
-        console.error('Error fetching associations:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAssociations();
-  }, []);
 
   // Extract unique townships for filtering
   const townships = useMemo(() => {

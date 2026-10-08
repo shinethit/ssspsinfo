@@ -4,6 +4,7 @@
  */
 
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { DataProvider } from './context/DataContext';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Announcements from './pages/Announcements';
@@ -21,23 +22,25 @@ import ProtectedRoute from './components/ProtectedRoute';
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Home />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="announcements" element={<Announcements />} />
-          <Route path="announcements/:id" element={<AnnouncementDetail />} />
-          <Route path="associations" element={<Associations />} />
-          <Route path="contacts" element={<Contacts />} />
-          <Route path="schools/:id" element={<SchoolDetail />} />
-          <Route path="chat" element={<Chat />} />
-          <Route path="versions" element={<VersionHistory />} />
-          <Route path="login" element={<Login />} />
-          <Route element={<ProtectedRoute />}>
-            <Route path="admin" element={<Admin />} />
+      <DataProvider>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<Home />} />
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="announcements" element={<Announcements />} />
+            <Route path="announcements/:id" element={<AnnouncementDetail />} />
+            <Route path="associations" element={<Associations />} />
+            <Route path="contacts" element={<Contacts />} />
+            <Route path="schools/:id" element={<SchoolDetail />} />
+            <Route path="chat" element={<Chat />} />
+            <Route path="versions" element={<VersionHistory />} />
+            <Route path="login" element={<Login />} />
+            <Route element={<ProtectedRoute />}>
+              <Route path="admin" element={<Admin />} />
+            </Route>
           </Route>
-        </Route>
-      </Routes>
+        </Routes>
+      </DataProvider>
     </BrowserRouter>
   );
 }

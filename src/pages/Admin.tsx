@@ -10,11 +10,13 @@ import * as XLSX from 'xlsx';
 import { ANNOUNCEMENT_CATEGORIES, getCategoryBadge } from './Announcements';
 import { Association, NewsTicker, AuditLog, AdminUser } from '../types';
 import { recordAuditLog } from '../lib/audit';
+import { useData, sortAnnouncementsByEventDate } from '../context/DataContext';
 import {
   FileText,
   School as SchoolIcon,
   Plus,
   Trash2,
+  Calendar,
   Download,
   Upload,
   Building2,
@@ -46,12 +48,13 @@ import {
   Mail,
   ShieldCheck,
 } from 'lucide-react';
-import { downloadSchoolTemplate, normalizeSchoolRow } from '../lib/excel';
+import { downloadSchoolTemplate, normalizeSchoolRow, exportSchoolsToExcel } from '../lib/excel';
 
 const announcementSchema = z.object({
   title: z.string().min(1, 'ခေါင်းစဉ် လိုအပ်သည်'),
   body: z.string().min(1, 'အကြောင်းအရာ လိုအပ်သည်'),
   category: z.string().min(1, 'ကဏ္ဍ ရွေးချယ်ပါ'),
+  eventDate: z.string().min(1, 'ကြေညာချက်ရက်စွဲ (Admin Set Date) ထည့်သွင်းပေးပါ'),
   attachmentUrl: z.string().optional(),
 });
 
@@ -59,20 +62,38 @@ const schoolSchema = z.object({
   logoUrl: z.string().optional(),
   name: z.string().min(1, 'ကျောင်းအမည် လိုအပ်သည်'),
   level: z.string().min(1, 'ကျောင်းအဆင့် လိုအပ်သည်'),
+  studentRange: z.string().default('1-100').optional(),
+  studentCount: z.union([z.number(), z.string()]).optional(),
+  feeAmount: z.union([z.number(), z.string()]).optional(),
+  feeAcademicYear: z.string().default('၂၀၂၄-၂၀၂၅').optional(),
+  feePaidDate: z.string().optional(),
+  // School phones (1 or more)
+  schoolPhone: z.string().optional(),
+  schoolPhone2: z.string().optional(),
   founderName: z.string().optional(),
   founderPhone: z.string().optional(),
+  founderPhone2: z.string().optional(),
   founderViber: z.string().optional(),
   founderTelegram: z.string().optional(),
   adminName: z.string().optional(),
   adminPhone: z.string().optional(),
+  adminPhone2: z.string().optional(),
   adminViber: z.string().optional(),
   adminTelegram: z.string().optional(),
+  // Coordinator 1 (တာဝန်ခံ ၁)
   contactName: z.string().optional(),
   contactRole: z.string().optional(),
   contactPhone: z.string().optional(),
+  contactPhone2: z.string().optional(),
   contactViber: z.string().optional(),
   contactTelegram: z.string().optional(),
-  schoolPhone: z.string().optional(),
+  // Coordinator 2 (တာဝန်ခံ ၂)
+  contact2Name: z.string().optional(),
+  contact2Role: z.string().optional(),
+  contact2Phone: z.string().optional(),
+  contact2Phone2: z.string().optional(),
+  contact2Viber: z.string().optional(),
+  contact2Telegram: z.string().optional(),
   schoolNote: z.string().optional(),
   note: z.string().optional(),
   isAnnualFeePaid: z.boolean().optional(),
@@ -101,13 +122,42 @@ const associationSchema = z.object({
 });
 
 export default function Admin() {
+  const {
+    schools: globalSchools,
+    announcements: globalAnnouncements,
+    syncData,
+    addSchool,
+    updateSchool,
+    deleteSchool: deleteSchoolFromContext,
+    addAnnouncement,
+    updateAnnouncement,
+    deleteAnnouncement: removeAnnouncement,
+  } = useData();
   const [activeTab, setActiveTab] = useState<'announcements' | 'associations' | 'schools' | 'tickers' | 'audit_logs' | 'admins'>('announcements');
+  const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [associations, setAssociations] = useState<Association[]>([]);
   const [schools, setSchools] = useState<any[]>([]);
   const [tickers, setTickers] = useState<NewsTicker[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [admins, setAdmins] = useState<AdminUser[]>([]);
+
+  // Synchronize schools and announcements state with DataContext
+  useEffect(() => {
+    if (globalSchools) {
+      setSchools(globalSchools);
+    }
+  }, [globalSchools]);
+
+  useEffect(() => {
+    if (globalAnnouncements) {
+      setAnnouncements(globalAnnouncements);
+    }
+  }, [globalAnnouncements]);
+
+  const sortedAnnouncements = useMemo(() => {
+    return sortAnnouncementsByEventDate(announcements as any);
+  }, [announcements]);
 
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
   const [loadingAssociations, setLoadingAssociations] = useState(false);
@@ -147,6 +197,13 @@ export default function Admin() {
   const [adminFeeFilter, setAdminFeeFilter] = useState<'all' | 'paid' | 'unpaid'>('all');
   const [adminStatusFilter, setAdminStatusFilter] = useState<'all' | 'active' | 'under_review' | 'inactive'>('all');
 
+  // Dynamic extra phone numbers state for school form
+  const [extraSchoolPhones, setExtraSchoolPhones] = useState<string[]>([]);
+  const [extraFounderPhones, setExtraFounderPhones] = useState<string[]>([]);
+  const [extraAdminPhones, setExtraAdminPhones] = useState<string[]>([]);
+  const [extraCoord1Phones, setExtraCoord1Phones] = useState<string[]>([]);
+  const [extraCoord2Phones, setExtraCoord2Phones] = useState<string[]>([]);
+
   // Bulk deletion state
   const [selectedSchoolIds, setSelectedSchoolIds] = useState<string[]>([]);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
@@ -182,6 +239,7 @@ export default function Admin() {
       title: '',
       body: '',
       category: 'general',
+      eventDate: new Date().toISOString().split('T')[0],
       attachmentUrl: '',
     },
   });
@@ -212,21 +270,36 @@ export default function Admin() {
     defaultValues: {
       name: '',
       level: 'အထက်တန်း',
+      studentRange: '1-100',
+      studentCount: '',
+      feeAmount: 50000,
+      feeAcademicYear: '၂၀၂၄-၂၀၂၅',
+      feePaidDate: '',
       logoUrl: '',
       schoolPhone: '',
+      schoolPhone2: '',
       founderName: '',
       founderPhone: '',
+      founderPhone2: '',
       founderViber: '',
       founderTelegram: '',
       adminName: '',
       adminPhone: '',
+      adminPhone2: '',
       adminViber: '',
       adminTelegram: '',
       contactName: '',
       contactRole: '',
       contactPhone: '',
+      contactPhone2: '',
       contactViber: '',
       contactTelegram: '',
+      contact2Name: '',
+      contact2Role: '',
+      contact2Phone: '',
+      contact2Phone2: '',
+      contact2Viber: '',
+      contact2Telegram: '',
       schoolNote: '',
       note: '',
       isAnnualFeePaid: false,
@@ -238,7 +311,9 @@ export default function Admin() {
     try {
       setLoadingAnnouncements(true);
       const snapshot = await getDocs(collection(db, 'announcements'));
-      setAnnouncements(snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() })));
+      const fetched = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+      setAnnouncements(sortAnnouncementsByEventDate(fetched as any));
+      syncData(false);
     } catch (err) {
       console.error(err);
     } finally {
@@ -251,6 +326,7 @@ export default function Admin() {
       setLoadingAssociations(true);
       const snapshot = await getDocs(collection(db, 'associations'));
       setAssociations(snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() })) as Association[]);
+      syncData(false);
     } catch (err) {
       console.error(err);
     } finally {
@@ -263,6 +339,7 @@ export default function Admin() {
       setLoadingSchools(true);
       const snapshot = await getDocs(collection(db, 'schools'));
       setSchools(snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() })));
+      syncData(false);
     } catch (err) {
       console.error(err);
     } finally {
@@ -558,52 +635,95 @@ export default function Admin() {
     setCustomDateTime('');
   };
 
+  const startEditAnnouncement = (a: any) => {
+    setActiveTab('announcements');
+    setEditingAnnouncementId(a.id);
+    const dateVal = a.eventDate || (a.publishedAt ? a.publishedAt.split('T')[0] : new Date().toISOString().split('T')[0]);
+    announcementForm.reset({
+      title: a.title || '',
+      body: a.body || '',
+      category: a.category || 'general',
+      eventDate: dateVal,
+      attachmentUrl: a.attachments && a.attachments.length > 0 ? a.attachments[0] : '',
+    });
+    setTimeout(() => {
+      const elem = document.getElementById('announcement-form-section');
+      if (elem) elem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  };
+
+  const cancelEditAnnouncement = () => {
+    setEditingAnnouncementId(null);
+    announcementForm.reset({
+      title: '',
+      body: '',
+      category: 'general',
+      eventDate: new Date().toISOString().split('T')[0],
+      attachmentUrl: '',
+    });
+  };
+
   const onAnnouncementSubmit = async (data: any) => {
     try {
-      const docRef = await addDoc(collection(db, 'announcements'), {
+      const selectedDate = data.eventDate || new Date().toISOString().split('T')[0];
+      const isoPublishedAt = new Date(`${selectedDate}T12:00:00Z`).toISOString();
+      const payload = {
         title: data.title,
         body: data.body,
         category: data.category,
+        eventDate: selectedDate, // Admin Set Date (Event Date)
+        publishedAt: isoPublishedAt, // Synchronized with Admin Set Date
         attachments: data.attachmentUrl ? [data.attachmentUrl] : [],
-        publishedAt: new Date().toISOString(),
-      });
-      await recordAuditLog({
-        action: 'create',
-        entityType: 'announcement',
-        entityId: docRef.id,
-        entityName: data.title,
-        details: `ကြေညာချက်အသစ် "${data.title}" တင်ခဲ့သည်`,
-      });
-      toast.success('ကြေညာချက် တင်ပြီးပါပြီ');
-      announcementForm.reset({
-        title: '',
-        body: '',
-        category: 'general',
-        attachmentUrl: '',
-      });
-      fetchAnnouncements();
+      };
+
+      if (editingAnnouncementId) {
+        await updateAnnouncement(editingAnnouncementId, payload);
+        await recordAuditLog({
+          action: 'update',
+          entityType: 'announcement',
+          entityId: editingAnnouncementId,
+          entityName: data.title,
+          details: `ကြေညာချက် "${data.title}" ၏ အချက်အလက်နှင့် ရက်စွဲ (${selectedDate}) ပြင်ဆင်ခဲ့သည်`,
+        });
+        toast.success(`ကြေညာချက် "${data.title}" ကို ပြင်ဆင်ပြီးပါပြီ`);
+        cancelEditAnnouncement();
+      } else {
+        const newId = await addAnnouncement({
+          ...payload,
+          createdAt: new Date().toISOString(), // System creation date, never used for sorting
+        });
+        await recordAuditLog({
+          action: 'create',
+          entityType: 'announcement',
+          entityId: newId,
+          entityName: data.title,
+          details: `ကြေညာချက်အသစ် "${data.title}" (ရက်စွဲ: ${selectedDate}) တင်ခဲ့သည်`,
+        });
+        toast.success(`ကြေညာချက် "${data.title}" ကို တင်ပြီးပါပြီ`);
+        cancelEditAnnouncement();
+      }
       fetchAuditLogs();
     } catch (err) {
       console.error(err);
-      toast.error('ကြေညာချက် တင်ရာတွင် အမှားဖြစ်ပွားပါသည်');
+      toast.error('ကြေညာချက် သိမ်းဆည်းရာတွင် အမှားဖြစ်ပွားပါသည်');
     }
   };
 
   const deleteAnnouncement = async (id: string) => {
     if (!confirm('ဤကြေညာချက်ကို ဖျက်ရန် သေချာပါသလား?')) return;
     try {
-      await deleteDoc(doc(db, 'announcements', id));
+      await removeAnnouncement(id);
       await recordAuditLog({
         action: 'delete',
         entityType: 'announcement',
         entityId: id,
-        details: 'ကြေညာချက် ဖျက်ပစ်ခဲ့သည်',
+        details: `ကြေညာချက် (ID: ${id}) ကို ဖျက်ပစ်ခဲ့သည်`,
       });
       toast.success('ကြေညာချက် ဖျက်ပြီးပါပြီ');
-      fetchAnnouncements();
       fetchAuditLogs();
     } catch (err) {
-      toast.error('ဖျက်၍ မရပါ');
+      console.error(err);
+      toast.error('ကြေညာချက် ဖျက်ရာတွင် အမှားဖြစ်ပွားပါသည်');
     }
   };
 
@@ -663,26 +783,51 @@ export default function Admin() {
     schoolForm.reset({
       name: school.name || '',
       level: school.level || 'အထက်တန်း',
+      studentRange: school.studentRange || '1-100',
+      studentCount: school.studentCount !== undefined && school.studentCount !== null ? school.studentCount : '',
+      feeAmount: school.feeAmount !== undefined && school.feeAmount !== null ? school.feeAmount : (
+        school.studentRange === '1000+' ? 300000 :
+        school.studentRange === '501-1000' ? 200000 :
+        school.studentRange === '301-500' ? 150000 :
+        school.studentRange === '101-300' ? 100000 : 50000
+      ),
+      feeAcademicYear: school.feeAcademicYear || '၂၀၂၄-၂၀၂၅',
+      feePaidDate: school.feePaidDate || '',
       logoUrl: school.logoUrl || '',
       schoolPhone: school.schoolPhone || '',
+      schoolPhone2: school.schoolPhone2 || '',
       founderName: school.founderName || '',
       founderPhone: school.founderPhone || '',
+      founderPhone2: school.founderPhone2 || '',
       founderViber: school.founderViber || '',
       founderTelegram: school.founderTelegram || '',
       adminName: school.adminName || '',
       adminPhone: school.adminPhone || '',
+      adminPhone2: school.adminPhone2 || '',
       adminViber: school.adminViber || '',
       adminTelegram: school.adminTelegram || '',
       contactName: school.contactName || '',
       contactRole: school.contactRole || '',
       contactPhone: school.contactPhone || '',
+      contactPhone2: school.contactPhone2 || '',
       contactViber: school.contactViber || '',
       contactTelegram: school.contactTelegram || '',
+      contact2Name: school.contact2Name || '',
+      contact2Role: school.contact2Role || '',
+      contact2Phone: school.contact2Phone || '',
+      contact2Phone2: school.contact2Phone2 || '',
+      contact2Viber: school.contact2Viber || '',
+      contact2Telegram: school.contact2Telegram || '',
       schoolNote: school.schoolNote || '',
       note: school.note || '',
       isAnnualFeePaid: school.isAnnualFeePaid ?? false,
       status: school.status || 'active',
     });
+    setExtraSchoolPhones(Array.isArray(school.schoolPhones) ? [...school.schoolPhones] : []);
+    setExtraFounderPhones(Array.isArray(school.founderPhones) ? [...school.founderPhones] : []);
+    setExtraAdminPhones(Array.isArray(school.adminPhones) ? [...school.adminPhones] : []);
+    setExtraCoord1Phones(Array.isArray(school.contactPhones) ? [...school.contactPhones] : []);
+    setExtraCoord2Phones(Array.isArray(school.contact2Phones) ? [...school.contact2Phones] : []);
     setTimeout(() => {
       const formElem = document.getElementById('school-form-section');
       if (formElem) {
@@ -696,33 +841,52 @@ export default function Admin() {
     schoolForm.reset({
       name: '',
       level: 'အထက်တန်း',
+      studentRange: '1-100',
+      studentCount: '',
+      feeAmount: 50000,
+      feeAcademicYear: '၂၀၂၄-၂၀၂၅',
+      feePaidDate: '',
       logoUrl: '',
       schoolPhone: '',
+      schoolPhone2: '',
       founderName: '',
       founderPhone: '',
+      founderPhone2: '',
       founderViber: '',
       founderTelegram: '',
       adminName: '',
       adminPhone: '',
+      adminPhone2: '',
       adminViber: '',
       adminTelegram: '',
       contactName: '',
       contactRole: '',
       contactPhone: '',
+      contactPhone2: '',
       contactViber: '',
       contactTelegram: '',
+      contact2Name: '',
+      contact2Role: '',
+      contact2Phone: '',
+      contact2Phone2: '',
+      contact2Viber: '',
+      contact2Telegram: '',
       schoolNote: '',
       note: '',
       isAnnualFeePaid: false,
       status: 'active',
     });
+    setExtraSchoolPhones([]);
+    setExtraFounderPhones([]);
+    setExtraAdminPhones([]);
+    setExtraCoord1Phones([]);
+    setExtraCoord2Phones([]);
   };
 
   const updateSchoolStatus = async (school: any, newStatus: 'active' | 'under_review' | 'inactive') => {
     try {
-      await updateDoc(doc(db, 'schools', school.id), {
+      await updateSchool(school.id, {
         status: newStatus,
-        updatedAt: new Date().toISOString(),
       });
       const statusLabel =
         newStatus === 'active'
@@ -738,7 +902,6 @@ export default function Admin() {
         details: `ကျောင်းအခြေအနေကို "${statusLabel}" အဖြစ် ပြောင်းလဲခဲ့သည်`,
       });
       toast.success(`"${school.name}" ၏ အခြေအနေကို "${statusLabel}" အဖြစ် ပြောင်းလဲလိုက်ပါပြီ`);
-      fetchSchools();
       fetchAuditLogs();
     } catch (err) {
       toast.error('အခြေအနေ ပြောင်းလဲ၍ မရပါ');
@@ -748,9 +911,9 @@ export default function Admin() {
   const toggleSchoolFeeStatus = async (school: any) => {
     try {
       const nextStatus = !school.isAnnualFeePaid;
-      await updateDoc(doc(db, 'schools', school.id), {
+      await updateSchool(school.id, {
         isAnnualFeePaid: nextStatus,
-        updatedAt: new Date().toISOString(),
+        feePaidDate: nextStatus ? (school.feePaidDate || new Date().toISOString().split('T')[0]) : '',
       });
       await recordAuditLog({
         action: 'update',
@@ -764,7 +927,6 @@ export default function Admin() {
           ? `"${school.name}" ၏ နှစ်စဉ်ကြေးကို ပေးသွင်းပြီးအဖြစ် ပြောင်းလဲလိုက်ပါပြီ`
           : `"${school.name}" ၏ နှစ်စဉ်ကြေးကို မပေးသွင်းရသေးအဖြစ် ပြောင်းလဲလိုက်ပါပြီ`
       );
-      fetchSchools();
       fetchAuditLogs();
     } catch (err) {
       toast.error('နှစ်စဉ်ကြေး အခြေအနေ ပြောင်းလဲ၍ မရပါ');
@@ -773,11 +935,65 @@ export default function Admin() {
 
   const onSchoolSubmit = async (data: any) => {
     try {
+      const cleanStudentCount = data.studentCount !== undefined && data.studentCount !== ''
+        ? Number(String(data.studentCount).replace(/[^0-9]/g, ''))
+        : undefined;
+
+      const cleanFeeAmount = data.feeAmount !== undefined && data.feeAmount !== ''
+        ? Number(String(data.feeAmount).replace(/[^0-9]/g, ''))
+        : (
+          data.studentRange === '1000+' ? 300000 :
+          data.studentRange === '501-1000' ? 200000 :
+          data.studentRange === '301-500' ? 150000 :
+          data.studentRange === '101-300' ? 100000 : 50000
+        );
+
+      const cleanSchoolPhones = extraSchoolPhones.map(p => p.trim()).filter(Boolean);
+      const cleanFounderPhones = extraFounderPhones.map(p => p.trim()).filter(Boolean);
+      const cleanAdminPhones = extraAdminPhones.map(p => p.trim()).filter(Boolean);
+      const cleanCoord1Phones = extraCoord1Phones.map(p => p.trim()).filter(Boolean);
+      const cleanCoord2Phones = extraCoord2Phones.map(p => p.trim()).filter(Boolean);
+
+      const payload = {
+        ...data,
+        schoolPhone: data.schoolPhone ? data.schoolPhone.trim() : '',
+        schoolPhone2: data.schoolPhone2 ? data.schoolPhone2.trim() : '',
+        schoolPhones: cleanSchoolPhones,
+        founderName: data.founderName ? data.founderName.trim() : '',
+        founderPhone: data.founderPhone ? data.founderPhone.trim() : '',
+        founderPhone2: data.founderPhone2 ? data.founderPhone2.trim() : '',
+        founderPhones: cleanFounderPhones,
+        founderViber: data.founderViber ? data.founderViber.trim() : '',
+        founderTelegram: data.founderTelegram ? data.founderTelegram.trim() : '',
+        adminName: data.adminName ? data.adminName.trim() : '',
+        adminPhone: data.adminPhone ? data.adminPhone.trim() : '',
+        adminPhone2: data.adminPhone2 ? data.adminPhone2.trim() : '',
+        adminPhones: cleanAdminPhones,
+        adminViber: data.adminViber ? data.adminViber.trim() : '',
+        adminTelegram: data.adminTelegram ? data.adminTelegram.trim() : '',
+        contactName: data.contactName ? data.contactName.trim() : '',
+        contactRole: data.contactRole ? data.contactRole.trim() : '',
+        contactPhone: data.contactPhone ? data.contactPhone.trim() : '',
+        contactPhone2: data.contactPhone2 ? data.contactPhone2.trim() : '',
+        contactPhones: cleanCoord1Phones,
+        contactViber: data.contactViber ? data.contactViber.trim() : '',
+        contactTelegram: data.contactTelegram ? data.contactTelegram.trim() : '',
+        contact2Name: data.contact2Name ? data.contact2Name.trim() : '',
+        contact2Role: data.contact2Role ? data.contact2Role.trim() : '',
+        contact2Phone: data.contact2Phone ? data.contact2Phone.trim() : '',
+        contact2Phone2: data.contact2Phone2 ? data.contact2Phone2.trim() : '',
+        contact2Phones: cleanCoord2Phones,
+        contact2Viber: data.contact2Viber ? data.contact2Viber.trim() : '',
+        contact2Telegram: data.contact2Telegram ? data.contact2Telegram.trim() : '',
+        studentRange: data.studentRange || '1-100',
+        studentCount: cleanStudentCount,
+        feeAmount: cleanFeeAmount,
+        feeAcademicYear: data.feeAcademicYear || '၂၀၂၄-၂၀၂၅',
+        feePaidDate: data.feePaidDate || '',
+      };
+
       if (editingSchoolId) {
-        await updateDoc(doc(db, 'schools', editingSchoolId), {
-          ...data,
-          updatedAt: new Date().toISOString(),
-        });
+        await updateSchool(editingSchoolId, payload);
         await recordAuditLog({
           action: 'update',
           entityType: 'school',
@@ -788,20 +1004,20 @@ export default function Admin() {
         toast.success(`ကျောင်းအချက်အလက် "${data.name}" ကို ပြင်ဆင်ပြီးပါပြီ`);
         cancelEditSchool();
       } else {
-        const docRef = await addDoc(collection(db, 'schools'), { ...data, createdAt: new Date().toISOString() });
+        const newId = await addSchool(payload);
         await recordAuditLog({
           action: 'create',
           entityType: 'school',
-          entityId: docRef.id,
+          entityId: newId,
           entityName: data.name,
           details: `ကျောင်းအသစ် "${data.name}" ထည့်သွင်းခဲ့သည်`,
         });
         toast.success(`ကျောင်းအသစ် "${data.name}" ကို ထည့်သွင်းပြီးပါပြီ`);
         cancelEditSchool();
       }
-      fetchSchools();
       fetchAuditLogs();
     } catch (err) {
+      console.error(err);
       toast.error('ကျောင်းအချက်အလက် သိမ်းဆည်းရာတွင် အမှားဖြစ်ပွားပါသည်');
     }
   };
@@ -809,7 +1025,7 @@ export default function Admin() {
   const deleteSchool = async (id: string, name?: string) => {
     if (!confirm(`"${name || 'ဤကျောင်း'}" ၏ အချက်အလက်များကို အပြီးပိုင် ဖျက်ရန် သေချာပါသလား?`)) return;
     try {
-      await deleteDoc(doc(db, 'schools', id));
+      await deleteSchoolFromContext(id);
       await recordAuditLog({
         action: 'delete',
         entityType: 'school',
@@ -822,9 +1038,9 @@ export default function Admin() {
         cancelEditSchool();
       }
       setSelectedSchoolIds(prev => prev.filter(x => x !== id));
-      fetchSchools();
       fetchAuditLogs();
     } catch (err) {
+      console.error(err);
       toast.error('ဖျက်၍ မရပါ');
     }
   };
@@ -1310,28 +1526,72 @@ export default function Admin() {
       {activeTab === 'announcements' && (
         <div className="space-y-8">
           <form
+            id="announcement-form-section"
             onSubmit={announcementForm.handleSubmit(onAnnouncementSubmit)}
-            className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-xs space-y-5"
+            className={`p-6 sm:p-8 rounded-2xl border shadow-xs space-y-5 ${
+              editingAnnouncementId
+                ? 'bg-amber-50/50 border-amber-300'
+                : 'bg-white border-slate-200'
+            }`}
           >
-            <h3 className="text-xl font-bold text-sky-900 flex items-center gap-2">
-              <Plus className="w-5 h-5 text-sky-600" /> ကြေညာချက် အသစ်တင်ရန် (New Announcement)
-            </h3>
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 className="text-xl font-bold text-sky-950 flex items-center gap-2">
+                {editingAnnouncementId ? (
+                  <>
+                    <Edit2 className="w-5 h-5 text-amber-600" /> ကြေညာချက် ပြင်ဆင်ရန် (Edit Announcement)
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-5 h-5 text-sky-600" /> ကြေညာချက် အသစ်တင်ရန် (New Announcement)
+                  </>
+                )}
+              </h3>
+              {editingAnnouncementId && (
+                <button
+                  type="button"
+                  onClick={cancelEditAnnouncement}
+                  className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-slate-800 bg-white border border-slate-300 rounded-lg cursor-pointer shadow-2xs"
+                >
+                  မပြင်တော့ပါ (Cancel)
+                </button>
+              )}
+            </div>
 
             <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  ကဏ္ဍ ရွေးချယ်ပါ (Category) *
-                </label>
-                <select
-                  {...announcementForm.register('category')}
-                  className="w-full p-3 rounded-xl border border-slate-300 bg-white text-slate-800 text-sm focus:border-sky-500 outline-hidden"
-                >
-                  {ANNOUNCEMENT_CATEGORIES.filter(c => c.id !== 'all').map(cat => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.label} ({cat.labelEn})
-                    </option>
-                  ))}
-                </select>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    ကဏ္ဍ ရွေးချယ်ပါ (Category) *
+                  </label>
+                  <select
+                    {...announcementForm.register('category')}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 bg-white text-slate-800 text-sm focus:border-sky-500 outline-hidden"
+                  >
+                    {ANNOUNCEMENT_CATEGORIES.filter(c => c.id !== 'all').map(cat => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.label} ({cat.labelEn})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-sky-600" />
+                    <span>ကြေညာချက်ရက်စွဲ (Admin Set Date / Event Date) *</span>
+                  </label>
+                  <input
+                    type="date"
+                    {...announcementForm.register('eventDate')}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 bg-white text-slate-800 text-sm focus:border-sky-500 outline-hidden font-semibold"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    (စာရင်းသွင်းသည့်ရက် မဟုတ်ဘဲ ကြေညာချက် ထုတ်ပြန်သည့်ရက် သို့မဟုတ် အခမ်းအနားရက်စွဲ)
+                  </p>
+                  {announcementForm.formState.errors.eventDate && (
+                    <p className="text-xs text-rose-500 mt-1">{announcementForm.formState.errors.eventDate.message}</p>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -1341,7 +1601,7 @@ export default function Admin() {
                 <input
                   {...announcementForm.register('title')}
                   placeholder="ဥပမာ - ၂၀၂၆-၂၀၂၇ ပညာသင်နှစ် နှစ်ပတ်လည် အထွေထွေအစည်းအဝေး ဖိတ်ကြားလွှာ"
-                  className="w-full p-3 rounded-xl border border-slate-300 text-sm focus:border-sky-500 outline-hidden"
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-sm focus:border-sky-500 outline-hidden"
                 />
                 {announcementForm.formState.errors.title && (
                   <p className="text-xs text-rose-500 mt-1">{announcementForm.formState.errors.title.message}</p>
@@ -1356,7 +1616,7 @@ export default function Admin() {
                   {...announcementForm.register('body')}
                   rows={5}
                   placeholder="ကြေညာချက် အကြောင်းအရာ အသေးစိတ် ရေးသားပါ..."
-                  className="w-full p-3 rounded-xl border border-slate-300 text-sm focus:border-sky-500 outline-hidden"
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-sm focus:border-sky-500 outline-hidden"
                 />
                 {announcementForm.formState.errors.body && (
                   <p className="text-xs text-rose-500 mt-1">{announcementForm.formState.errors.body.message}</p>
@@ -1370,54 +1630,100 @@ export default function Admin() {
                 <input
                   {...announcementForm.register('attachmentUrl')}
                   placeholder="https://..."
-                  className="w-full p-3 rounded-xl border border-slate-300 text-sm focus:border-sky-500 outline-hidden"
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-sm focus:border-sky-500 outline-hidden"
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={announcementForm.formState.isSubmitting}
-                className="bg-sky-900 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-sky-800 transition cursor-pointer disabled:opacity-50"
-              >
-                ကြေညာချက် တင်မည် (Publish)
-              </button>
+              <div className="flex items-center gap-3 pt-1">
+                <button
+                  type="submit"
+                  disabled={announcementForm.formState.isSubmitting}
+                  className={`px-6 py-2.5 rounded-xl font-bold text-sm text-white transition cursor-pointer disabled:opacity-50 ${
+                    editingAnnouncementId
+                      ? 'bg-amber-600 hover:bg-amber-700'
+                      : 'bg-sky-900 hover:bg-sky-800'
+                  }`}
+                >
+                  {editingAnnouncementId
+                    ? 'ကြေညာချက် ပြင်ဆင်ချက် သိမ်းဆည်းမည် (Update Announcement)'
+                    : 'ကြေညာချက် တင်မည် (Publish)'}
+                </button>
+                {editingAnnouncementId && (
+                  <button
+                    type="button"
+                    onClick={cancelEditAnnouncement}
+                    className="px-5 py-2.5 rounded-xl font-semibold text-sm text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                  >
+                    မပြင်တော့ပါ (Cancel)
+                  </button>
+                )}
+              </div>
             </div>
           </form>
 
           {/* Existing Announcements List */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-            <h3 className="font-bold text-lg text-slate-900">
-              တင်ထားပြီးသော ကြေညာချက်များ ({announcements.length})
-            </h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <h3 className="font-bold text-lg text-slate-900">
+                တင်ထားပြီးသော ကြေညာချက်များ ({announcements.length})
+              </h3>
+              <span className="text-xs text-sky-800 font-semibold bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200">
+                ✓ Event Date ရက်စွဲအလိုက် အလိုအလျောက် စီစဉ်ထားသည်
+              </span>
+            </div>
             {loadingAnnouncements ? (
               <p className="text-sm text-slate-400">တင်ထားသော ဒေတာများ ဆွဲယူနေပါသည်...</p>
             ) : announcements.length === 0 ? (
               <p className="text-sm text-slate-500 py-4">ကြေညာချက် မရှိသေးပါ</p>
             ) : (
               <div className="divide-y divide-slate-100">
-                {announcements.map(a => {
+                {sortedAnnouncements.map(a => {
                   const badge = getCategoryBadge(a.category);
+                  const displayDate = a.eventDate || (a.publishedAt ? a.publishedAt.split('T')[0] : '');
                   return (
-                    <div key={a.id} className="py-3 flex items-center justify-between gap-4">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
+                    <div key={a.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/70 p-2 rounded-xl transition">
+                      <div className="space-y-1.5 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className={`text-[11px] px-2 py-0.5 rounded-md border font-medium ${badge.className}`}>
                             {badge.label}
                           </span>
                           <span className="font-bold text-sm text-slate-900">{a.title}</span>
+                          {editingAnnouncementId === a.id && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white animate-pulse">
+                              ပြင်ဆင်နေသည်
+                            </span>
+                          )}
                         </div>
-                        <p className="text-xs text-slate-400">
-                          {a.publishedAt ? new Date(a.publishedAt).toLocaleDateString() : ''}
-                        </p>
+                        <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
+                          <span className="flex items-center gap-1 font-semibold text-slate-700 bg-sky-50 px-2.5 py-0.5 rounded-lg border border-sky-100">
+                            <Calendar className="w-3.5 h-3.5 text-sky-600" />
+                            ရက်စွဲ (Admin Set Date): <strong>{displayDate || 'မသတ်မှတ်ထားပါ'}</strong>
+                          </span>
+                          {a.createdAt && (
+                            <span className="text-[11px] text-slate-400">
+                              (စာရင်းသွင်း: {new Date(a.createdAt).toLocaleDateString()})
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <button
-                        onClick={() => deleteAnnouncement(a.id)}
-                        type="button"
-                        className="text-rose-600 hover:text-rose-800 p-2 rounded-lg hover:bg-rose-50 transition cursor-pointer"
-                        title="ဖျက်ရန်"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0">
+                        <button
+                          onClick={() => startEditAnnouncement(a)}
+                          type="button"
+                          className="text-amber-700 hover:text-amber-900 px-2.5 py-1.5 rounded-lg hover:bg-amber-50 border border-amber-200 transition cursor-pointer flex items-center gap-1 text-xs font-semibold shadow-2xs"
+                          title="ပြင်ဆင်ရန်"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" /> ပြင်ဆင်မည်
+                        </button>
+                        <button
+                          onClick={() => deleteAnnouncement(a.id)}
+                          type="button"
+                          className="text-rose-600 hover:text-rose-800 px-2.5 py-1.5 rounded-lg hover:bg-rose-50 border border-rose-200 transition cursor-pointer flex items-center gap-1 text-xs font-semibold shadow-2xs"
+                          title="ဖျက်ရန်"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> ဖျက်မည်
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -1741,7 +2047,7 @@ export default function Admin() {
               </div>
             </div>
 
-            {/* Import Buttons */}
+            {/* Import & Export Buttons */}
             <div className="flex flex-wrap items-center gap-3">
               <button
                 onClick={downloadTemplate}
@@ -1759,6 +2065,16 @@ export default function Admin() {
                   className="hidden"
                 />
               </label>
+              <button
+                onClick={() => {
+                  exportSchoolsToExcel(schools);
+                  toast.success(`ကျောင်း (${schools.length}) ကျောင်း၏ အချက်အလက်အားလုံးကို Excel ထုတ်ယူလိုက်ပါပြီ`);
+                }}
+                type="button"
+                className="bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold hover:bg-emerald-800 transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              >
+                <Download className="w-4 h-4" /> ကျောင်းစာရင်းအားလုံး Excel ထုတ်ယူမည် ({schools.length})
+              </button>
             </div>
 
             {/* Import Report Banner if just imported */}
@@ -1859,37 +2175,228 @@ export default function Admin() {
                 </select>
               </div>
 
-              {/* Annual Fee Paid Checkbox */}
-              <div className="sm:col-span-2 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
-                <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    {...schoolForm.register('isAnnualFeePaid')}
-                    className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
-                  />
+              {/* Annual Fee & Student Count Range Settings Block */}
+              <div className="sm:col-span-2 bg-gradient-to-br from-sky-50/60 via-slate-50 to-indigo-50/40 p-4 rounded-2xl border border-sky-100 space-y-4">
+                <div className="flex items-center justify-between border-b border-sky-100 pb-2">
+                  <h4 className="font-bold text-xs sm:text-sm text-sky-950 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-sky-600" />
+                    <span>ကျောင်းသားဦးရေ Range နှင့် နှစ်စဉ်ကြေး သတ်မှတ်ချက်</span>
+                  </h4>
+                  <span className="text-[10px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                    အသင်းဝင် စည်းမျဉ်းသတ်မှတ်ချက်
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* Student Range Dropdown */}
                   <div>
-                    <span className="text-xs sm:text-sm font-bold text-slate-800 block">
-                      နှစ်စဉ်ကြေး ပေးသွင်းပြီး (Annual Fee Paid)
-                    </span>
-                    <span className="text-[11px] text-slate-500 block">
-                      အသင်းဝင်နှစ်စဉ်ကြေး ပေးသွင်းထားသော ကျောင်းဖြစ်ပါက အမှန်ခြစ်ပေးပါ
-                    </span>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      ကျောင်းသားဦးရေ Range *
+                    </label>
+                    <select
+                      {...schoolForm.register('studentRange')}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        schoolForm.setValue('studentRange', val);
+                        // Auto-fill default fee if user hasn't set custom
+                        const defaultFee =
+                          val === '1000+' ? 300000 :
+                          val === '501-1000' ? 200000 :
+                          val === '301-500' ? 150000 :
+                          val === '101-300' ? 100000 : 50000;
+                        schoolForm.setValue('feeAmount', defaultFee);
+                      }}
+                      className="w-full p-2.5 border rounded-lg text-xs sm:text-sm bg-white font-medium"
+                    >
+                      <option value="1-100">၁ - ၁၀၀ ဦး (သတ်မှတ်နှုန်း: ၅၀,၀၀၀ ကျပ်)</option>
+                      <option value="101-300">၁၀၁ - ၃၀၀ ဦး (သတ်မှတ်နှုန်း: ၁၀၀,၀၀၀ ကျပ်)</option>
+                      <option value="301-500">၃၀၁ - ၅၀၀ ဦး (သတ်မှတ်နှုန်း: ၁၅၀,၀၀၀ ကျပ်)</option>
+                      <option value="501-1000">၅၀၁ - ၁,၀၀၀ ဦး (သတ်မှတ်နှုန်း: ၂၀၀,၀၀၀ ကျပ်)</option>
+                      <option value="1000+">၁,၀၀၀ ဦး နှင့်အထက် (သတ်မှတ်နှုန်း: ၃၀၀,၀၀၀ ကျပ်)</option>
+                    </select>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      အသင်းဝင် နှစ်စဉ်ကြေး ကောက်ခံရန် ကျောင်းသားဦးရေ အဆင့်အတန်း
+                    </p>
                   </div>
-                </label>
+
+                  {/* Fee Amount (MMK) */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      နှစ်စဉ်ကြေး ပမာဏ (ကျပ်) *
+                    </label>
+                    <input
+                      type="number"
+                      {...schoolForm.register('feeAmount')}
+                      placeholder="ဥပမာ - 100000"
+                      className="w-full p-2.5 border rounded-lg text-xs sm:text-sm bg-white font-bold text-sky-950"
+                    />
+                    <div className="flex flex-wrap gap-1 mt-1 text-[10px]">
+                      <span className="text-slate-400">အမြန်ရွေး:</span>
+                      {[50000, 100000, 150000, 200000, 300000].map(amt => (
+                        <button
+                          key={amt}
+                          type="button"
+                          onClick={() => schoolForm.setValue('feeAmount', amt)}
+                          className="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-sky-800 hover:bg-sky-50 font-semibold"
+                        >
+                          {(amt / 10000).toLocaleString('my-MM')}သောင်း
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Exact Student Count (Optional) */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      တိကျသော ကျောင်းသားဦးရေ (ဦး)
+                    </label>
+                    <input
+                      type="number"
+                      {...schoolForm.register('studentCount')}
+                      placeholder="ဥပမာ - 180"
+                      className="w-full p-2.5 border rounded-lg text-xs sm:text-sm bg-white"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-0.5">ရှိပါက တိကျစွာ ရေးသွင်းနိုင်ပါသည်</p>
+                  </div>
+
+                  {/* Academic Year */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      ပညာသင်နှစ် (Academic Year)
+                    </label>
+                    <input
+                      {...schoolForm.register('feeAcademicYear')}
+                      placeholder="ဥပမာ - ၂၀၂၄-၂၀၂၅"
+                      className="w-full p-2.5 border rounded-lg text-xs sm:text-sm bg-white"
+                    />
+                  </div>
+                </div>
+
+                {/* Annual Fee Paid Status & Date */}
+                <div className="pt-2 border-t border-sky-100/80 flex flex-wrap items-center justify-between gap-3">
+                  <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      {...schoolForm.register('isAnnualFeePaid')}
+                      className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                    />
+                    <div>
+                      <span className="text-xs sm:text-sm font-bold text-slate-800 block">
+                        နှစ်စဉ်ကြေး ပေးသွင်းပြီး (Annual Fee Paid)
+                      </span>
+                      <span className="text-[11px] text-slate-500 block">
+                        အသင်းဝင်နှစ်စဉ်ကြေး ပေးသွင်းပြီးပါက အမှန်ခြစ်ပေးပါ
+                      </span>
+                    </div>
+                  </label>
+
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-medium text-slate-600 whitespace-nowrap">
+                      ပေးသွင်းသည့်ရက်:
+                    </label>
+                    <input
+                      type="date"
+                      {...schoolForm.register('feePaidDate')}
+                      className="p-1.5 border rounded-lg text-xs bg-white text-slate-700"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-slate-600 mb-1">ကျောင်း ဆက်သွယ်ရန် ဖုန်း</label>
-                <input {...schoolForm.register('schoolPhone')} placeholder="ကျောင်းဖုန်း" className="w-full p-2.5 border rounded-lg text-sm" />
+              {/* School Phone numbers (1 or more) */}
+              <div className="sm:col-span-2 border border-slate-200 p-3.5 rounded-xl space-y-2.5 bg-slate-50/60">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-800">
+                    ကျောင်း ဆက်သွယ်ရန် ဖုန်း (School Phone Numbers - ၁ လုံးနှင့်အထက် ထည့်သွင်းနိုင်သည်)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setExtraSchoolPhones(prev => [...prev, ''])}
+                    className="text-xs text-sky-700 hover:text-sky-900 font-bold cursor-pointer inline-flex items-center gap-1 bg-white px-2.5 py-1 rounded-lg border border-sky-200 shadow-2xs"
+                  >
+                    + နောက်ထပ် ကျောင်းဖုန်းထည့်ရန်
+                  </button>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  <input
+                    {...schoolForm.register('schoolPhone')}
+                    placeholder="ကျောင်းဖုန်း (၁) - အဓိက"
+                    className="w-full p-2.5 border rounded-lg text-sm bg-white"
+                  />
+                  <input
+                    {...schoolForm.register('schoolPhone2')}
+                    placeholder="ကျောင်းဖုန်း (၂) - အရန် (ရှိပါက)"
+                    className="w-full p-2.5 border rounded-lg text-sm bg-white"
+                  />
+                </div>
+                {extraSchoolPhones.map((ph, idx) => (
+                  <div key={idx} className="flex items-center gap-2 animate-in fade-in">
+                    <input
+                      type="text"
+                      value={ph}
+                      onChange={(e) => {
+                        const updated = [...extraSchoolPhones];
+                        updated[idx] = e.target.value;
+                        setExtraSchoolPhones(updated);
+                      }}
+                      placeholder={`နောက်ထပ် ကျောင်းဖုန်း (${idx + 3})`}
+                      className="flex-1 p-2.5 border rounded-lg text-sm bg-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setExtraSchoolPhones(extraSchoolPhones.filter((_, i) => i !== idx))}
+                      className="px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg border border-rose-200 cursor-pointer"
+                    >
+                      ဖယ်ရှားရန်
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
 
             {/* Founder */}
             <div className="border border-slate-200 p-4 rounded-xl space-y-3 bg-slate-50/50">
-              <h4 className="font-bold text-sm text-sky-900">တည်ထောင်သူ အချက်အလက် (Founder)</h4>
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <h4 className="font-bold text-sm text-sky-900">တည်ထောင်သူ အချက်အလက် (Founder)</h4>
+                <button
+                  type="button"
+                  onClick={() => setExtraFounderPhones(prev => [...prev, ''])}
+                  className="text-xs text-sky-800 hover:text-sky-950 font-bold cursor-pointer inline-flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-sky-300 shadow-2xs"
+                >
+                  + နောက်ထပ် ဖုန်းထည့်ရန်
+                </button>
+              </div>
               <input {...schoolForm.register('founderName')} placeholder="တည်ထောင်သူ အမည်" className="w-full p-2 border rounded-lg text-sm bg-white" />
-              <div className="grid sm:grid-cols-3 gap-2">
-                <input {...schoolForm.register('founderPhone')} placeholder="ဖုန်းနံပါတ်" className="p-2 border rounded-lg text-sm bg-white" />
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-semibold text-slate-500 block">ဖုန်းနံပါတ်များ (၁ လုံးနှင့်အထက် ထည့်သွင်းနိုင်သည်):</span>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  <input {...schoolForm.register('founderPhone')} placeholder="တည်ထောင်သူ ဖုန်းနံပါတ် (၁) - အဓိက" className="p-2 border rounded-lg text-sm bg-white" />
+                  <input {...schoolForm.register('founderPhone2')} placeholder="တည်ထောင်သူ ဖုန်းနံပါတ် (၂) - အရန် (ရှိပါက)" className="p-2 border rounded-lg text-sm bg-white" />
+                </div>
+              </div>
+              {extraFounderPhones.map((ph, idx) => (
+                <div key={idx} className="flex items-center gap-2 animate-in fade-in">
+                  <input
+                    type="text"
+                    value={ph}
+                    onChange={(e) => {
+                      const updated = [...extraFounderPhones];
+                      updated[idx] = e.target.value;
+                      setExtraFounderPhones(updated);
+                    }}
+                    placeholder={`နောက်ထပ် တည်ထောင်သူ ဖုန်းနံပါတ် (${idx + 3})`}
+                    className="flex-1 p-2 border rounded-lg text-sm bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setExtraFounderPhones(extraFounderPhones.filter((_, i) => i !== idx))}
+                    className="px-2.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50 rounded-lg border border-rose-200 cursor-pointer"
+                  >
+                    ဖယ်ရှားရန်
+                  </button>
+                </div>
+              ))}
+              <div className="grid sm:grid-cols-2 gap-2">
                 <input {...schoolForm.register('founderViber')} placeholder="Viber" className="p-2 border rounded-lg text-sm bg-white" />
                 <input {...schoolForm.register('founderTelegram')} placeholder="Telegram" className="p-2 border rounded-lg text-sm bg-white" />
               </div>
@@ -1897,26 +2404,157 @@ export default function Admin() {
 
             {/* Admin */}
             <div className="border border-slate-200 p-4 rounded-xl space-y-3 bg-slate-50/50">
-              <h4 className="font-bold text-sm text-sky-900">စီမံအုပ်ချုပ်သူ အချက်အလက် (Admin / Principal)</h4>
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <h4 className="font-bold text-sm text-sky-900">စီမံအုပ်ချုပ်သူ အချက်အလက် (Admin / Principal)</h4>
+                <button
+                  type="button"
+                  onClick={() => setExtraAdminPhones(prev => [...prev, ''])}
+                  className="text-xs text-sky-800 hover:text-sky-950 font-bold cursor-pointer inline-flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-sky-300 shadow-2xs"
+                >
+                  + နောက်ထပ် ဖုန်းထည့်ရန်
+                </button>
+              </div>
               <input {...schoolForm.register('adminName')} placeholder="စီမံအုပ်ချုပ်သူ အမည်" className="w-full p-2 border rounded-lg text-sm bg-white" />
-              <div className="grid sm:grid-cols-3 gap-2">
-                <input {...schoolForm.register('adminPhone')} placeholder="ဖုန်းနံပါတ်" className="p-2 border rounded-lg text-sm bg-white" />
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-semibold text-slate-500 block">ဖုန်းနံပါတ်များ (၁ လုံးနှင့်အထက် ထည့်သွင်းနိုင်သည်):</span>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  <input {...schoolForm.register('adminPhone')} placeholder="စီမံအုပ်ချုပ်သူ ဖုန်းနံပါတ် (၁) - အဓိက" className="p-2 border rounded-lg text-sm bg-white" />
+                  <input {...schoolForm.register('adminPhone2')} placeholder="စီမံအုပ်ချုပ်သူ ဖုန်းနံပါတ် (၂) - အရန် (ရှိပါက)" className="p-2 border rounded-lg text-sm bg-white" />
+                </div>
+              </div>
+              {extraAdminPhones.map((ph, idx) => (
+                <div key={idx} className="flex items-center gap-2 animate-in fade-in">
+                  <input
+                    type="text"
+                    value={ph}
+                    onChange={(e) => {
+                      const updated = [...extraAdminPhones];
+                      updated[idx] = e.target.value;
+                      setExtraAdminPhones(updated);
+                    }}
+                    placeholder={`နောက်ထပ် စီမံအုပ်ချုပ်သူ ဖုန်းနံပါတ် (${idx + 3})`}
+                    className="flex-1 p-2 border rounded-lg text-sm bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setExtraAdminPhones(extraAdminPhones.filter((_, i) => i !== idx))}
+                    className="px-2.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50 rounded-lg border border-rose-200 cursor-pointer"
+                  >
+                    ဖယ်ရှားရန်
+                  </button>
+                </div>
+              ))}
+              <div className="grid sm:grid-cols-2 gap-2">
                 <input {...schoolForm.register('adminViber')} placeholder="Viber" className="p-2 border rounded-lg text-sm bg-white" />
                 <input {...schoolForm.register('adminTelegram')} placeholder="Telegram" className="p-2 border rounded-lg text-sm bg-white" />
               </div>
             </div>
 
-            {/* Coordinator */}
-            <div className="border border-slate-200 p-4 rounded-xl space-y-3 bg-slate-50/50">
-              <h4 className="font-bold text-sm text-sky-900">တာဝန်ခံ အချက်အလက် (Coordinator)</h4>
-              <div className="grid sm:grid-cols-2 gap-2">
-                <input {...schoolForm.register('contactName')} placeholder="တာဝန်ခံ အမည်" className="p-2 border rounded-lg text-sm bg-white" />
-                <input {...schoolForm.register('contactRole')} placeholder="တာဝန်ခံ ရာထူး" className="p-2 border rounded-lg text-sm bg-white" />
+            {/* Coordinator 1 */}
+            <div className="border border-sky-200 p-4 rounded-xl space-y-3 bg-sky-50/40">
+              <div className="flex items-center justify-between border-b border-sky-100 pb-2">
+                <h4 className="font-bold text-sm text-sky-900 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-sky-800 text-white text-xs flex items-center justify-center font-bold">၁</span>
+                  တာဝန်ခံ (၁) အချက်အလက် (Coordinator 1)
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setExtraCoord1Phones(prev => [...prev, ''])}
+                  className="text-xs text-sky-800 hover:text-sky-950 font-bold cursor-pointer inline-flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-sky-300 shadow-2xs"
+                >
+                  + နောက်ထပ် ဖုန်းထည့်ရန်
+                </button>
               </div>
-              <div className="grid sm:grid-cols-3 gap-2">
-                <input {...schoolForm.register('contactPhone')} placeholder="ဖုန်းနံပါတ်" className="p-2 border rounded-lg text-sm bg-white" />
+              <div className="grid sm:grid-cols-2 gap-2">
+                <input {...schoolForm.register('contactName')} placeholder="တာဝန်ခံ (၁) အမည်" className="p-2 border rounded-lg text-sm bg-white" />
+                <input {...schoolForm.register('contactRole')} placeholder="တာဝန်ခံ (၁) ရာထူး (ဥပမာ - ရုံးတာဝန်ခံ)" className="p-2 border rounded-lg text-sm bg-white" />
+              </div>
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-semibold text-slate-500 block">ဖုန်းနံပါတ်များ (အနည်းဆုံး ၂ လုံး ထည့်သွင်းနိုင်သည်):</span>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  <input {...schoolForm.register('contactPhone')} placeholder="ဖုန်းနံပါတ် (၁)" className="p-2 border rounded-lg text-sm bg-white" />
+                  <input {...schoolForm.register('contactPhone2')} placeholder="ဖုန်းနံပါတ် (၂)" className="p-2 border rounded-lg text-sm bg-white" />
+                </div>
+              </div>
+              {extraCoord1Phones.map((ph, idx) => (
+                <div key={idx} className="flex items-center gap-2 animate-in fade-in">
+                  <input
+                    type="text"
+                    value={ph}
+                    onChange={(e) => {
+                      const updated = [...extraCoord1Phones];
+                      updated[idx] = e.target.value;
+                      setExtraCoord1Phones(updated);
+                    }}
+                    placeholder={`တာဝန်ခံ (၁) ဖုန်းနံပါတ် (${idx + 3})`}
+                    className="flex-1 p-2 border rounded-lg text-sm bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setExtraCoord1Phones(extraCoord1Phones.filter((_, i) => i !== idx))}
+                    className="px-2.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50 rounded-lg border border-rose-200 cursor-pointer"
+                  >
+                    ဖယ်ရှားရန်
+                  </button>
+                </div>
+              ))}
+              <div className="grid sm:grid-cols-2 gap-2">
                 <input {...schoolForm.register('contactViber')} placeholder="Viber" className="p-2 border rounded-lg text-sm bg-white" />
                 <input {...schoolForm.register('contactTelegram')} placeholder="Telegram" className="p-2 border rounded-lg text-sm bg-white" />
+              </div>
+            </div>
+
+            {/* Coordinator 2 */}
+            <div className="border border-indigo-200 p-4 rounded-xl space-y-3 bg-indigo-50/40">
+              <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
+                <h4 className="font-bold text-sm text-indigo-900 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-indigo-800 text-white text-xs flex items-center justify-center font-bold">၂</span>
+                  တာဝန်ခံ (၂) အချက်အလက် (Coordinator 2)
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setExtraCoord2Phones(prev => [...prev, ''])}
+                  className="text-xs text-indigo-800 hover:text-indigo-950 font-bold cursor-pointer inline-flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-indigo-300 shadow-2xs"
+                >
+                  + နောက်ထပ် ဖုန်းထည့်ရန်
+                </button>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-2">
+                <input {...schoolForm.register('contact2Name')} placeholder="တာဝန်ခံ (၂) အမည်" className="p-2 border rounded-lg text-sm bg-white" />
+                <input {...schoolForm.register('contact2Role')} placeholder="တာဝန်ခံ (၂) ရာထူး" className="p-2 border rounded-lg text-sm bg-white" />
+              </div>
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-semibold text-slate-500 block">ဖုန်းနံပါတ်များ (အနည်းဆုံး ၂ လုံး ထည့်သွင်းနိုင်သည်):</span>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  <input {...schoolForm.register('contact2Phone')} placeholder="ဖုန်းနံပါတ် (၁)" className="p-2 border rounded-lg text-sm bg-white" />
+                  <input {...schoolForm.register('contact2Phone2')} placeholder="ဖုန်းနံပါတ် (၂)" className="p-2 border rounded-lg text-sm bg-white" />
+                </div>
+              </div>
+              {extraCoord2Phones.map((ph, idx) => (
+                <div key={idx} className="flex items-center gap-2 animate-in fade-in">
+                  <input
+                    type="text"
+                    value={ph}
+                    onChange={(e) => {
+                      const updated = [...extraCoord2Phones];
+                      updated[idx] = e.target.value;
+                      setExtraCoord2Phones(updated);
+                    }}
+                    placeholder={`တာဝန်ခံ (၂) ဖုန်းနံပါတ် (${idx + 3})`}
+                    className="flex-1 p-2 border rounded-lg text-sm bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setExtraCoord2Phones(extraCoord2Phones.filter((_, i) => i !== idx))}
+                    className="px-2.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50 rounded-lg border border-rose-200 cursor-pointer"
+                  >
+                    ဖယ်ရှားရန်
+                  </button>
+                </div>
+              ))}
+              <div className="grid sm:grid-cols-2 gap-2">
+                <input {...schoolForm.register('contact2Viber')} placeholder="Viber" className="p-2 border rounded-lg text-sm bg-white" />
+                <input {...schoolForm.register('contact2Telegram')} placeholder="Telegram" className="p-2 border rounded-lg text-sm bg-white" />
               </div>
             </div>
 
@@ -2185,18 +2823,18 @@ export default function Admin() {
                   return (
                     <div
                       key={s.id}
-                      className={`p-4 rounded-2xl border transition flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                      className={`p-4 sm:p-5 rounded-2xl border transition space-y-3.5 ${
                         editingSchoolId === s.id
-                          ? 'bg-amber-50/80 border-amber-300 ring-2 ring-amber-200'
+                          ? 'bg-amber-50/80 border-amber-300 ring-2 ring-amber-200 shadow-xs'
                           : isSelected
                           ? 'bg-rose-50/30 border-rose-300 ring-1 ring-rose-200'
-                          : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-2xs'
+                          : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-xs'
                       }`}
                     >
-                      {/* Left: Selection Checkbox & School Emblem/Logo & Info */}
-                      <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
+                      {/* Top Row: Checkbox + Logo + School Info (Gets full horizontal width) */}
+                      <div className="flex items-start gap-3.5">
                         {/* Checkbox for bulk deletion */}
-                        <div className="pt-1 sm:pt-0 shrink-0">
+                        <div className="pt-1 shrink-0">
                           <input
                             type="checkbox"
                             checked={isSelected}
@@ -2210,38 +2848,38 @@ export default function Admin() {
                           <img
                             src={s.logoUrl}
                             alt={s.name}
-                            className="w-12 h-12 rounded-xl object-cover border border-slate-200 bg-white p-1 shrink-0"
+                            className="w-12 h-12 rounded-xl object-cover border border-slate-200 bg-white p-0.5 shrink-0 shadow-2xs"
                           />
                         ) : (
-                          <div className="w-12 h-12 rounded-xl bg-sky-900 text-white flex items-center justify-center shrink-0">
+                          <div className="w-12 h-12 rounded-xl bg-sky-900 text-white flex items-center justify-center shrink-0 shadow-2xs">
                             <SchoolIcon className="w-6 h-6" />
                           </div>
                         )}
 
-                        <div className="space-y-1 min-w-0 flex-1">
+                        <div className="space-y-1.5 min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-bold text-sm sm:text-base text-slate-900">
+                            <span className="font-bold text-base sm:text-lg text-slate-900 leading-snug break-words">
                               {s.name}
                             </span>
                             {s.level && (
-                              <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-semibold">
+                              <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-semibold shrink-0">
                                 {s.level}
                               </span>
                             )}
 
                             {/* Status Indicator Badge (Active, Under Review, Inactive) */}
                             {s.status === 'under_review' ? (
-                              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1.5 shadow-2xs">
+                              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1.5 shadow-2xs shrink-0 whitespace-nowrap">
                                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                                 <span>စိစစ်ဆဲ (Under Review)</span>
                               </span>
                             ) : s.status === 'inactive' ? (
-                              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-300 flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-300 flex items-center gap-1.5 shrink-0 whitespace-nowrap">
                                 <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
                                 <span>ယာယီရပ်နား (Inactive)</span>
                               </span>
                             ) : (
-                              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300 flex items-center gap-1.5 shadow-2xs">
+                              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300 flex items-center gap-1.5 shadow-2xs shrink-0 whitespace-nowrap">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                                 <span>လည်ပတ်ဆဲ (Active)</span>
                               </span>
@@ -2249,104 +2887,122 @@ export default function Admin() {
 
                             {/* Annual Fee Badge in Admin List */}
                             {s.isAnnualFeePaid ? (
-                              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1 shadow-2xs">
+                              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1 shadow-2xs shrink-0 whitespace-nowrap">
                                 <CheckCircle2 className="w-3 h-3 text-emerald-600" /> နှစ်စဉ်ကြေး ပေးပြီး
                               </span>
                             ) : (
-                              <span className="text-[10px] font-medium px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 flex items-center gap-1">
+                              <span className="text-[10px] font-medium px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 flex items-center gap-1 shrink-0 whitespace-nowrap">
                                 <XCircle className="w-3 h-3 text-slate-400" /> မပေးရသေး
                               </span>
                             )}
+
+                            {/* Student Count Range & Fee Badges */}
+                            {s.studentRange && (
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sky-50 text-sky-800 border border-sky-200 shrink-0 whitespace-nowrap">
+                                ကျောင်းသား: {s.studentRange} ဦး
+                              </span>
+                            )}
+                            {s.feeAmount !== undefined && s.feeAmount !== null && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-800 border border-indigo-200 shrink-0 whitespace-nowrap">
+                                {Number(s.feeAmount).toLocaleString('my-MM')} ကျပ်
+                              </span>
+                            )}
+
                             {editingSchoolId === s.id && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white animate-pulse">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white animate-pulse shrink-0 whitespace-nowrap">
                                 လက်ရှိ ပြင်ဆင်နေသည်
                               </span>
                             )}
                             {isSelected && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500 text-white">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500 text-white shrink-0 whitespace-nowrap">
                                 ဖျက်ရန် ရွေးထားသည်
                               </span>
                             )}
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-                            {s.schoolPhone && <span>ကျောင်းဖုန်း: <strong className="text-slate-700">{s.schoolPhone}</strong></span>}
-                            {s.founderName && <span>တည်ထောင်သူ: <span className="text-slate-700 font-medium">{s.founderName}</span></span>}
-                            {s.adminName && <span>စီမံအုပ်ချုပ်သူ: <span className="text-slate-700 font-medium">{s.adminName}</span></span>}
-                            {!s.schoolPhone && !s.founderName && !s.adminName && <span>အသေးစိတ် အချက်အလက် မရှိသေးပါ</span>}
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 pt-0.5">
+                            {(s.schoolPhone || s.schoolPhone2) && (
+                              <span>ကျောင်းဖုန်း: <strong className="text-slate-800">{[s.schoolPhone, s.schoolPhone2].filter(Boolean).join(', ')}</strong></span>
+                            )}
+                            {s.founderName && <span>တည်ထောင်သူ: <span className="text-slate-800 font-medium">{s.founderName} {[s.founderPhone, s.founderPhone2].filter(Boolean).length > 0 ? `(${[s.founderPhone, s.founderPhone2].filter(Boolean).join(', ')})` : ''}</span></span>}
+                            {s.adminName && <span>စီမံအုပ်ချုပ်သူ: <span className="text-slate-800 font-medium">{s.adminName} {[s.adminPhone, s.adminPhone2].filter(Boolean).length > 0 ? `(${[s.adminPhone, s.adminPhone2].filter(Boolean).join(', ')})` : ''}</span></span>}
+                            {s.contactName && <span>တာဝန်ခံ (၁): <span className="text-slate-800 font-medium">{s.contactName} {[s.contactPhone, s.contactPhone2].filter(Boolean).length > 0 ? `(${[s.contactPhone, s.contactPhone2].filter(Boolean).join(', ')})` : ''}</span></span>}
+                            {s.contact2Name && <span>တာဝန်ခံ (၂): <span className="text-slate-800 font-medium">{s.contact2Name} {[s.contact2Phone, s.contact2Phone2].filter(Boolean).length > 0 ? `(${[s.contact2Phone, s.contact2Phone2].filter(Boolean).join(', ')})` : ''}</span></span>}
+                            {!s.schoolPhone && !s.schoolPhone2 && !s.founderName && !s.adminName && !s.contactName && !s.contact2Name && <span className="text-slate-400 italic">အသေးစိတ် အချက်အလက် မရှိသေးပါ</span>}
                           </div>
                         </div>
                       </div>
 
-                      {/* Right: Clear Action Buttons (Edit, Delete, View, Quick Status, Quick Fee Toggle) */}
-                      <div className="flex flex-wrap items-center gap-2 shrink-0 border-t md:border-t-0 pt-3 md:pt-0 border-slate-100">
-                        {/* Quick Status Dropdown Selector */}
-                        <select
-                          value={s.status || 'active'}
-                          onChange={(e) => updateSchoolStatus(s, e.target.value as any)}
-                          className={`px-2.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer shadow-2xs outline-hidden ${
-                            s.status === 'under_review'
-                              ? 'bg-amber-50 border-amber-300 text-amber-900'
-                              : s.status === 'inactive'
-                              ? 'bg-slate-100 border-slate-300 text-slate-700'
-                              : 'bg-emerald-50 border-emerald-300 text-emerald-800'
-                          }`}
-                          title="ကျောင်း၏ လက်ရှိအခြေအနေ ပြောင်းလဲရန်"
-                        >
-                          <option value="active">🟢 Active (လည်ပတ်ဆဲ)</option>
-                          <option value="under_review">🟡 Under Review (စိစစ်ဆဲ)</option>
-                          <option value="inactive">⚪ Inactive (ယာယီရပ်နား)</option>
-                        </select>
+                      {/* Bottom Row: Action Toolbar (Separated cleanly, never squishing the school title) */}
+                      <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5">
+                        {/* Left Controls: Status Dropdown & Fee Toggle */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <select
+                            value={s.status || 'active'}
+                            onChange={(e) => updateSchoolStatus(s, e.target.value as any)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer shadow-2xs outline-hidden ${
+                              s.status === 'under_review'
+                                ? 'bg-amber-50 border-amber-300 text-amber-900'
+                                : s.status === 'inactive'
+                                ? 'bg-slate-100 border-slate-300 text-slate-700'
+                                : 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                            }`}
+                            title="ကျောင်း၏ လက်ရှိအခြေအနေ ပြောင်းလဲရန်"
+                          >
+                            <option value="active">🟢 Active (လည်ပတ်ဆဲ)</option>
+                            <option value="under_review">🟡 Under Review (စိစစ်ဆဲ)</option>
+                            <option value="inactive">⚪ Inactive (ယာယီရပ်နား)</option>
+                          </select>
 
-                        {/* 1-Click Toggle Annual Fee */}
-                        <button
-                          type="button"
-                          onClick={() => toggleSchoolFeeStatus(s)}
-                          className={`px-3 py-2 rounded-xl text-xs font-bold border transition cursor-pointer shadow-2xs flex items-center gap-1 ${
-                            s.isAnnualFeePaid
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                              : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
-                          }`}
-                          title="နှစ်စဉ်ကြေး အခြေအနေကို ၁-ချက်နှိပ်ရုံဖြင့် ပြောင်းလဲရန်"
-                        >
-                          {s.isAnnualFeePaid ? 'ကြေးပေးပြီး ✓' : 'ကြေးမပေးရသေး ✗'}
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => toggleSchoolFeeStatus(s)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer shadow-2xs flex items-center gap-1 ${
+                              s.isAnnualFeePaid
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                                : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                            }`}
+                            title="နှစ်စဉ်ကြေး အခြေအနေကို ၁-ချက်နှိပ်ရုံဖြင့် ပြောင်းလဲရန်"
+                          >
+                            {s.isAnnualFeePaid ? 'ကြေးပေးပြီး ✓' : 'ကြေးမပေးရသေး ✗'}
+                          </button>
+                        </div>
 
-                        {/* Explicit Edit School Button */}
-                        <button
-                          type="button"
-                          onClick={() => startEditSchool(s)}
-                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs ${
-                            editingSchoolId === s.id
-                              ? 'bg-amber-600 text-white shadow-xs ring-2 ring-amber-300'
-                              : 'bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100'
-                          }`}
-                          title="ဤကျောင်းအချက်အလက်ကို ပြင်ဆင်ရန်"
-                        >
-                          <Edit2 className="w-3.5 h-3.5 text-amber-700" />
-                          <span>ပြင်ဆင်ရန် (Edit)</span>
-                        </button>
+                        {/* Right Controls: Edit, View Detail, Delete */}
+                        <div className="flex items-center gap-2 ml-auto">
+                          <Link
+                            to={`/schools/${s.id}`}
+                            className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition flex items-center gap-1 shadow-2xs"
+                            title="ကျောင်းအသေးစိတ် စာမျက်နှာ ကြည့်ရှုရန်"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-slate-500" />
+                            <span>ကြည့်ရန်</span>
+                          </Link>
 
-                        {/* View Detail Link */}
-                        <Link
-                          to={`/schools/${s.id}`}
-                          className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition flex items-center gap-1 shadow-2xs"
-                          title="ကျောင်းအသေးစိတ် စာမျက်နှာ ကြည့်ရှုရန်"
-                        >
-                          <Eye className="w-3.5 h-3.5 text-slate-500" />
-                          <span className="hidden sm:inline">ကြည့်ရန်</span>
-                        </Link>
+                          <button
+                            type="button"
+                            onClick={() => startEditSchool(s)}
+                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                              editingSchoolId === s.id
+                                ? 'bg-amber-600 text-white shadow-xs ring-2 ring-amber-300'
+                                : 'bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100'
+                            }`}
+                            title="ဤကျောင်းအချက်အလက်ကို ပြင်ဆင်ရန်"
+                          >
+                            <Edit2 className="w-3.5 h-3.5 text-amber-700" />
+                            <span>ပြင်ဆင်ရန် (Edit)</span>
+                          </button>
 
-                        {/* Explicit Delete School Button */}
-                        <button
-                          onClick={() => deleteSchool(s.id, s.name)}
-                          type="button"
-                          className="px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100 transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                          title="ဤကျောင်းကို အပြီးပိုင် ဖျက်ရန်"
-                        >
-                          <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                          <span>ဖျက်ရန် (Delete)</span>
-                        </button>
+                          <button
+                            onClick={() => deleteSchool(s.id, s.name)}
+                            type="button"
+                            className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100 transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                            title="ဤကျောင်းကို အပြီးပိုင် ဖျက်ရန်"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                            <span>ဖျက်ရန် (Delete)</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );

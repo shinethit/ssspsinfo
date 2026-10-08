@@ -1,8 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Announcement, School, Association } from '../types';
+import { useData, getAnnouncementTimestamp } from '../context/DataContext';
 import { getCategoryBadge } from './Announcements';
 import {
   BookOpen,
@@ -28,38 +27,14 @@ import {
 import { PWAInstallButton } from '../components/PWAInstallButton';
 
 export default function Home() {
-  const [latestAnnouncements, setLatestAnnouncements] = useState<Announcement[]>([]);
-  const [schools, setSchools] = useState<School[]>([]);
-  const [associations, setAssociations] = useState<Association[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { schools, announcements, associations, loading } = useData();
   const [quickSearch, setQuickSearch] = useState('');
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true);
-        // Fetch announcements
-        const annQ = query(collection(db, 'announcements'), orderBy('publishedAt', 'desc'), limit(4));
-        const annSnap = await getDocs(annQ);
-        setLatestAnnouncements(
-          annSnap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() })) as Announcement[]
-        );
-
-        // Fetch schools
-        const schSnap = await getDocs(collection(db, 'schools'));
-        setSchools(schSnap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() })) as School[]);
-
-        // Fetch associations
-        const ascSnap = await getDocs(collection(db, 'associations'));
-        setAssociations(ascSnap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() })) as Association[]);
-      } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchDashboardData();
-  }, []);
+  const latestAnnouncements = useMemo(() => {
+    return [...announcements]
+      .sort((a, b) => getAnnouncementTimestamp(b) - getAnnouncementTimestamp(a))
+      .slice(0, 4);
+  }, [announcements]);
 
   // Dashboard Stats Calculations
   const totalSchools = schools.length;
@@ -78,6 +53,23 @@ export default function Home() {
         (s.name && s.name.toLowerCase().includes(q)) ||
         (s.founderName && s.founderName.toLowerCase().includes(q)) ||
         (s.adminName && s.adminName.toLowerCase().includes(q)) ||
+        (s.contactName && s.contactName.toLowerCase().includes(q)) ||
+        (s.contact2Name && s.contact2Name.toLowerCase().includes(q)) ||
+        (s.schoolPhone && s.schoolPhone.toLowerCase().includes(q)) ||
+        (s.schoolPhone2 && s.schoolPhone2.toLowerCase().includes(q)) ||
+        (s.founderPhone && s.founderPhone.toLowerCase().includes(q)) ||
+        (s.founderPhone2 && s.founderPhone2.toLowerCase().includes(q)) ||
+        (Array.isArray(s.founderPhones) && s.founderPhones.some(p => p.toLowerCase().includes(q))) ||
+        (s.adminPhone && s.adminPhone.toLowerCase().includes(q)) ||
+        (s.adminPhone2 && s.adminPhone2.toLowerCase().includes(q)) ||
+        (Array.isArray(s.adminPhones) && s.adminPhones.some(p => p.toLowerCase().includes(q))) ||
+        (s.contactPhone && s.contactPhone.toLowerCase().includes(q)) ||
+        (s.contactPhone2 && s.contactPhone2.toLowerCase().includes(q)) ||
+        (s.contact2Phone && s.contact2Phone.toLowerCase().includes(q)) ||
+        (s.contact2Phone2 && s.contact2Phone2.toLowerCase().includes(q)) ||
+        (Array.isArray(s.schoolPhones) && s.schoolPhones.some(p => p.toLowerCase().includes(q))) ||
+        (Array.isArray(s.contactPhones) && s.contactPhones.some(p => p.toLowerCase().includes(q))) ||
+        (Array.isArray(s.contact2Phones) && s.contact2Phones.some(p => p.toLowerCase().includes(q))) ||
         (s.level && s.level.toLowerCase().includes(q))
       )
       .slice(0, 6);
@@ -135,10 +127,19 @@ export default function Home() {
                         to={`/schools/${s.id}`}
                         className="p-1.5 hover:bg-slate-50 rounded-lg flex items-center justify-between gap-2 transition"
                       >
-                        <div>
-                          <p className="font-bold text-[11px] sm:text-xs text-sky-950">{s.name}</p>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-[11px] sm:text-xs text-sky-950 truncate">{s.name}</p>
+                          {(s.contactName || s.contact2Name || s.schoolPhone || s.schoolPhone2) && (
+                            <p className="text-[10px] text-slate-500 truncate">
+                              {[
+                                s.contactName ? `တာဝန်ခံ (၁): ${s.contactName}` : '',
+                                s.contact2Name ? `တာဝန်ခံ (၂): ${s.contact2Name}` : '',
+                                (s.schoolPhone || s.schoolPhone2) ? `ဖုန်း: ${s.schoolPhone || s.schoolPhone2}` : '',
+                              ].filter(Boolean).join(' | ')}
+                            </p>
+                          )}
                         </div>
-                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-800 border border-sky-200">
+                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-800 border border-sky-200 shrink-0">
                           အသေးစိတ်
                         </span>
                       </Link>
@@ -225,9 +226,9 @@ export default function Home() {
                     <span className={`text-[8px] px-1 py-0.5 rounded-full font-semibold border ${badge.className}`}>
                       {badge.label}
                     </span>
-                    <span className="text-[9px] text-slate-400 flex items-center gap-0.5 shrink-0">
-                      <Calendar className="w-2.5 h-2.5" />
-                      {a.publishedAt ? new Date(a.publishedAt).toLocaleDateString('my-MM') : 'မကြာသေးမီက'}
+                    <span className="text-[9px] text-slate-500 font-medium flex items-center gap-0.5 shrink-0">
+                      <Calendar className="w-2.5 h-2.5 text-sky-600" />
+                      {a.eventDate || (a.publishedAt ? new Date(a.publishedAt).toLocaleDateString('my-MM') : 'မကြာသေးမီက')}
                     </span>
                   </div>
 
@@ -255,9 +256,12 @@ export default function Home() {
 
         <div className="grid grid-cols-3 gap-2">
           {/* High School */}
-          <div className="p-2 rounded-lg bg-sky-50/50 border border-sky-50 space-y-0.5">
+          <Link
+            to="/contacts?category=high"
+            className="p-2 rounded-lg bg-sky-50/60 border border-sky-100 space-y-0.5 hover:border-sky-300 transition group block"
+          >
             <div className="flex items-center justify-between text-[9px] font-bold text-sky-900">
-              <span>အထက်တန်း</span>
+              <span className="group-hover:text-sky-700">အထက်တန်း</span>
               <span className="text-sky-700 font-extrabold">{highSchoolsCount}</span>
             </div>
             <div className="w-full bg-sky-100/50 rounded-full h-1 overflow-hidden">
@@ -266,11 +270,14 @@ export default function Home() {
                 style={{ width: `${totalSchools > 0 ? (highSchoolsCount / totalSchools) * 100 : 0}%` }}
               />
             </div>
-          </div>
+          </Link>
           {/* Middle School */}
-          <div className="p-2 rounded-lg bg-emerald-50/50 border border-emerald-50 space-y-0.5">
+          <Link
+            to="/contacts?category=middle"
+            className="p-2 rounded-lg bg-emerald-50/60 border border-emerald-100 space-y-0.5 hover:border-emerald-300 transition group block"
+          >
             <div className="flex items-center justify-between text-[9px] font-bold text-emerald-900">
-              <span>အလယ်တန်း</span>
+              <span className="group-hover:text-emerald-700">အလယ်တန်း</span>
               <span className="text-emerald-700 font-extrabold">{middleSchoolsCount}</span>
             </div>
             <div className="w-full bg-emerald-100/50 rounded-full h-1 overflow-hidden">
@@ -279,11 +286,14 @@ export default function Home() {
                 style={{ width: `${totalSchools > 0 ? (middleSchoolsCount / totalSchools) * 100 : 0}%` }}
               />
             </div>
-          </div>
+          </Link>
           {/* Primary School */}
-          <div className="p-2 rounded-lg bg-amber-50/50 border border-amber-50 space-y-0.5">
+          <Link
+            to="/contacts?category=primary"
+            className="p-2 rounded-lg bg-amber-50/60 border border-amber-100 space-y-0.5 hover:border-amber-300 transition group block"
+          >
             <div className="flex items-center justify-between text-[9px] font-bold text-amber-900">
-              <span>မူလတန်း</span>
+              <span className="group-hover:text-amber-700">မူလတန်း</span>
               <span className="text-amber-700 font-extrabold">{primarySchoolsCount}</span>
             </div>
             <div className="w-full bg-amber-100/50 rounded-full h-1 overflow-hidden">
@@ -292,7 +302,7 @@ export default function Home() {
                 style={{ width: `${totalSchools > 0 ? (primarySchoolsCount / totalSchools) * 100 : 0}%` }}
               />
             </div>
-          </div>
+          </Link>
         </div>
       </section>
 

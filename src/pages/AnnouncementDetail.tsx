@@ -61,13 +61,18 @@ export default function AnnouncementDetail() {
   }
 
   const badge = getCategoryBadge(announcement.category);
-  const dateFormatted = announcement.publishedAt
-    ? new Date(announcement.publishedAt).toLocaleDateString('my-MM', {
+  const rawDate = announcement.eventDate || (announcement.publishedAt ? announcement.publishedAt.split('T')[0] : '');
+  let dateFormatted = rawDate;
+  if (rawDate) {
+    const d = new Date(rawDate.includes('T') ? rawDate : `${rawDate}T12:00:00`);
+    if (!isNaN(d.getTime())) {
+      dateFormatted = d.toLocaleDateString('my-MM', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
-      })
-    : '';
+      });
+    }
+  }
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
