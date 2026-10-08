@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 
 export default function Dashboard() {
-  const { schools, announcements, loading } = useData();
+  const { schools, announcements, schoolLevels, loading } = useData();
 
   // Annual Fee Breakdown Tab: 'level' | 'student_range' | 'amount' | 'matrix'
   const [feeBreakdownTab, setFeeBreakdownTab] = useState<'level' | 'student_range' | 'amount' | 'matrix'>('level');
@@ -46,28 +46,19 @@ export default function Dashboard() {
     if (s.feeAmount !== undefined && s.feeAmount !== null && !isNaN(Number(s.feeAmount))) {
       return Number(s.feeAmount);
     }
-    const range = s.studentRange;
-    if (range === '1000+') return 300000;
-    if (range === '501-1000') return 200000;
-    if (range === '301-500') return 150000;
-    if (range === '101-300') return 100000;
-    return 50000;
+    const tier = getStudentRangeTier(s.studentRange);
+    if (tier) return tier.defaultFee;
+    return 200000;
   };
 
   // Helper to normalize range key
   const getSchoolRangeKey = (s: School): string => {
-    if (s.studentRange) return s.studentRange;
-    return '1-100'; // Default fallback tier
-  };
-
-  // Helper to normalize level key
-  const getSchoolLevelKey = (s: School): 'high' | 'middle' | 'primary' | 'preschool' | 'other' => {
-    const l = (s.level || '').toLowerCase();
-    if (l.includes('အထက်တန်း') || l.includes('high')) return 'high';
-    if (l.includes('အလယ်တန်း') || l.includes('middle')) return 'middle';
-    if (l.includes('မူလတန်းကြို') || l.includes('မူကြို') || l.includes('kg') || l.includes('pre')) return 'preschool';
-    if (l.includes('မူလတန်း') || l.includes('primary')) return 'primary';
-    return 'other';
+    if (s.studentRange) {
+      const tier = getStudentRangeTier(s.studentRange);
+      if (tier) return tier.key;
+      return s.studentRange;
+    }
+    return '0-100'; // Default fallback tier
   };
 
   // 1. Overall Key Metrics
@@ -99,25 +90,40 @@ export default function Dashboard() {
     return `${lakhs} သိန်း`;
   };
 
-  // 2. Breakdown By School Level (ကျောင်းအဆင့်အလိုက်)
+  // 2. Breakdown By School Level (ကျောင်းအဆင့်အလိုက် - Configurable & Database School Levels)
   const levelBreakdown = useMemo(() => {
-    const levels = [
-      { key: 'high', label: 'အထက်တန်း', sub: 'High School', color: 'sky' },
-      { key: 'middle', label: 'အလယ်တန်း', sub: 'Middle School', color: 'emerald' },
-      { key: 'primary', label: 'မူလတန်း', sub: 'Primary School', color: 'amber' },
-      { key: 'preschool', label: 'မူလတန်းကြို', sub: 'Pre-school / KG', color: 'purple' },
-    ];
+    const configuredNames = (schoolLevels || []).map(l => l.name.trim()).filter(Boolean);
+    const distinctSchoolLevels = Array.from(new Set(schools.map(s => (s.level || '').trim()).filter(Boolean)));
+    const allLevelNames = [...configuredNames];
+    distinctSchoolLevels.forEach(lvl => {
+      if (!allLevelNames.some(existing => existing.toLowerCase() === lvl.toLowerCase())) {
+        allLevelNames.push(lvl);
+      }
+    });
 
-    return levels.map(lvl => {
-      const allInLevel = schools.filter(s => getSchoolLevelKey(s) === lvl.key);
+    if (allLevelNames.length === 0) {
+      allLevelNames.push('အထက်တန်း');
+    }
+
+    const colorPalettes = ['sky', 'emerald', 'teal', 'cyan', 'blue', 'indigo', 'purple', 'violet', 'amber', 'rose'];
+
+    return allLevelNames.map((levelName, idx) => {
+      const allInLevel = schools.filter(s => {
+        const sl = (s.level || '').trim();
+        return sl === levelName || sl.toLowerCase() === levelName.toLowerCase();
+      });
       const paidInLevel = allInLevel.filter(s => !!s.isAnnualFeePaid);
       const unpaidInLevel = allInLevel.filter(s => !s.isAnnualFeePaid);
       const collected = paidInLevel.reduce((sum, s) => sum + getSchoolFee(s), 0);
       const expected = allInLevel.reduce((sum, s) => sum + getSchoolFee(s), 0);
       const pct = allInLevel.length > 0 ? Math.round((paidInLevel.length / allInLevel.length) * 100) : 0;
+      const color = colorPalettes[idx % colorPalettes.length];
 
       return {
-        ...lvl,
+        key: levelName,
+        label: levelName,
+        sub: `ကျောင်းအဆင့် (${idx + 1})`,
+        color,
         total: allInLevel.length,
         paid: paidInLevel.length,
         unpaid: unpaidInLevel.length,
@@ -126,9 +132,9 @@ export default function Dashboard() {
         pct,
       };
     });
-  }, [schools]);
+  }, [schools, schoolLevels]);
 
-  // 3. Breakdown By Student Count Range (ကျောင်းသားဦးရေ Range အလိုက်)
+  // 3. Breakdown By Student Count Range (ကျောင်းသားဦးရေ Range အလိုက် - Reference Tiers)
   const studentRangeBreakdown = useMemo(() => {
     return STUDENT_RANGE_TIERS.map(tier => {
       const allInRange = schools.filter(s => getSchoolRangeKey(s) === tier.key);
@@ -156,14 +162,17 @@ export default function Dashboard() {
     });
   }, [schools]);
 
-  // 4. Breakdown By Fee Amount Tiers (ထည့်ဝင်ထားသော ပမာဏအလိုက်)
+  // 4. Breakdown By Fee Amount Tiers (ထည့်ဝင်ထားသော ပမာဏအလိုက် - Reference Tiers)
   const feeAmountBreakdown = useMemo(() => {
     const tiers = [
-      { amount: 300000, label: '၃၀၀,၀၀၀ ကျပ် နှုန်းထား' },
-      { amount: 200000, label: '၂၀၀,၀၀၀ ကျပ် နှုန်းထား' },
-      { amount: 150000, label: '၁၅၀,၀၀၀ ကျပ် နှုန်းထား' },
-      { amount: 100000, label: '၁၀၀,၀၀၀ ကျပ် နှုန်းထား' },
-      { amount: 50000, label: '၅၀,၀၀၀ ကျပ် နှုန်းထား' },
+      { amount: 1000000, label: '၁,၀၀၀,၀၀၀ ကျပ် နှုန်းထား (၆၀၁ ဦးနှင့်အထက်)' },
+      { amount: 700000, label: '၇၀၀,၀၀၀ ကျပ် နှုန်းထား (၄၀၁ - ၆၀၀ ဦး)' },
+      { amount: 500000, label: '၅၀၀,၀၀၀ ကျပ် နှုန်းထား (၃၀၁ - ၄၀၀ ဦး)' },
+      { amount: 400000, label: '၄၀၀,၀၀၀ ကျပ် နှုန်းထား (၂၅၁ - ၃၀၀ ဦး)' },
+      { amount: 350000, label: '၃၅၀,၀၀၀ ကျပ် နှုန်းထား (၂၀၁ - ၂၅၀ ဦး)' },
+      { amount: 300000, label: '၃၀၀,၀၀၀ ကျပ် နှုန်းထား (၁၅၁ - ၂၀၀ ဦး)' },
+      { amount: 250000, label: '၂၅၀,၀၀၀ ကျပ် နှုန်းထား (၁၀၁ - ၁၅၀ ဦး)' },
+      { amount: 200000, label: '၂၀၀,၀၀၀ ကျပ် နှုန်းထား (၀ - ၁၀၀ ဦး)' },
     ];
 
     return tiers.map(t => {
@@ -189,43 +198,33 @@ export default function Dashboard() {
 
   // 5. Cross Matrix (ကျောင်းအဆင့် x ကျောင်းသားဦးရေ Range)
   const matrixData = useMemo(() => {
-    const levels = [
-      { key: 'high', label: 'အထက်တန်း' },
-      { key: 'middle', label: 'အလယ်တန်း' },
-      { key: 'primary', label: 'မူလတန်း' },
-      { key: 'preschool', label: 'မူကြို' },
-    ];
-
-    return levels.map(lvl => {
+    return levelBreakdown.map(lvl => {
       const rowRanges = STUDENT_RANGE_TIERS.map(tier => {
         const matching = schools.filter(
-          s => getSchoolLevelKey(s) === lvl.key && getSchoolRangeKey(s) === tier.key
+          s => (s.level || '').trim().toLowerCase() === lvl.key.toLowerCase() && getSchoolRangeKey(s) === tier.key
         );
         const paid = matching.filter(s => !!s.isAnnualFeePaid).length;
         const total = matching.length;
         const collected = matching.filter(s => !!s.isAnnualFeePaid).reduce((sum, s) => sum + getSchoolFee(s), 0);
         return {
           tierKey: tier.key,
+          tierLabel: tier.shortLabel,
           paid,
           total,
           collected,
         };
       });
 
-      const totalLevelSchools = schools.filter(s => getSchoolLevelKey(s) === lvl.key);
-      const totalLevelPaid = totalLevelSchools.filter(s => !!s.isAnnualFeePaid).length;
-      const totalLevelCollected = totalLevelSchools.filter(s => !!s.isAnnualFeePaid).reduce((sum, s) => sum + getSchoolFee(s), 0);
-
       return {
         levelKey: lvl.key,
         levelLabel: lvl.label,
         ranges: rowRanges,
-        rowTotal: totalLevelSchools.length,
-        rowPaid: totalLevelPaid,
-        rowCollected: totalLevelCollected,
+        rowTotal: lvl.total,
+        rowPaid: lvl.paid,
+        rowCollected: lvl.collected,
       };
     });
-  }, [schools]);
+  }, [levelBreakdown, schools]);
 
   // Top 2 Announcements (sorted strictly by Admin Set Date / Event Date)
   const latestTwoAnnouncements = useMemo(() => {
@@ -245,27 +244,34 @@ export default function Dashboard() {
           (school.founderName && school.founderName.toLowerCase().includes(q)) ||
           (school.founderPhone && school.founderPhone.toLowerCase().includes(q)) ||
           (school.founderPhone2 && school.founderPhone2.toLowerCase().includes(q)) ||
+          (Array.isArray(school.founderPhones) && school.founderPhones.some(p => p.toLowerCase().includes(q))) ||
           (school.adminName && school.adminName.toLowerCase().includes(q)) ||
           (school.adminPhone && school.adminPhone.toLowerCase().includes(q)) ||
           (school.adminPhone2 && school.adminPhone2.toLowerCase().includes(q)) ||
+          (Array.isArray(school.adminPhones) && school.adminPhones.some(p => p.toLowerCase().includes(q))) ||
           (school.contactName && school.contactName.toLowerCase().includes(q)) ||
+          (school.responsiblePerson1Name && school.responsiblePerson1Name.toLowerCase().includes(q)) ||
           (school.contact2Name && school.contact2Name.toLowerCase().includes(q)) ||
+          (school.responsiblePerson2Name && school.responsiblePerson2Name.toLowerCase().includes(q)) ||
           (school.schoolPhone && school.schoolPhone.toLowerCase().includes(q)) ||
           (school.schoolPhone2 && school.schoolPhone2.toLowerCase().includes(q)) ||
+          (Array.isArray(school.schoolPhones) && school.schoolPhones.some(p => p.toLowerCase().includes(q))) ||
           (school.contactPhone && school.contactPhone.toLowerCase().includes(q)) ||
+          (school.responsiblePerson1Phone && school.responsiblePerson1Phone.toLowerCase().includes(q)) ||
+          (Array.isArray(school.contactPhones) && school.contactPhones.some(p => p.toLowerCase().includes(q))) ||
+          (Array.isArray(school.responsiblePerson1Phones) && school.responsiblePerson1Phones.some(p => p.toLowerCase().includes(q))) ||
           (school.contact2Phone && school.contact2Phone.toLowerCase().includes(q)) ||
+          (school.responsiblePerson2Phone && school.responsiblePerson2Phone.toLowerCase().includes(q)) ||
+          (Array.isArray(school.contact2Phones) && school.contact2Phones.some(p => p.toLowerCase().includes(q))) ||
+          (Array.isArray(school.responsiblePerson2Phones) && school.responsiblePerson2Phones.some(p => p.toLowerCase().includes(q))) ||
           (school.level && school.level.toLowerCase().includes(q));
 
         const matchStatus = selectedStatus === 'all' || (school.status || 'active') === selectedStatus;
 
-        const schoolLvl = getSchoolLevelKey(school);
+        const schoolLvl = (school.level || '').trim().toLowerCase();
         const matchLevel =
           selectedLevel === 'all' ||
-          selectedLevel === schoolLvl ||
-          (selectedLevel === 'high' && schoolLvl === 'high') ||
-          (selectedLevel === 'middle' && schoolLvl === 'middle') ||
-          (selectedLevel === 'primary' && schoolLvl === 'primary') ||
-          (selectedLevel === 'preschool' && schoolLvl === 'preschool');
+          schoolLvl === selectedLevel.trim().toLowerCase();
 
         const schoolRange = getSchoolRangeKey(school);
         const matchRange = selectedRange === 'all' || selectedRange === schoolRange;
@@ -424,8 +430,8 @@ export default function Dashboard() {
             </p>
           </div>
 
-          {/* Interactive Navigation Tabs */}
-          <div className="flex items-center p-1 bg-slate-100 rounded-xl gap-1 self-start sm:self-auto overflow-x-auto max-w-full">
+          {/* Interactive Navigation Tabs - flex-wrap to prevent horizontal scrolling */}
+          <div className="flex flex-wrap items-center p-1 bg-slate-100 rounded-xl gap-1 self-start sm:self-auto max-w-full">
             <button
               onClick={() => setFeeBreakdownTab('level')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
@@ -640,21 +646,56 @@ export default function Dashboard() {
 
         {/* TAB CONTENT 4: ပေါင်းစပ်ဇယား (Matrix View) */}
         {feeBreakdownTab === 'matrix' && (
-          <div className="space-y-3">
-            <div className="overflow-x-auto border border-slate-200 rounded-2xl">
-              <table className="w-full text-xs text-left border-collapse">
+          <div className="space-y-4">
+            {/* Mobile View: Level breakdown cards */}
+            <div className="md:hidden space-y-3">
+              {matrixData.map(row => (
+                <div key={row.levelKey} className="p-4 bg-white border border-slate-200 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span className="font-extrabold text-sm text-slate-900">{row.levelLabel}</span>
+                    <span className="text-xs font-bold text-sky-800 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-100">
+                      {row.rowPaid} / {row.rowTotal} ကျောင်း ({formatMMK(row.rowCollected)})
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {row.ranges.map(cell => (
+                      <div key={cell.tierKey} className="p-2 bg-slate-50 rounded-lg border border-slate-150 space-y-0.5">
+                        <span className="text-[10px] text-slate-500 block truncate">{cell.tierLabel}</span>
+                        {cell.total > 0 ? (
+                          <div>
+                            <div className="font-bold text-slate-800">
+                              <span className="text-emerald-700">{cell.paid}</span>
+                              <span className="text-slate-400 font-normal"> / {cell.total}</span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-medium block">
+                              {formatMMK(cell.collected)}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-300">-</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop View: Table */}
+            <div className="hidden md:block border border-slate-200 rounded-2xl overflow-hidden">
+              <table className="w-full text-xs text-left border-collapse table-auto">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
-                    <th className="p-3 whitespace-nowrap">ကျောင်းအဆင့် \ ကျောင်းသား Range</th>
+                    <th className="p-3">ကျောင်းအဆင့် \ ကျောင်းသား Range</th>
                     {STUDENT_RANGE_TIERS.map(tier => (
-                      <th key={tier.key} className="p-3 text-center whitespace-nowrap">
+                      <th key={tier.key} className="p-3 text-center">
                         <div>{tier.shortLabel} ဦး</div>
                         <span className="text-[10px] font-normal text-slate-400">
                           ({formatMMK(tier.defaultFee)})
                         </span>
                       </th>
                     ))}
-                    <th className="p-3 text-right whitespace-nowrap bg-sky-50/60 text-sky-950 font-black">
+                    <th className="p-3 text-right bg-sky-50/60 text-sky-950 font-black">
                       စုစုပေါင်း
                     </th>
                   </tr>
@@ -662,11 +703,11 @@ export default function Dashboard() {
                 <tbody className="divide-y divide-slate-100">
                   {matrixData.map(row => (
                     <tr key={row.levelKey} className="hover:bg-slate-50/80 transition">
-                      <td className="p-3 font-bold text-slate-900 whitespace-nowrap">
+                      <td className="p-3 font-bold text-slate-900">
                         {row.levelLabel}
                       </td>
                       {row.ranges.map(cell => (
-                        <td key={cell.tierKey} className="p-3 text-center whitespace-nowrap">
+                        <td key={cell.tierKey} className="p-3 text-center">
                           {cell.total > 0 ? (
                             <div>
                               <span className="font-extrabold text-emerald-700">
@@ -682,7 +723,7 @@ export default function Dashboard() {
                           )}
                         </td>
                       ))}
-                      <td className="p-3 text-right font-black text-sky-950 whitespace-nowrap bg-sky-50/30">
+                      <td className="p-3 text-right font-black text-sky-950 bg-sky-50/30">
                         <div>{row.rowPaid} / {row.rowTotal} ကျောင်း</div>
                         <div className="text-[10px] text-sky-700 font-bold">{formatMMK(row.rowCollected)} ကျပ်</div>
                       </td>
@@ -696,12 +737,12 @@ export default function Dashboard() {
                       const tierTotal = schools.filter(s => getSchoolRangeKey(s) === tier.key);
                       const tierPaid = tierTotal.filter(s => !!s.isAnnualFeePaid).length;
                       return (
-                        <td key={tier.key} className="p-3 text-center whitespace-nowrap text-sky-950">
+                        <td key={tier.key} className="p-3 text-center text-sky-950">
                           {tierPaid} / {tierTotal.length}
                         </td>
                       );
                     })}
-                    <td className="p-3 text-right whitespace-nowrap text-sky-950 font-black bg-sky-100/60">
+                    <td className="p-3 text-right text-sky-950 font-black bg-sky-100/60">
                       {paidCount} / {totalSchools} ကျောင်း ({formatMMK(totalCollectedAmount)} ကျပ်)
                     </td>
                   </tr>
@@ -787,10 +828,11 @@ export default function Dashboard() {
             className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium"
           >
             <option value="all">ကျောင်းအဆင့် အားလုံး</option>
-            <option value="high">အထက်တန်းအဆင့်</option>
-            <option value="middle">အလယ်တန်းအဆင့်</option>
-            <option value="primary">မူလတန်းအဆင့်</option>
-            <option value="preschool">မူလတန်းကြို / KG</option>
+            {levelBreakdown.map((lvl) => (
+              <option key={lvl.key} value={lvl.key}>
+                {lvl.label} ({lvl.total} ကျောင်း)
+              </option>
+            ))}
           </select>
 
           <select
@@ -799,11 +841,11 @@ export default function Dashboard() {
             className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium"
           >
             <option value="all">ကျောင်းသား Range အားလုံး</option>
-            <option value="1-100">၁ - ၁၀၀ ဦး (၅သောင်း)</option>
-            <option value="101-300">၁၀၁ - ၃၀၀ ဦး (၁သိန်း)</option>
-            <option value="301-500">၃၀၁ - ၅၀၀ ဦး (၁.၅သိန်း)</option>
-            <option value="501-1000">၅၀၁ - ၁,၀၀၀ ဦး (၂သိန်း)</option>
-            <option value="1000+">၁,၀၀၀ ဦး အထက် (၃သိန်း)</option>
+            {STUDENT_RANGE_TIERS.map((tier) => (
+              <option key={tier.key} value={tier.key}>
+                {tier.label} ({formatMMK(tier.defaultFee)} ကျပ်)
+              </option>
+            ))}
           </select>
 
           <select

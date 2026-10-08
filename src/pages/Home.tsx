@@ -27,7 +27,7 @@ import {
 import { PWAInstallButton } from '../components/PWAInstallButton';
 
 export default function Home() {
-  const { schools, announcements, associations, loading } = useData();
+  const { schools, announcements, associations, schoolLevels, loading } = useData();
   const [quickSearch, setQuickSearch] = useState('');
 
   const latestAnnouncements = useMemo(() => {
@@ -40,9 +40,37 @@ export default function Home() {
   const totalSchools = schools.length;
   const activeSchools = useMemo(() => schools.filter(s => (s.status || 'active') === 'active').length, [schools]);
   const underReviewSchools = useMemo(() => schools.filter(s => s.status === 'under_review').length, [schools]);
-  const highSchoolsCount = useMemo(() => schools.filter(s => s.level?.includes('အထက်တန်း')).length, [schools]);
-  const middleSchoolsCount = useMemo(() => schools.filter(s => s.level?.includes('အလယ်တန်း')).length, [schools]);
-  const primarySchoolsCount = useMemo(() => schools.filter(s => s.level?.includes('မူလတန်း')).length, [schools]);
+
+  // Dynamic School Levels Stats matching reference / database
+  const levelStats = useMemo(() => {
+    const configuredNames = (schoolLevels || []).map(l => l.name.trim()).filter(Boolean);
+    const distinctLevels = Array.from(new Set(schools.map(s => (s.level || '').trim()).filter(Boolean)));
+    const allNames = [...configuredNames];
+    distinctLevels.forEach(lvl => {
+      if (!allNames.some(existing => existing.toLowerCase() === lvl.toLowerCase())) {
+        allNames.push(lvl);
+      }
+    });
+
+    const colors = [
+      { bg: 'bg-sky-50/70', border: 'border-sky-200', text: 'text-sky-900', count: 'text-sky-700', bar: 'bg-sky-500', barBg: 'bg-sky-100' },
+      { bg: 'bg-emerald-50/70', border: 'border-emerald-200', text: 'text-emerald-900', count: 'text-emerald-700', bar: 'bg-emerald-500', barBg: 'bg-emerald-100' },
+      { bg: 'bg-teal-50/70', border: 'border-teal-200', text: 'text-teal-900', count: 'text-teal-700', bar: 'bg-teal-500', barBg: 'bg-teal-100' },
+      { bg: 'bg-indigo-50/70', border: 'border-indigo-200', text: 'text-indigo-900', count: 'text-indigo-700', bar: 'bg-indigo-500', barBg: 'bg-indigo-100' },
+      { bg: 'bg-purple-50/70', border: 'border-purple-200', text: 'text-purple-900', count: 'text-purple-700', bar: 'bg-purple-500', barBg: 'bg-purple-100' },
+      { bg: 'bg-amber-50/70', border: 'border-amber-200', text: 'text-amber-900', count: 'text-amber-700', bar: 'bg-amber-500', barBg: 'bg-amber-100' },
+    ];
+
+    return allNames.map((name, idx) => {
+      const count = schools.filter(s => (s.level || '').trim().toLowerCase() === name.toLowerCase()).length;
+      return {
+        name,
+        count,
+        pct: totalSchools > 0 ? (count / totalSchools) * 100 : 0,
+        style: colors[idx % colors.length],
+      };
+    });
+  }, [schools, schoolLevels, totalSchools]);
 
   // Quick searched schools preview
   const filteredQuickSchools = useMemo(() => {
@@ -242,67 +270,41 @@ export default function Home() {
         )}
       </section>
 
-      {/* 3. SCHOOL EDUCATION LEVELS BREAKDOWN */}
+      {/* 3. SCHOOL EDUCATION LEVELS BREAKDOWN (Matching Reference & Database) */}
       <section className="bg-white p-3 rounded-xl border border-slate-100 shadow-none space-y-2">
         <div className="flex items-center justify-between border-b border-slate-50 pb-1">
           <h3 className="font-bold text-xs text-sky-950 flex items-center gap-1.5">
             <GraduationCap className="w-3.5 h-3.5 text-sky-600" />
-            <span>ကျောင်းအဆင့် ခွဲခြမ်းမှု</span>
+            <span>ကျောင်းအဆင့် ခွဲခြမ်းမှု (အဆင့်အလိုက် စာရင်းအင်း)</span>
           </h3>
           <Link to="/contacts" className="text-[10px] font-bold text-sky-700 hover:underline">
             အသေးစိတ် &rarr;
           </Link>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
-          {/* High School */}
-          <Link
-            to="/contacts?category=high"
-            className="p-2 rounded-lg bg-sky-50/60 border border-sky-100 space-y-0.5 hover:border-sky-300 transition group block"
-          >
-            <div className="flex items-center justify-between text-[9px] font-bold text-sky-900">
-              <span className="group-hover:text-sky-700">အထက်တန်း</span>
-              <span className="text-sky-700 font-extrabold">{highSchoolsCount}</span>
-            </div>
-            <div className="w-full bg-sky-100/50 rounded-full h-1 overflow-hidden">
-              <div
-                className="bg-sky-500 h-1 rounded-full transition-all"
-                style={{ width: `${totalSchools > 0 ? (highSchoolsCount / totalSchools) * 100 : 0}%` }}
-              />
-            </div>
-          </Link>
-          {/* Middle School */}
-          <Link
-            to="/contacts?category=middle"
-            className="p-2 rounded-lg bg-emerald-50/60 border border-emerald-100 space-y-0.5 hover:border-emerald-300 transition group block"
-          >
-            <div className="flex items-center justify-between text-[9px] font-bold text-emerald-900">
-              <span className="group-hover:text-emerald-700">အလယ်တန်း</span>
-              <span className="text-emerald-700 font-extrabold">{middleSchoolsCount}</span>
-            </div>
-            <div className="w-full bg-emerald-100/50 rounded-full h-1 overflow-hidden">
-              <div
-                className="bg-emerald-500 h-1 rounded-full transition-all"
-                style={{ width: `${totalSchools > 0 ? (middleSchoolsCount / totalSchools) * 100 : 0}%` }}
-              />
-            </div>
-          </Link>
-          {/* Primary School */}
-          <Link
-            to="/contacts?category=primary"
-            className="p-2 rounded-lg bg-amber-50/60 border border-amber-100 space-y-0.5 hover:border-amber-300 transition group block"
-          >
-            <div className="flex items-center justify-between text-[9px] font-bold text-amber-900">
-              <span className="group-hover:text-amber-700">မူလတန်း</span>
-              <span className="text-amber-700 font-extrabold">{primarySchoolsCount}</span>
-            </div>
-            <div className="w-full bg-amber-100/50 rounded-full h-1 overflow-hidden">
-              <div
-                className="bg-amber-500 h-1 rounded-full transition-all"
-                style={{ width: `${totalSchools > 0 ? (primarySchoolsCount / totalSchools) * 100 : 0}%` }}
-              />
-            </div>
-          </Link>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+          {levelStats.map((item) => (
+            <Link
+              key={item.name}
+              to={`/contacts?level=${encodeURIComponent(item.name)}`}
+              className={`p-2.5 rounded-lg ${item.style.bg} border ${item.style.border} space-y-1 hover:brightness-95 transition group block`}
+            >
+              <div className="flex items-center justify-between text-[10px] font-bold">
+                <span className={`${item.style.text} truncate group-hover:underline`} title={item.name}>
+                  {item.name}
+                </span>
+                <span className={`${item.style.count} font-extrabold shrink-0 ml-1`}>
+                  {item.count}
+                </span>
+              </div>
+              <div className={`w-full ${item.style.barBg} rounded-full h-1 overflow-hidden`}>
+                <div
+                  className={`${item.style.bar} h-1 rounded-full transition-all`}
+                  style={{ width: `${item.pct}%` }}
+                />
+              </div>
+            </Link>
+          ))}
         </div>
       </section>
 

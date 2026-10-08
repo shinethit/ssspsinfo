@@ -9,14 +9,27 @@ import {
   query,
   orderBy,
   getDocs,
+  setDoc,
+  getDoc,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { School, Announcement, Association } from '../types';
+import { School, Announcement, Association, DEFAULT_SCHOOL_LEVELS, SchoolLevelItem } from '../types';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { toast } from 'sonner';
 
 const CACHE_KEY = 'pss_offline_data_cache_v3';
 const CACHE_TIMESTAMP_KEY = 'pss_last_sync_timestamp_v3';
+const LEVELS_CACHE_KEY = 'pss_school_levels_cache_v2';
+
+export const getDefaultSchoolLevels = (): SchoolLevelItem[] => {
+  return DEFAULT_SCHOOL_LEVELS.map((name, idx) => ({
+    id: `default-${idx + 1}`,
+    name,
+    order: idx + 1,
+    description: `အဆင့်သတ်မှတ်ချက် (${name})`,
+    createdAt: new Date().toISOString(),
+  }));
+};
 
 // Helper to get reliable timestamp from Admin Set Date (eventDate) or fallback to publishedAt
 export const getAnnouncementTimestamp = (a: { eventDate?: string; publishedAt?: string }): number => {
@@ -59,6 +72,7 @@ interface DataContextType {
   schools: School[];
   announcements: Announcement[];
   associations: Association[];
+  schoolLevels: SchoolLevelItem[];
   loading: boolean;
   isSyncing: boolean;
   lastSyncTime: number | null;
@@ -72,6 +86,11 @@ interface DataContextType {
   addAnnouncement: (data: Omit<Announcement, 'id'>) => Promise<string>;
   updateAnnouncement: (id: string, data: Partial<Announcement>) => Promise<void>;
   deleteAnnouncement: (id: string) => Promise<void>;
+  // School Levels Management (Admin-customizable)
+  addSchoolLevel: (name: string, description?: string, order?: number) => Promise<string>;
+  updateSchoolLevel: (id: string, data: Partial<SchoolLevelItem>) => Promise<void>;
+  deleteSchoolLevel: (id: string) => Promise<void>;
+  resetSchoolLevelsToDefault: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | null>(null);
@@ -81,6 +100,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [schools, setSchools] = useState<School[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [associations, setAssociations] = useState<Association[]>([]);
+  const [schoolLevels, setSchoolLevels] = useState<SchoolLevelItem[]>(() => {
+    try {
+      const cached = localStorage.getItem(LEVELS_CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to parse cached school levels:', e);
+    }
+    return getDefaultSchoolLevels();
+  });
   const [loading, setLoading] = useState<boolean>(true);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
@@ -140,6 +171,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let unsubSchools: (() => void) | undefined;
     let unsubAnnouncements: (() => void) | undefined;
     let unsubAssociations: (() => void) | undefined;
+    let unsubLevels: (() => void) | undefined;
 
     try {
       // Schools real-time listener
@@ -197,6 +229,27 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.warn('Realtime associations listener error:', error);
         }
       );
+
+      // School Levels real-time listener
+      unsubLevels = onSnapshot(
+        collection(db, 'school_levels'),
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const updated = snapshot.docs.map((docSnap) => ({
+              id: docSnap.id,
+              ...docSnap.data(),
+            })) as SchoolLevelItem[];
+            updated.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+            setSchoolLevels(updated);
+            try {
+              localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(updated));
+            } catch (e) {}
+          }
+        },
+        (error) => {
+          console.warn('Realtime school_levels listener error:', error);
+        }
+      );
     } catch (err) {
       console.warn('Error setting up onSnapshot listeners:', err);
       setLoading(false);
@@ -206,6 +259,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (unsubSchools) unsubSchools();
       if (unsubAnnouncements) unsubAnnouncements();
       if (unsubAssociations) unsubAssociations();
+      if (unsubLevels) unsubLevels();
     };
   }, [persistCache]);
 
@@ -220,10 +274,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsSyncing(true);
 
       try {
-        const [schoolsSnap, announcementsSnap, associationsSnap] = await Promise.all([
+        const [schoolsSnap, announcementsSnap, associationsSnap, levelsSnap] = await Promise.all([
           getDocs(collection(db, 'schools')),
           getDocs(query(collection(db, 'announcements'), orderBy('publishedAt', 'desc'))),
           getDocs(collection(db, 'associations')),
+          getDocs(collection(db, 'school_levels')),
         ]);
 
         const fetchedSchools = schoolsSnap.docs.map((docSnap) => ({
@@ -245,6 +300,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setAnnouncements(sortAnnouncementsByEventDate(fetchedAnnouncements));
         setAssociations(fetchedAssociations);
         persistCache(fetchedSchools, sortAnnouncementsByEventDate(fetchedAnnouncements), fetchedAssociations);
+
+        if (!levelsSnap.empty) {
+          const fetchedLevels = levelsSnap.docs.map((docSnap) => ({
+            id: docSnap.id,
+            ...docSnap.data(),
+          })) as SchoolLevelItem[];
+          fetchedLevels.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+          setSchoolLevels(fetchedLevels);
+          try {
+            localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(fetchedLevels));
+          } catch (e) {}
+        }
 
         if (force) {
           toast.success('အချက်အလက်များ အောင်မြင်စွာ နောက်ဆုံးဗားရှင်းသို့ Sync လုပ်ပြီးပါပြီ');
@@ -382,6 +449,102 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [schools, associations, persistCache]
   );
 
+  // School Level Mutation Helpers
+  const addSchoolLevel = useCallback(
+    async (name: string, description?: string, order?: number): Promise<string> => {
+      const cleanName = name.trim();
+      if (!cleanName) throw new Error('ကျောင်းအဆင့် အမည် လိုအပ်ပါသည်');
+      const newOrder = order ?? (schoolLevels.length + 1);
+      const payload = {
+        name: cleanName,
+        description: description?.trim() || '',
+        order: newOrder,
+        createdAt: new Date().toISOString(),
+      };
+      const docRef = await addDoc(collection(db, 'school_levels'), payload);
+      const newItem: SchoolLevelItem = { id: docRef.id, ...payload };
+      setSchoolLevels((prev) => {
+        const next = [...prev.filter((l) => l.id !== docRef.id), newItem].sort(
+          (a, b) => (a.order ?? 999) - (b.order ?? 999)
+        );
+        try {
+          localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(next));
+        } catch (e) {}
+        return next;
+      });
+      return docRef.id;
+    },
+    [schoolLevels]
+  );
+
+  const updateSchoolLevel = useCallback(
+    async (id: string, data: Partial<SchoolLevelItem>): Promise<void> => {
+      setSchoolLevels((prev) => {
+        const next = prev
+          .map((l) => (l.id === id ? { ...l, ...data } : l))
+          .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+        try {
+          localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(next));
+        } catch (e) {}
+        return next;
+      });
+
+      if (!id.startsWith('default-')) {
+        await updateDoc(doc(db, 'school_levels', id), data);
+      } else {
+        const existing = schoolLevels.find((l) => l.id === id);
+        const payload = {
+          name: data.name ?? existing?.name ?? '',
+          description: data.description ?? existing?.description ?? '',
+          order: data.order ?? existing?.order ?? 1,
+          createdAt: new Date().toISOString(),
+        };
+        await addDoc(collection(db, 'school_levels'), payload);
+      }
+    },
+    [schoolLevels]
+  );
+
+  const deleteSchoolLevel = useCallback(async (id: string): Promise<void> => {
+    setSchoolLevels((prev) => {
+      const next = prev.filter((l) => l.id !== id);
+      try {
+        localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+
+    if (!id.startsWith('default-')) {
+      await deleteDoc(doc(db, 'school_levels', id));
+    }
+  }, []);
+
+  const resetSchoolLevelsToDefault = useCallback(async (): Promise<void> => {
+    const defaults = getDefaultSchoolLevels();
+    setSchoolLevels(defaults);
+    try {
+      localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(defaults));
+    } catch (e) {}
+
+    try {
+      const snap = await getDocs(collection(db, 'school_levels'));
+      for (const d of snap.docs) {
+        await deleteDoc(doc(db, 'school_levels', d.id));
+      }
+      for (const item of defaults) {
+        await addDoc(collection(db, 'school_levels'), {
+          name: item.name,
+          order: item.order,
+          description: item.description,
+          createdAt: item.createdAt,
+        });
+      }
+      toast.success('ကျောင်းအဆင့်များကို မူလ သတ်မှတ်ချက်အတိုင်း ပြန်လည်သတ်မှတ်ပြီးပါပြီ');
+    } catch (e) {
+      console.warn('Reset school levels error in Firestore:', e);
+    }
+  }, []);
+
   const getSchoolById = useCallback(
     (id: string) => {
       return schools.find((s) => s.id === id);
@@ -394,6 +557,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       schools,
       announcements,
       associations,
+      schoolLevels,
       loading,
       isSyncing,
       lastSyncTime,
@@ -406,11 +570,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addAnnouncement,
       updateAnnouncement,
       deleteAnnouncement,
+      addSchoolLevel,
+      updateSchoolLevel,
+      deleteSchoolLevel,
+      resetSchoolLevelsToDefault,
     }),
     [
       schools,
       announcements,
       associations,
+      schoolLevels,
       loading,
       isSyncing,
       lastSyncTime,
@@ -423,6 +592,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addAnnouncement,
       updateAnnouncement,
       deleteAnnouncement,
+      addSchoolLevel,
+      updateSchoolLevel,
+      deleteSchoolLevel,
+      resetSchoolLevelsToDefault,
     ]
   );
 

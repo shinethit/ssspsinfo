@@ -206,18 +206,27 @@ export default function Contacts() {
     if (urlCategory && urlCategory !== selectedCategoryTab) {
       setSelectedCategoryTab(urlCategory);
     }
+    const urlLevel = searchParams.get('level');
+    if (urlLevel && urlLevel !== levelFilter) {
+      setLevelFilter(urlLevel);
+    }
   }, [searchParams]);
+
+  const { schoolLevels } = useData();
 
   // Distinct school levels for filter options
   const availableLevels = useMemo(() => {
     const levels = new Set<string>();
+    (schoolLevels || []).forEach(l => {
+      if (l.name && l.name.trim()) levels.add(l.name.trim());
+    });
     schools.forEach((s) => {
       if (s.level && s.level.trim()) {
         levels.add(s.level.trim());
       }
     });
     return Array.from(levels);
-  }, [schools]);
+  }, [schools, schoolLevels]);
 
   // Fee counts
   const paidCount = useMemo(() => schools.filter((s) => s.isAnnualFeePaid).length, [schools]);
@@ -270,16 +279,22 @@ export default function Contacts() {
         (s.founderName && s.founderName.toLowerCase().includes(q)) ||
         (s.adminName && s.adminName.toLowerCase().includes(q)) ||
         (s.contactName && s.contactName.toLowerCase().includes(q)) ||
+        (s.responsiblePerson1Name && s.responsiblePerson1Name.toLowerCase().includes(q)) ||
         (s.contact2Name && s.contact2Name.toLowerCase().includes(q)) ||
+        (s.responsiblePerson2Name && s.responsiblePerson2Name.toLowerCase().includes(q)) ||
         (s.schoolPhone && s.schoolPhone.toLowerCase().includes(q)) ||
         (s.schoolPhone2 && s.schoolPhone2.toLowerCase().includes(q)) ||
         (s.contactPhone && s.contactPhone.toLowerCase().includes(q)) ||
         (s.contactPhone2 && s.contactPhone2.toLowerCase().includes(q)) ||
+        (s.responsiblePerson1Phone && s.responsiblePerson1Phone.toLowerCase().includes(q)) ||
         (s.contact2Phone && s.contact2Phone.toLowerCase().includes(q)) ||
         (s.contact2Phone2 && s.contact2Phone2.toLowerCase().includes(q)) ||
+        (s.responsiblePerson2Phone && s.responsiblePerson2Phone.toLowerCase().includes(q)) ||
         (Array.isArray(s.schoolPhones) && s.schoolPhones.some(p => p.toLowerCase().includes(q))) ||
         (Array.isArray(s.contactPhones) && s.contactPhones.some(p => p.toLowerCase().includes(q))) ||
+        (Array.isArray(s.responsiblePerson1Phones) && s.responsiblePerson1Phones.some(p => p.toLowerCase().includes(q))) ||
         (Array.isArray(s.contact2Phones) && s.contact2Phones.some(p => p.toLowerCase().includes(q))) ||
+        (Array.isArray(s.responsiblePerson2Phones) && s.responsiblePerson2Phones.some(p => p.toLowerCase().includes(q))) ||
         (s.founderPhone && s.founderPhone.toLowerCase().includes(q)) ||
         (s.founderPhone2 && s.founderPhone2.toLowerCase().includes(q)) ||
         (Array.isArray(s.founderPhones) && s.founderPhones.some(p => p.toLowerCase().includes(q))) ||
@@ -431,8 +446,8 @@ export default function Contacts() {
           </span>
         </div>
 
-        {/* Pill buttons for each category */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+        {/* Pill buttons for each category - flex-wrap to prevent horizontal scrolling */}
+        <div className="flex flex-wrap items-center gap-2 pb-1">
           <button
             type="button"
             onClick={() => setSelectedCategoryTab('all')}

@@ -417,22 +417,25 @@ export default function SchoolDetail() {
             </div>
           </div>
 
-          {/* Coordinator 1 */}
+          {/* Coordinator 1 / Responsible Person 1 */}
           <div className="bg-sky-50/60 p-5 rounded-xl border border-sky-200 space-y-3 min-w-0">
             <h3 className="font-bold text-sky-900 border-b border-sky-200 pb-2 text-sm flex items-center gap-1.5">
               <span className="w-4 h-4 rounded-full bg-sky-800 text-white text-[10px] flex items-center justify-center font-bold">၁</span>
-              တာဝန်ခံ (၁) (Coordinator 1)
+              တာဝန်ခံ ပုဂ္ဂိုလ် (၁) (Responsible Person 1)
             </h3>
             <p className="text-sm font-semibold text-slate-800 break-words">
-              {school.contactName || 'မဖော်ပြထားပါ'}
-              {school.contactRole ? ` (${school.contactRole})` : ''}
+              {school.responsiblePerson1Name || school.contactName || 'မဖော်ပြထားပါ'}
+              {(school.responsiblePerson1Role || school.contactRole) ? ` (${school.responsiblePerson1Role || school.contactRole})` : ''}
             </p>
             {(() => {
               const coord1Phones = [
+                school.responsiblePerson1Phone,
                 school.contactPhone,
+                school.responsiblePerson1Phone2,
                 school.contactPhone2,
+                ...(Array.isArray(school.responsiblePerson1Phones) ? school.responsiblePerson1Phones : []),
                 ...(Array.isArray(school.contactPhones) ? school.contactPhones : []),
-              ].filter(Boolean);
+              ].filter((p, i, self) => Boolean(p) && self.indexOf(p) === i);
               if (coord1Phones.length === 0) return null;
               return (
                 <div className="space-y-1">
@@ -440,7 +443,7 @@ export default function SchoolDetail() {
                     <p key={idx} className="text-xs text-slate-600 flex items-center gap-1.5">
                       <Phone className="w-3.5 h-3.5 text-sky-600 shrink-0" />
                       <a href={`tel:${ph}`} className="hover:underline font-medium break-all">
-                        {ph} {idx === 0 ? '(ဖုန်း ၁)' : idx === 1 ? '(ဖုန်း ၂)' : ''}
+                        {ph} {coord1Phones.length > 1 ? (idx === 0 ? '(ဖုန်း ၁)' : idx === 1 ? '(ဖုန်း ၂)' : `(ဖုန်း ${idx + 1})`) : ''}
                       </a>
                     </p>
                   ))}
@@ -448,43 +451,46 @@ export default function SchoolDetail() {
               );
             })()}
             <div className="flex items-center gap-3 text-xs pt-1">
-              {school.contactViber && (
+              {(school.responsiblePerson1Viber || school.contactViber) && (
                 <a
-                  href={`viber://chat?number=${school.contactViber.replace(/[^0-9]/g, '')}`}
+                  href={`viber://chat?number=${(school.responsiblePerson1Viber || school.contactViber || '').replace(/[^0-9]/g, '')}`}
                   className="text-purple-600 font-bold hover:underline"
                 >
-                  Viber: {school.contactViber}
+                  Viber: {school.responsiblePerson1Viber || school.contactViber}
                 </a>
               )}
-              {school.contactTelegram && (
+              {(school.responsiblePerson1Telegram || school.contactTelegram) && (
                 <a
-                  href={`https://t.me/${school.contactTelegram.replace('@', '')}`}
+                  href={`https://t.me/${(school.responsiblePerson1Telegram || school.contactTelegram || '').replace('@', '')}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sky-500 font-medium hover:underline inline-flex items-center gap-0.5"
                 >
-                  <Send className="w-3 h-3" /> {school.contactTelegram}
+                  <Send className="w-3 h-3" /> {school.responsiblePerson1Telegram || school.contactTelegram}
                 </a>
               )}
             </div>
           </div>
 
-          {/* Coordinator 2 */}
+          {/* Coordinator 2 / Responsible Person 2 */}
           <div className="bg-indigo-50/60 p-5 rounded-xl border border-indigo-200 space-y-3 min-w-0">
             <h3 className="font-bold text-indigo-900 border-b border-indigo-200 pb-2 text-sm flex items-center gap-1.5">
               <span className="w-4 h-4 rounded-full bg-indigo-800 text-white text-[10px] flex items-center justify-center font-bold">၂</span>
-              တာဝန်ခံ (၂) (Coordinator 2)
+              တာဝန်ခံ ပုဂ္ဂိုလ် (၂) (Responsible Person 2)
             </h3>
             <p className="text-sm font-semibold text-slate-800 break-words">
-              {school.contact2Name || 'မဖော်ပြထားပါ'}
-              {school.contact2Role ? ` (${school.contact2Role})` : ''}
+              {school.responsiblePerson2Name || school.contact2Name || 'မဖော်ပြထားပါ'}
+              {(school.responsiblePerson2Role || school.contact2Role) ? ` (${school.responsiblePerson2Role || school.contact2Role})` : ''}
             </p>
             {(() => {
               const coord2Phones = [
+                school.responsiblePerson2Phone,
                 school.contact2Phone,
+                school.responsiblePerson2Phone2,
                 school.contact2Phone2,
+                ...(Array.isArray(school.responsiblePerson2Phones) ? school.responsiblePerson2Phones : []),
                 ...(Array.isArray(school.contact2Phones) ? school.contact2Phones : []),
-              ].filter(Boolean);
+              ].filter((p, i, self) => Boolean(p) && self.indexOf(p) === i);
               if (coord2Phones.length === 0) return null;
               return (
                 <div className="space-y-1">
@@ -492,7 +498,7 @@ export default function SchoolDetail() {
                     <p key={idx} className="text-xs text-slate-600 flex items-center gap-1.5">
                       <Phone className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                       <a href={`tel:${ph}`} className="hover:underline font-medium break-all">
-                        {ph} {idx === 0 ? '(ဖုန်း ၁)' : idx === 1 ? '(ဖုန်း ၂)' : ''}
+                        {ph} {coord2Phones.length > 1 ? (idx === 0 ? '(ဖုန်း ၁)' : idx === 1 ? '(ဖုန်း ၂)' : `(ဖုန်း ${idx + 1})`) : ''}
                       </a>
                     </p>
                   ))}
@@ -500,22 +506,22 @@ export default function SchoolDetail() {
               );
             })()}
             <div className="flex items-center gap-3 text-xs pt-1">
-              {school.contact2Viber && (
+              {(school.responsiblePerson2Viber || school.contact2Viber) && (
                 <a
-                  href={`viber://chat?number=${school.contact2Viber.replace(/[^0-9]/g, '')}`}
+                  href={`viber://chat?number=${(school.responsiblePerson2Viber || school.contact2Viber || '').replace(/[^0-9]/g, '')}`}
                   className="text-purple-600 font-bold hover:underline"
                 >
-                  Viber: {school.contact2Viber}
+                  Viber: {school.responsiblePerson2Viber || school.contact2Viber}
                 </a>
               )}
-              {school.contact2Telegram && (
+              {(school.responsiblePerson2Telegram || school.contact2Telegram) && (
                 <a
-                  href={`https://t.me/${school.contact2Telegram.replace('@', '')}`}
+                  href={`https://t.me/${(school.responsiblePerson2Telegram || school.contact2Telegram || '').replace('@', '')}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sky-500 font-medium hover:underline inline-flex items-center gap-0.5"
                 >
-                  <Send className="w-3 h-3" /> {school.contact2Telegram}
+                  <Send className="w-3 h-3" /> {school.responsiblePerson2Telegram || school.contact2Telegram}
                 </a>
               )}
             </div>

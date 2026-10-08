@@ -73,6 +73,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // School Levels (Customizable by Admin, read by all)
+    match /school_levels/{levelId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // Audit Logs (Track who performed which action and when)
     match /audit_logs/{logId} {
       allow read, create: if isSignedIn();

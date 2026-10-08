@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { ANNOUNCEMENT_CATEGORIES, getCategoryBadge } from './Announcements';
-import { Association, NewsTicker, AuditLog, AdminUser } from '../types';
+import { Association, NewsTicker, AuditLog, AdminUser, STUDENT_RANGE_TIERS, getStudentRangeTier, SchoolLevelItem } from '../types';
 import { recordAuditLog } from '../lib/audit';
 import { useData, sortAnnouncementsByEventDate } from '../context/DataContext';
 import {
@@ -62,7 +62,7 @@ const schoolSchema = z.object({
   logoUrl: z.string().optional(),
   name: z.string().min(1, 'ကျောင်းအမည် လိုအပ်သည်'),
   level: z.string().min(1, 'ကျောင်းအဆင့် လိုအပ်သည်'),
-  studentRange: z.string().default('1-100').optional(),
+  studentRange: z.string().default('0-100').optional(),
   studentCount: z.union([z.number(), z.string()]).optional(),
   feeAmount: z.union([z.number(), z.string()]).optional(),
   feeAcademicYear: z.string().default('၂၀၂၄-၂၀၂၅').optional(),
@@ -70,30 +70,49 @@ const schoolSchema = z.object({
   // School phones (1 or more)
   schoolPhone: z.string().optional(),
   schoolPhone2: z.string().optional(),
+  schoolPhones: z.array(z.string()).optional(),
   founderName: z.string().optional(),
   founderPhone: z.string().optional(),
   founderPhone2: z.string().optional(),
+  founderPhones: z.array(z.string()).optional(),
   founderViber: z.string().optional(),
   founderTelegram: z.string().optional(),
   adminName: z.string().optional(),
   adminPhone: z.string().optional(),
   adminPhone2: z.string().optional(),
+  adminPhones: z.array(z.string()).optional(),
   adminViber: z.string().optional(),
   adminTelegram: z.string().optional(),
-  // Coordinator 1 (တာဝန်ခံ ၁)
+  // Responsible Person 1 (တာဝန်ခံ ပုဂ္ဂိုလ် ၁)
   contactName: z.string().optional(),
   contactRole: z.string().optional(),
   contactPhone: z.string().optional(),
   contactPhone2: z.string().optional(),
+  contactPhones: z.array(z.string()).optional(),
   contactViber: z.string().optional(),
   contactTelegram: z.string().optional(),
-  // Coordinator 2 (တာဝန်ခံ ၂)
+  responsiblePerson1Name: z.string().optional(),
+  responsiblePerson1Role: z.string().optional(),
+  responsiblePerson1Phone: z.string().optional(),
+  responsiblePerson1Phone2: z.string().optional(),
+  responsiblePerson1Phones: z.array(z.string()).optional(),
+  responsiblePerson1Viber: z.string().optional(),
+  responsiblePerson1Telegram: z.string().optional(),
+  // Responsible Person 2 (တာဝန်ခံ ပုဂ္ဂိုလ် ၂)
   contact2Name: z.string().optional(),
   contact2Role: z.string().optional(),
   contact2Phone: z.string().optional(),
   contact2Phone2: z.string().optional(),
+  contact2Phones: z.array(z.string()).optional(),
   contact2Viber: z.string().optional(),
   contact2Telegram: z.string().optional(),
+  responsiblePerson2Name: z.string().optional(),
+  responsiblePerson2Role: z.string().optional(),
+  responsiblePerson2Phone: z.string().optional(),
+  responsiblePerson2Phone2: z.string().optional(),
+  responsiblePerson2Phones: z.array(z.string()).optional(),
+  responsiblePerson2Viber: z.string().optional(),
+  responsiblePerson2Telegram: z.string().optional(),
   schoolNote: z.string().optional(),
   note: z.string().optional(),
   isAnnualFeePaid: z.boolean().optional(),
@@ -125,6 +144,7 @@ export default function Admin() {
   const {
     schools: globalSchools,
     announcements: globalAnnouncements,
+    schoolLevels,
     syncData,
     addSchool,
     updateSchool,
@@ -132,9 +152,20 @@ export default function Admin() {
     addAnnouncement,
     updateAnnouncement,
     deleteAnnouncement: removeAnnouncement,
+    addSchoolLevel,
+    updateSchoolLevel,
+    deleteSchoolLevel,
+    resetSchoolLevelsToDefault,
   } = useData();
-  const [activeTab, setActiveTab] = useState<'announcements' | 'associations' | 'schools' | 'tickers' | 'audit_logs' | 'admins'>('announcements');
+  const [activeTab, setActiveTab] = useState<'announcements' | 'associations' | 'schools' | 'tickers' | 'audit_logs' | 'admins' | 'levels'>('announcements');
   const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
+
+  // School Level Management form state
+  const [editingLevelId, setEditingLevelId] = useState<string | null>(null);
+  const [levelNameInput, setLevelNameInput] = useState('');
+  const [levelOrderInput, setLevelOrderInput] = useState<number | ''>('');
+  const [levelDescInput, setLevelDescInput] = useState('');
+  const [isSavingLevel, setIsSavingLevel] = useState(false);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [associations, setAssociations] = useState<Association[]>([]);
   const [schools, setSchools] = useState<any[]>([]);
@@ -171,6 +202,7 @@ export default function Admin() {
   const [newAdminName, setNewAdminName] = useState('');
   const [newAdminRole, setNewAdminRole] = useState<'admin' | 'editor' | 'super_admin'>('admin');
   const [newAdminPhone, setNewAdminPhone] = useState('');
+  const [extraAdminUserPhones, setExtraAdminUserPhones] = useState<string[]>([]);
   const [newAdminNote, setNewAdminNote] = useState('');
   const [addingAdmin, setAddingAdmin] = useState(false);
 
@@ -395,12 +427,21 @@ export default function Admin() {
 
     try {
       setAddingAdmin(true);
+      const cleanPhones = [
+        newAdminPhone.trim(),
+        ...extraAdminUserPhones.map((p) => p.trim()),
+      ].filter(Boolean);
+
       // Use email as doc ID for easy lookup in firestore.rules
       await setDoc(doc(db, 'admins', cleanEmail), {
         email: cleanEmail,
         name: newAdminName.trim() || 'အက်ဒမင်',
         role: newAdminRole,
         phone: newAdminPhone.trim(),
+        phone2: extraAdminUserPhones[0]?.trim() || '',
+        phones: cleanPhones,
+        contactNumbers: cleanPhones,
+        adminPhones: cleanPhones,
         note: newAdminNote.trim(),
         addedBy: auth.currentUser?.email || 'Super Admin',
         createdAt: new Date().toISOString(),
@@ -409,12 +450,13 @@ export default function Admin() {
         action: 'create',
         entityType: 'admin',
         entityName: cleanEmail,
-        details: `အက်ဒမင်အသစ် "${cleanEmail}" (${newAdminRole}) အား စီမံခွင့် ပေးအပ်ခဲ့သည်`,
+        details: `အက်ဒမင်အသစ် "${cleanEmail}" (${newAdminRole}) အား ဖုန်းနံပါတ် (${cleanPhones.length} ခု) ဖြင့် စီမံခွင့် ပေးအပ်ခဲ့သည်`,
       });
       toast.success(`အက်ဒမင်သစ် "${cleanEmail}" ကို အောင်မြင်စွာ ခန့်အပ်ထည့်သွင်းပြီးပါပြီ`);
       setNewAdminEmail('');
       setNewAdminName('');
       setNewAdminPhone('');
+      setExtraAdminUserPhones([]);
       setNewAdminNote('');
       setNewAdminRole('admin');
       fetchAdmins();
@@ -447,6 +489,109 @@ export default function Admin() {
       fetchAuditLogs();
     } catch (err) {
       toast.error('အက်ဒမင် ဖယ်ရှား၍ မရပါ');
+    }
+  };
+
+  // School Level Management Handlers
+  const handleStartEditLevel = (lvl: SchoolLevelItem) => {
+    setEditingLevelId(lvl.id);
+    setLevelNameInput(lvl.name);
+    setLevelOrderInput(lvl.order ?? '');
+    setLevelDescInput(lvl.description ?? '');
+    const elem = document.getElementById('level-form-section');
+    if (elem) elem.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleCancelEditLevel = () => {
+    setEditingLevelId(null);
+    setLevelNameInput('');
+    setLevelOrderInput('');
+    setLevelDescInput('');
+  };
+
+  const handleSaveLevel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!levelNameInput.trim()) {
+      toast.error('ကျောင်းအဆင့် အမည် ထည့်သွင်းပေးပါ');
+      return;
+    }
+    setIsSavingLevel(true);
+    try {
+      if (editingLevelId) {
+        await updateSchoolLevel(editingLevelId, {
+          name: levelNameInput.trim(),
+          order: levelOrderInput !== '' ? Number(levelOrderInput) : undefined,
+          description: levelDescInput.trim(),
+        });
+        await recordAuditLog({
+          action: 'update',
+          entityType: 'school_level',
+          entityId: editingLevelId,
+          entityName: levelNameInput.trim(),
+          details: `ကျောင်းအဆင့် "${levelNameInput.trim()}" ကို ပြင်ဆင်ခဲ့သည်`,
+        });
+        toast.success(`ကျောင်းအဆင့် "${levelNameInput.trim()}" ကို ပြင်ဆင်ပြီးပါပြီ`);
+      } else {
+        const newId = await addSchoolLevel(
+          levelNameInput.trim(),
+          levelDescInput.trim(),
+          levelOrderInput !== '' ? Number(levelOrderInput) : undefined
+        );
+        await recordAuditLog({
+          action: 'create',
+          entityType: 'school_level',
+          entityId: newId,
+          entityName: levelNameInput.trim(),
+          details: `ကျောင်းအဆင့်သစ် "${levelNameInput.trim()}" ကို ထည့်သွင်းခဲ့သည်`,
+        });
+        toast.success(`ကျောင်းအဆင့်သစ် "${levelNameInput.trim()}" ကို ထည့်သွင်းပြီးပါပြီ`);
+      }
+      handleCancelEditLevel();
+      fetchAuditLogs();
+    } catch (err: any) {
+      toast.error(err.message || 'ကျောင်းအဆင့် သိမ်းဆည်းရာတွင် အမှားဖြစ်ပွားပါသည်');
+    } finally {
+      setIsSavingLevel(false);
+    }
+  };
+
+  const handleDeleteLevel = async (lvl: SchoolLevelItem) => {
+    const schoolsInLevel = schools.filter(s => (s.level || '').trim().toLowerCase() === lvl.name.trim().toLowerCase());
+    const confirmMsg = schoolsInLevel.length > 0
+      ? `ဤကျောင်းအဆင့် "${lvl.name}" တွင် လက်ရှိ ကျောင်း (${schoolsInLevel.length}) ကျောင်း သတ်မှတ်ထားဆဲ ဖြစ်ပါသည်။ အမှန်တကယ် ဖျက်ပစ်ပါမည်လား?`
+      : `ကျောင်းအဆင့် "${lvl.name}" ကို အပြီးပိုင် ဖျက်ပစ်ပါမည်လား?`;
+
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      await deleteSchoolLevel(lvl.id);
+      await recordAuditLog({
+        action: 'delete',
+        entityType: 'school_level',
+        entityId: lvl.id,
+        entityName: lvl.name,
+        details: `ကျောင်းအဆင့် "${lvl.name}" ကို ဖျက်ပစ်ခဲ့သည်`,
+      });
+      toast.success(`ကျောင်းအဆင့် "${lvl.name}" ကို ဖျက်ပစ်ပြီးပါပြီ`);
+      fetchAuditLogs();
+    } catch (err) {
+      toast.error('ကျောင်းအဆင့် ဖျက်၍ မရပါ');
+    }
+  };
+
+  const handleResetLevels = async () => {
+    if (!confirm('ကျောင်းအဆင့်များကို မူလ သတ်မှတ်ချက်အတိုင်း ပြန်လည်ထားရှိပါမည်လား?')) return;
+    try {
+      await resetSchoolLevelsToDefault();
+      await recordAuditLog({
+        action: 'update',
+        entityType: 'school_level',
+        entityName: 'Reset Default Levels',
+        details: 'ကျောင်းအဆင့်အားလုံးကို မူလ သတ်မှတ်ချက်အတိုင်း Reset ပြုလုပ်ခဲ့သည်',
+      });
+      fetchAuditLogs();
+    } catch (err) {
+      toast.error('Reset ပြုလုပ်ရာတွင် အမှားဖြစ်ပွားပါသည်');
     }
   };
 
@@ -780,17 +925,13 @@ export default function Admin() {
   const startEditSchool = (school: any) => {
     setActiveTab('schools');
     setEditingSchoolId(school.id);
+    const rangeTier = getStudentRangeTier(school.studentRange);
     schoolForm.reset({
       name: school.name || '',
-      level: school.level || 'အထက်တန်း',
-      studentRange: school.studentRange || '1-100',
+      level: school.level || '၁။ အထက်တန်း',
+      studentRange: school.studentRange || '0-100',
       studentCount: school.studentCount !== undefined && school.studentCount !== null ? school.studentCount : '',
-      feeAmount: school.feeAmount !== undefined && school.feeAmount !== null ? school.feeAmount : (
-        school.studentRange === '1000+' ? 300000 :
-        school.studentRange === '501-1000' ? 200000 :
-        school.studentRange === '301-500' ? 150000 :
-        school.studentRange === '101-300' ? 100000 : 50000
-      ),
+      feeAmount: school.feeAmount !== undefined && school.feeAmount !== null ? school.feeAmount : (rangeTier?.defaultFee ?? 200000),
       feeAcademicYear: school.feeAcademicYear || '၂၀၂၄-၂၀၂၅',
       feePaidDate: school.feePaidDate || '',
       logoUrl: school.logoUrl || '',
@@ -806,18 +947,18 @@ export default function Admin() {
       adminPhone2: school.adminPhone2 || '',
       adminViber: school.adminViber || '',
       adminTelegram: school.adminTelegram || '',
-      contactName: school.contactName || '',
-      contactRole: school.contactRole || '',
-      contactPhone: school.contactPhone || '',
-      contactPhone2: school.contactPhone2 || '',
-      contactViber: school.contactViber || '',
-      contactTelegram: school.contactTelegram || '',
-      contact2Name: school.contact2Name || '',
-      contact2Role: school.contact2Role || '',
-      contact2Phone: school.contact2Phone || '',
-      contact2Phone2: school.contact2Phone2 || '',
-      contact2Viber: school.contact2Viber || '',
-      contact2Telegram: school.contact2Telegram || '',
+      contactName: school.responsiblePerson1Name || school.contactName || '',
+      contactRole: school.responsiblePerson1Role || school.contactRole || '',
+      contactPhone: school.responsiblePerson1Phone || school.contactPhone || '',
+      contactPhone2: school.responsiblePerson1Phone2 || school.contactPhone2 || '',
+      contactViber: school.responsiblePerson1Viber || school.contactViber || '',
+      contactTelegram: school.responsiblePerson1Telegram || school.contactTelegram || '',
+      contact2Name: school.responsiblePerson2Name || school.contact2Name || '',
+      contact2Role: school.responsiblePerson2Role || school.contact2Role || '',
+      contact2Phone: school.responsiblePerson2Phone || school.contact2Phone || '',
+      contact2Phone2: school.responsiblePerson2Phone2 || school.contact2Phone2 || '',
+      contact2Viber: school.responsiblePerson2Viber || school.contact2Viber || '',
+      contact2Telegram: school.responsiblePerson2Telegram || school.contact2Telegram || '',
       schoolNote: school.schoolNote || '',
       note: school.note || '',
       isAnnualFeePaid: school.isAnnualFeePaid ?? false,
@@ -826,8 +967,16 @@ export default function Admin() {
     setExtraSchoolPhones(Array.isArray(school.schoolPhones) ? [...school.schoolPhones] : []);
     setExtraFounderPhones(Array.isArray(school.founderPhones) ? [...school.founderPhones] : []);
     setExtraAdminPhones(Array.isArray(school.adminPhones) ? [...school.adminPhones] : []);
-    setExtraCoord1Phones(Array.isArray(school.contactPhones) ? [...school.contactPhones] : []);
-    setExtraCoord2Phones(Array.isArray(school.contact2Phones) ? [...school.contact2Phones] : []);
+    setExtraCoord1Phones(
+      Array.isArray(school.responsiblePerson1Phones) && school.responsiblePerson1Phones.length > 0
+        ? [...school.responsiblePerson1Phones]
+        : (Array.isArray(school.contactPhones) ? [...school.contactPhones] : [])
+    );
+    setExtraCoord2Phones(
+      Array.isArray(school.responsiblePerson2Phones) && school.responsiblePerson2Phones.length > 0
+        ? [...school.responsiblePerson2Phones]
+        : (Array.isArray(school.contact2Phones) ? [...school.contact2Phones] : [])
+    );
     setTimeout(() => {
       const formElem = document.getElementById('school-form-section');
       if (formElem) {
@@ -840,10 +989,10 @@ export default function Admin() {
     setEditingSchoolId(null);
     schoolForm.reset({
       name: '',
-      level: 'အထက်တန်း',
-      studentRange: '1-100',
+      level: '၁။ အထက်တန်း',
+      studentRange: '0-100',
       studentCount: '',
-      feeAmount: 50000,
+      feeAmount: 200000,
       feeAcademicYear: '၂၀၂၄-၂၀၂၅',
       feePaidDate: '',
       logoUrl: '',
@@ -941,12 +1090,7 @@ export default function Admin() {
 
       const cleanFeeAmount = data.feeAmount !== undefined && data.feeAmount !== ''
         ? Number(String(data.feeAmount).replace(/[^0-9]/g, ''))
-        : (
-          data.studentRange === '1000+' ? 300000 :
-          data.studentRange === '501-1000' ? 200000 :
-          data.studentRange === '301-500' ? 150000 :
-          data.studentRange === '101-300' ? 100000 : 50000
-        );
+        : (getStudentRangeTier(data.studentRange)?.defaultFee ?? 200000);
 
       const cleanSchoolPhones = extraSchoolPhones.map(p => p.trim()).filter(Boolean);
       const cleanFounderPhones = extraFounderPhones.map(p => p.trim()).filter(Boolean);
@@ -971,21 +1115,36 @@ export default function Admin() {
         adminPhones: cleanAdminPhones,
         adminViber: data.adminViber ? data.adminViber.trim() : '',
         adminTelegram: data.adminTelegram ? data.adminTelegram.trim() : '',
-        contactName: data.contactName ? data.contactName.trim() : '',
-        contactRole: data.contactRole ? data.contactRole.trim() : '',
-        contactPhone: data.contactPhone ? data.contactPhone.trim() : '',
-        contactPhone2: data.contactPhone2 ? data.contactPhone2.trim() : '',
+        contactName: data.contactName ? data.contactName.trim() : (data.responsiblePerson1Name ? data.responsiblePerson1Name.trim() : ''),
+        contactRole: data.contactRole ? data.contactRole.trim() : (data.responsiblePerson1Role ? data.responsiblePerson1Role.trim() : ''),
+        contactPhone: data.contactPhone ? data.contactPhone.trim() : (data.responsiblePerson1Phone ? data.responsiblePerson1Phone.trim() : ''),
+        contactPhone2: data.contactPhone2 ? data.contactPhone2.trim() : (data.responsiblePerson1Phone2 ? data.responsiblePerson1Phone2.trim() : ''),
         contactPhones: cleanCoord1Phones,
-        contactViber: data.contactViber ? data.contactViber.trim() : '',
-        contactTelegram: data.contactTelegram ? data.contactTelegram.trim() : '',
-        contact2Name: data.contact2Name ? data.contact2Name.trim() : '',
-        contact2Role: data.contact2Role ? data.contact2Role.trim() : '',
-        contact2Phone: data.contact2Phone ? data.contact2Phone.trim() : '',
-        contact2Phone2: data.contact2Phone2 ? data.contact2Phone2.trim() : '',
+        responsiblePerson1Name: data.contactName ? data.contactName.trim() : (data.responsiblePerson1Name ? data.responsiblePerson1Name.trim() : ''),
+        responsiblePerson1Role: data.contactRole ? data.contactRole.trim() : (data.responsiblePerson1Role ? data.responsiblePerson1Role.trim() : ''),
+        responsiblePerson1Phone: data.contactPhone ? data.contactPhone.trim() : (data.responsiblePerson1Phone ? data.responsiblePerson1Phone.trim() : ''),
+        responsiblePerson1Phone2: data.contactPhone2 ? data.contactPhone2.trim() : (data.responsiblePerson1Phone2 ? data.responsiblePerson1Phone2.trim() : ''),
+        responsiblePerson1Phones: cleanCoord1Phones,
+        contactViber: data.contactViber ? data.contactViber.trim() : (data.responsiblePerson1Viber ? data.responsiblePerson1Viber.trim() : ''),
+        contactTelegram: data.contactTelegram ? data.contactTelegram.trim() : (data.responsiblePerson1Telegram ? data.responsiblePerson1Telegram.trim() : ''),
+        responsiblePerson1Viber: data.contactViber ? data.contactViber.trim() : (data.responsiblePerson1Viber ? data.responsiblePerson1Viber.trim() : ''),
+        responsiblePerson1Telegram: data.contactTelegram ? data.contactTelegram.trim() : (data.responsiblePerson1Telegram ? data.responsiblePerson1Telegram.trim() : ''),
+
+        contact2Name: data.contact2Name ? data.contact2Name.trim() : (data.responsiblePerson2Name ? data.responsiblePerson2Name.trim() : ''),
+        contact2Role: data.contact2Role ? data.contact2Role.trim() : (data.responsiblePerson2Role ? data.responsiblePerson2Role.trim() : ''),
+        contact2Phone: data.contact2Phone ? data.contact2Phone.trim() : (data.responsiblePerson2Phone ? data.responsiblePerson2Phone.trim() : ''),
+        contact2Phone2: data.contact2Phone2 ? data.contact2Phone2.trim() : (data.responsiblePerson2Phone2 ? data.responsiblePerson2Phone2.trim() : ''),
         contact2Phones: cleanCoord2Phones,
-        contact2Viber: data.contact2Viber ? data.contact2Viber.trim() : '',
-        contact2Telegram: data.contact2Telegram ? data.contact2Telegram.trim() : '',
-        studentRange: data.studentRange || '1-100',
+        responsiblePerson2Name: data.contact2Name ? data.contact2Name.trim() : (data.responsiblePerson2Name ? data.responsiblePerson2Name.trim() : ''),
+        responsiblePerson2Role: data.contact2Role ? data.contact2Role.trim() : (data.responsiblePerson2Role ? data.responsiblePerson2Role.trim() : ''),
+        responsiblePerson2Phone: data.contact2Phone ? data.contact2Phone.trim() : (data.responsiblePerson2Phone ? data.responsiblePerson2Phone.trim() : ''),
+        responsiblePerson2Phone2: data.contact2Phone2 ? data.contact2Phone2.trim() : (data.responsiblePerson2Phone2 ? data.responsiblePerson2Phone2.trim() : ''),
+        responsiblePerson2Phones: cleanCoord2Phones,
+        contact2Viber: data.contact2Viber ? data.contact2Viber.trim() : (data.responsiblePerson2Viber ? data.responsiblePerson2Viber.trim() : ''),
+        contact2Telegram: data.contact2Telegram ? data.contact2Telegram.trim() : (data.responsiblePerson2Telegram ? data.responsiblePerson2Telegram.trim() : ''),
+        responsiblePerson2Viber: data.contact2Viber ? data.contact2Viber.trim() : (data.responsiblePerson2Viber ? data.responsiblePerson2Viber.trim() : ''),
+        responsiblePerson2Telegram: data.contact2Telegram ? data.contact2Telegram.trim() : (data.responsiblePerson2Telegram ? data.responsiblePerson2Telegram.trim() : ''),
+        studentRange: data.studentRange || '0-100',
         studentCount: cleanStudentCount,
         feeAmount: cleanFeeAmount,
         feeAcademicYear: data.feeAcademicYear || '၂၀၂၄-၂၀၂၅',
@@ -1356,6 +1515,21 @@ export default function Admin() {
             }`}
           >
             <SchoolIcon className="w-4 h-4 shrink-0" /> အသင်းဝင်ကျောင်းများ
+          </button>
+          <button
+            onClick={() => setActiveTab('levels')}
+            type="button"
+            className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+              activeTab === 'levels'
+                ? 'bg-white text-emerald-900 shadow-xs ring-1 ring-emerald-300'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Layers className="w-4 h-4 shrink-0 text-emerald-600" />
+            <span>ကျောင်းအဆင့်များ</span>
+            <span className="text-[10px] font-bold px-1.5 py-0.2 bg-emerald-100 text-emerald-900 rounded-full">
+              {schoolLevels.length}
+            </span>
           </button>
           <button
             onClick={() => setActiveTab('tickers')}
@@ -2160,8 +2334,50 @@ export default function Admin() {
                 <input {...schoolForm.register('name')} placeholder="ကျောင်းအမည်" className="w-full p-2.5 border rounded-lg text-sm" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">ကျောင်းအဆင့် *</label>
-                <input {...schoolForm.register('level')} placeholder="ဥပမာ - မူလတန်း / အလယ်တန်း / အထက်တန်း" className="w-full p-2.5 border rounded-lg text-sm" />
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  ကျောင်းအဆင့် * (ဥပမာ - ၁။ အထက်တန်း၊ ၂။ အထက်တန်း(မူဆင့်မပါ)၊ ၂။ ထက်ဆင့်...)
+                </label>
+                <div className="space-y-1.5">
+                  <div className="flex gap-2">
+                    <input
+                      {...schoolForm.register('level')}
+                      list="school-levels-datalist"
+                      placeholder="ကျောင်းအဆင့် ရွေးချယ်ပါ သို့မဟုတ် ရိုက်ထည့်ပါ"
+                      className="flex-1 p-2.5 border rounded-lg text-sm bg-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('levels')}
+                      className="px-2.5 py-1 text-xs text-sky-800 bg-sky-50 hover:bg-sky-100 rounded-lg border border-sky-200 font-semibold cursor-pointer whitespace-nowrap"
+                      title="ကျောင်းအဆင့်များ စီမံပြင်ဆင်ရန်"
+                    >
+                      အဆင့်များ စီမံရန် ⚙️
+                    </button>
+                  </div>
+                  <datalist id="school-levels-datalist">
+                    {schoolLevels.map(l => (
+                      <option key={l.id} value={l.name} />
+                    ))}
+                  </datalist>
+                  {/* Quick Pill Buttons */}
+                  <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto p-1 bg-slate-50 rounded-lg border border-slate-100">
+                    <span className="text-[10px] text-slate-400 font-medium self-center mr-1">အမြန်ရွေး:</span>
+                    {schoolLevels.map(l => (
+                      <button
+                        key={l.id}
+                        type="button"
+                        onClick={() => schoolForm.setValue('level', l.name)}
+                        className={`text-[11px] px-2 py-0.5 rounded border transition cursor-pointer ${
+                          schoolForm.watch('level') === l.name
+                            ? 'bg-sky-600 text-white border-sky-600 font-bold'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {l.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold text-slate-600 mb-1">ကျောင်း အခြေအနေ (Status) *</label>
@@ -2180,7 +2396,7 @@ export default function Admin() {
                 <div className="flex items-center justify-between border-b border-sky-100 pb-2">
                   <h4 className="font-bold text-xs sm:text-sm text-sky-950 flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-sky-600" />
-                    <span>ကျောင်းသားဦးရေ Range နှင့် နှစ်စဉ်ကြေး သတ်မှတ်ချက်</span>
+                    <span>ကျောင်းသားဦးရေ Range နှင့် နှစ်စဉ်ကြေး သတ်မှတ်ချက် (Reference အတိုင်း)</span>
                   </h4>
                   <span className="text-[10px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
                     အသင်းဝင် စည်းမျဉ်းသတ်မှတ်ချက်
@@ -2198,21 +2414,18 @@ export default function Admin() {
                       onChange={(e) => {
                         const val = e.target.value;
                         schoolForm.setValue('studentRange', val);
-                        // Auto-fill default fee if user hasn't set custom
-                        const defaultFee =
-                          val === '1000+' ? 300000 :
-                          val === '501-1000' ? 200000 :
-                          val === '301-500' ? 150000 :
-                          val === '101-300' ? 100000 : 50000;
-                        schoolForm.setValue('feeAmount', defaultFee);
+                        const tier = getStudentRangeTier(val);
+                        if (tier) {
+                          schoolForm.setValue('feeAmount', tier.defaultFee);
+                        }
                       }}
                       className="w-full p-2.5 border rounded-lg text-xs sm:text-sm bg-white font-medium"
                     >
-                      <option value="1-100">၁ - ၁၀၀ ဦး (သတ်မှတ်နှုန်း: ၅၀,၀၀၀ ကျပ်)</option>
-                      <option value="101-300">၁၀၁ - ၃၀၀ ဦး (သတ်မှတ်နှုန်း: ၁၀၀,၀၀၀ ကျပ်)</option>
-                      <option value="301-500">၃၀၁ - ၅၀၀ ဦး (သတ်မှတ်နှုန်း: ၁၅၀,၀၀၀ ကျပ်)</option>
-                      <option value="501-1000">၅၀၁ - ၁,၀၀၀ ဦး (သတ်မှတ်နှုန်း: ၂၀၀,၀၀၀ ကျပ်)</option>
-                      <option value="1000+">၁,၀၀၀ ဦး နှင့်အထက် (သတ်မှတ်နှုန်း: ၃၀၀,၀၀၀ ကျပ်)</option>
+                      {STUDENT_RANGE_TIERS.map(t => (
+                        <option key={t.key} value={t.key}>
+                          {t.label} (သတ်မှတ်နှုန်း: {t.defaultFee.toLocaleString('my-MM')} ကျပ်)
+                        </option>
+                      ))}
                     </select>
                     <p className="text-[10px] text-slate-500 mt-1">
                       အသင်းဝင် နှစ်စဉ်ကြေး ကောက်ခံရန် ကျောင်းသားဦးရေ အဆင့်အတန်း
@@ -2227,19 +2440,19 @@ export default function Admin() {
                     <input
                       type="number"
                       {...schoolForm.register('feeAmount')}
-                      placeholder="ဥပမာ - 100000"
+                      placeholder="ဥပမာ - 200000"
                       className="w-full p-2.5 border rounded-lg text-xs sm:text-sm bg-white font-bold text-sky-950"
                     />
                     <div className="flex flex-wrap gap-1 mt-1 text-[10px]">
                       <span className="text-slate-400">အမြန်ရွေး:</span>
-                      {[50000, 100000, 150000, 200000, 300000].map(amt => (
+                      {STUDENT_RANGE_TIERS.map(t => (
                         <button
-                          key={amt}
+                          key={t.key}
                           type="button"
-                          onClick={() => schoolForm.setValue('feeAmount', amt)}
+                          onClick={() => schoolForm.setValue('feeAmount', t.defaultFee)}
                           className="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-sky-800 hover:bg-sky-50 font-semibold"
                         >
-                          {(amt / 10000).toLocaleString('my-MM')}သောင်း
+                          {t.shortLabel}: {(t.defaultFee / 100000).toFixed(t.defaultFee % 100000 === 0 ? 0 : 1)} သိန်း
                         </button>
                       ))}
                     </div>
@@ -2450,12 +2663,12 @@ export default function Admin() {
               </div>
             </div>
 
-            {/* Coordinator 1 */}
+            {/* Responsible Person 1 */}
             <div className="border border-sky-200 p-4 rounded-xl space-y-3 bg-sky-50/40">
               <div className="flex items-center justify-between border-b border-sky-100 pb-2">
                 <h4 className="font-bold text-sm text-sky-900 flex items-center gap-1.5">
                   <span className="w-5 h-5 rounded-full bg-sky-800 text-white text-xs flex items-center justify-center font-bold">၁</span>
-                  တာဝန်ခံ (၁) အချက်အလက် (Coordinator 1)
+                  တာဝန်ခံ ပုဂ္ဂိုလ် (၁) အချက်အလက် (Responsible Person 1)
                 </h4>
                 <button
                   type="button"
@@ -2466,14 +2679,14 @@ export default function Admin() {
                 </button>
               </div>
               <div className="grid sm:grid-cols-2 gap-2">
-                <input {...schoolForm.register('contactName')} placeholder="တာဝန်ခံ (၁) အမည်" className="p-2 border rounded-lg text-sm bg-white" />
-                <input {...schoolForm.register('contactRole')} placeholder="တာဝန်ခံ (၁) ရာထူး (ဥပမာ - ရုံးတာဝန်ခံ)" className="p-2 border rounded-lg text-sm bg-white" />
+                <input {...schoolForm.register('contactName')} placeholder="တာဝန်ခံ ပုဂ္ဂိုလ် (၁) အမည်" className="p-2 border rounded-lg text-sm bg-white" />
+                <input {...schoolForm.register('contactRole')} placeholder="တာဝန်ခံ ပုဂ္ဂိုလ် (၁) ရာထူး (ဥပမာ - ရုံးတာဝန်ခံ)" className="p-2 border rounded-lg text-sm bg-white" />
               </div>
               <div className="space-y-1.5">
-                <span className="text-[11px] font-semibold text-slate-500 block">ဖုန်းနံပါတ်များ (အနည်းဆုံး ၂ လုံး ထည့်သွင်းနိုင်သည်):</span>
+                <span className="text-[11px] font-semibold text-slate-500 block">ဖုန်းနံပါတ်များ (၁ လုံးနှင့်အထက် ထည့်သွင်းနိုင်သည်):</span>
                 <div className="grid sm:grid-cols-2 gap-2">
-                  <input {...schoolForm.register('contactPhone')} placeholder="ဖုန်းနံပါတ် (၁)" className="p-2 border rounded-lg text-sm bg-white" />
-                  <input {...schoolForm.register('contactPhone2')} placeholder="ဖုန်းနံပါတ် (၂)" className="p-2 border rounded-lg text-sm bg-white" />
+                  <input {...schoolForm.register('contactPhone')} placeholder="တာဝန်ခံ (၁) ဖုန်းနံပါတ် (၁) - အဓိက" className="p-2 border rounded-lg text-sm bg-white" />
+                  <input {...schoolForm.register('contactPhone2')} placeholder="တာဝန်ခံ (၁) ဖုန်းနံပါတ် (၂) - အရန် (ရှိပါက)" className="p-2 border rounded-lg text-sm bg-white" />
                 </div>
               </div>
               {extraCoord1Phones.map((ph, idx) => (
@@ -2486,7 +2699,7 @@ export default function Admin() {
                       updated[idx] = e.target.value;
                       setExtraCoord1Phones(updated);
                     }}
-                    placeholder={`တာဝန်ခံ (၁) ဖုန်းနံပါတ် (${idx + 3})`}
+                    placeholder={`တာဝန်ခံ ပုဂ္ဂိုလ် (၁) ဖုန်းနံပါတ် (${idx + 3})`}
                     className="flex-1 p-2 border rounded-lg text-sm bg-white"
                   />
                   <button
@@ -2504,12 +2717,12 @@ export default function Admin() {
               </div>
             </div>
 
-            {/* Coordinator 2 */}
+            {/* Responsible Person 2 */}
             <div className="border border-indigo-200 p-4 rounded-xl space-y-3 bg-indigo-50/40">
               <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
                 <h4 className="font-bold text-sm text-indigo-900 flex items-center gap-1.5">
                   <span className="w-5 h-5 rounded-full bg-indigo-800 text-white text-xs flex items-center justify-center font-bold">၂</span>
-                  တာဝန်ခံ (၂) အချက်အလက် (Coordinator 2)
+                  တာဝန်ခံ ပုဂ္ဂိုလ် (၂) အချက်အလက် (Responsible Person 2)
                 </h4>
                 <button
                   type="button"
@@ -2520,14 +2733,14 @@ export default function Admin() {
                 </button>
               </div>
               <div className="grid sm:grid-cols-2 gap-2">
-                <input {...schoolForm.register('contact2Name')} placeholder="တာဝန်ခံ (၂) အမည်" className="p-2 border rounded-lg text-sm bg-white" />
-                <input {...schoolForm.register('contact2Role')} placeholder="တာဝန်ခံ (၂) ရာထူး" className="p-2 border rounded-lg text-sm bg-white" />
+                <input {...schoolForm.register('contact2Name')} placeholder="တာဝန်ခံ ပုဂ္ဂိုလ် (၂) အမည်" className="p-2 border rounded-lg text-sm bg-white" />
+                <input {...schoolForm.register('contact2Role')} placeholder="တာဝန်ခံ ပုဂ္ဂိုလ် (၂) ရာထူး" className="p-2 border rounded-lg text-sm bg-white" />
               </div>
               <div className="space-y-1.5">
-                <span className="text-[11px] font-semibold text-slate-500 block">ဖုန်းနံပါတ်များ (အနည်းဆုံး ၂ လုံး ထည့်သွင်းနိုင်သည်):</span>
+                <span className="text-[11px] font-semibold text-slate-500 block">ဖုန်းနံပါတ်များ (၁ လုံးနှင့်အထက် ထည့်သွင်းနိုင်သည်):</span>
                 <div className="grid sm:grid-cols-2 gap-2">
-                  <input {...schoolForm.register('contact2Phone')} placeholder="ဖုန်းနံပါတ် (၁)" className="p-2 border rounded-lg text-sm bg-white" />
-                  <input {...schoolForm.register('contact2Phone2')} placeholder="ဖုန်းနံပါတ် (၂)" className="p-2 border rounded-lg text-sm bg-white" />
+                  <input {...schoolForm.register('contact2Phone')} placeholder="တာဝန်ခံ (၂) ဖုန်းနံပါတ် (၁) - အဓိက" className="p-2 border rounded-lg text-sm bg-white" />
+                  <input {...schoolForm.register('contact2Phone2')} placeholder="တာဝန်ခံ (၂) ဖုန်းနံပါတ် (၂) - အရန် (ရှိပါက)" className="p-2 border rounded-lg text-sm bg-white" />
                 </div>
               </div>
               {extraCoord2Phones.map((ph, idx) => (
@@ -3805,17 +4018,48 @@ export default function Admin() {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  ဖုန်းနံပါတ် (Phone Number - စိတ်ကြိုက်)
-                </label>
+              <div className="sm:col-span-2 border border-slate-200 p-3.5 rounded-xl space-y-2 bg-slate-50/70">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    ဖုန်းနံပါတ်များ (Phone Numbers - ၁ လုံးနှင့်အထက် ထည့်သွင်းနိုင်သည်)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setExtraAdminUserPhones(prev => [...prev, ''])}
+                    className="text-xs text-amber-800 hover:text-amber-950 font-bold cursor-pointer inline-flex items-center gap-1 bg-white px-2.5 py-1 rounded-lg border border-amber-300 shadow-2xs"
+                  >
+                    + နောက်ထပ် ဖုန်းထည့်ရန်
+                  </button>
+                </div>
                 <input
                   type="tel"
                   value={newAdminPhone}
                   onChange={(e) => setNewAdminPhone(e.target.value)}
-                  placeholder="09..."
+                  placeholder="အဓိက ဆက်သွယ်ရန် ဖုန်း (၁) - 09..."
                   className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-amber-500 outline-hidden"
                 />
+                {extraAdminUserPhones.map((ph, idx) => (
+                  <div key={idx} className="flex items-center gap-2 animate-in fade-in">
+                    <input
+                      type="tel"
+                      value={ph}
+                      onChange={(e) => {
+                        const updated = [...extraAdminUserPhones];
+                        updated[idx] = e.target.value;
+                        setExtraAdminUserPhones(updated);
+                      }}
+                      placeholder={`နောက်ထပ် အက်ဒမင် ဖုန်းနံပါတ် (${idx + 2}) - 09...`}
+                      className="flex-1 p-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-amber-500 outline-hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setExtraAdminUserPhones(extraAdminUserPhones.filter((_, i) => i !== idx))}
+                      className="px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg border border-rose-200 cursor-pointer"
+                    >
+                      ဖယ်ရှားရန်
+                    </button>
+                  </div>
+                ))}
               </div>
 
               <div className="sm:col-span-2">
@@ -3932,9 +4176,32 @@ export default function Admin() {
                           </span>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                           {adm.name && <span>အမည်: <strong className="text-slate-700">{adm.name}</strong></span>}
-                          {adm.phone && <span>ဖုန်း: <span className="text-slate-700">{adm.phone}</span></span>}
+                          {(() => {
+                            const allPhones = [
+                              adm.phone,
+                              adm.phone2,
+                              ...(Array.isArray(adm.phones) ? adm.phones : []),
+                              ...(Array.isArray(adm.contactNumbers) ? adm.contactNumbers : []),
+                              ...(Array.isArray(adm.adminPhones) ? adm.adminPhones : []),
+                            ].filter((p, i, self) => Boolean(p) && self.indexOf(p) === i);
+                            if (allPhones.length === 0) return null;
+                            return (
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-slate-600 font-medium">ဖုန်း:</span>
+                                {allPhones.map((ph, pIdx) => (
+                                  <a
+                                    key={pIdx}
+                                    href={`tel:${ph}`}
+                                    className="text-sky-700 font-bold bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200 hover:underline hover:bg-sky-100 transition"
+                                  >
+                                    {ph} {allPhones.length > 1 ? (pIdx === 0 ? '(အဓိက)' : `(အရန် ${pIdx})`) : ''}
+                                  </a>
+                                ))}
+                              </div>
+                            );
+                          })()}
                           {adm.note && <span>မှတ်ချက်: <span className="text-slate-700">{adm.note}</span></span>}
                           {adm.createdAt && (
                             <span className="text-[11px] text-slate-400">
@@ -3958,6 +4225,289 @@ export default function Admin() {
                 ))
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 7. SCHOOL LEVELS MANAGEMENT TAB */}
+      {activeTab === 'levels' && (
+        <div className="space-y-6 animate-in fade-in">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-br from-emerald-950 via-teal-900 to-sky-950 text-white p-5 sm:p-6 rounded-3xl shadow-lg border border-emerald-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-400/30">
+                <Layers className="w-3.5 h-3.5" />
+                <span>ကျောင်းအဆင့်များ စီမံခန့်ခွဲမှု (School Levels)</span>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-black">ကျောင်းအဆင့်များ သတ်မှတ်စီမံခြင်း</h3>
+              <p className="text-emerald-100/80 text-xs sm:text-sm max-w-xl">
+                ဒေတာဘေ့စ်ရှိ ကျောင်းအဆင့်များကို စိတ်ကြိုက် ထည့်သွင်းခြင်း၊ ပြင်ဆင်ခြင်း၊ ဖျက်ပစ်ခြင်း နှင့် အစဉ်လိုက်စီခြင်းများ ပြုလုပ်နိုင်ပါသည်။ Dashboard နှင့် အသင်းဝင်ကျောင်းစာရင်းများတွင် ဤအဆင့်များအတိုင်း အလိုအလျောက် ခွဲခြမ်းပြသပေးပါသည်။
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleResetLevels}
+              className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-white text-emerald-950 hover:bg-emerald-50 transition shadow-md flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4 text-emerald-700" />
+              <span>မူလ အဆင့်များသို့ ပြန်ထားရန်</span>
+            </button>
+          </div>
+
+          {/* Add / Edit Form */}
+          <div id="level-form-section" className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h4 className="font-extrabold text-sm sm:text-base text-slate-900 flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
+                <span>{editingLevelId ? 'ကျောင်းအဆင့် ပြင်ဆင်ရန်' : 'ကျောင်းအဆင့် အသစ် ထည့်သွင်းရန်'}</span>
+              </h4>
+              {editingLevelId && (
+                <button
+                  type="button"
+                  onClick={handleCancelEditLevel}
+                  className="text-xs text-slate-500 hover:text-slate-800 font-semibold cursor-pointer underline"
+                >
+                  မလုပ်တော့ပါ (Cancel)
+                </button>
+              )}
+            </div>
+
+            <form onSubmit={handleSaveLevel} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    ကျောင်းအဆင့် အမည် * (ဥပမာ - ၁။ အထက်တန်း၊ ၂။ အထက်တန်း(မူဆင့်မပါ)၊ ၂။ ထက်ဆင့်...)
+                  </label>
+                  <input
+                    type="text"
+                    value={levelNameInput}
+                    onChange={(e) => setLevelNameInput(e.target.value)}
+                    placeholder="ကျောင်းအဆင့် အမည် ထည့်သွင်းပါ"
+                    className="w-full p-2.5 border rounded-xl text-sm bg-white font-medium focus:ring-2 focus:ring-emerald-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    အစဉ်နံပါတ် (Order #)
+                  </label>
+                  <input
+                    type="number"
+                    value={levelOrderInput}
+                    onChange={(e) => setLevelOrderInput(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="ဥပမာ - 1, 2, 3..."
+                    className="w-full p-2.5 border rounded-xl text-sm bg-white font-medium focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  ဖော်ပြချက် / မှတ်ချက် (Description - ရှိပါက)
+                </label>
+                <input
+                  type="text"
+                  value={levelDescInput}
+                  onChange={(e) => setLevelDescInput(e.target.value)}
+                  placeholder="ဥပမာ - အထက်တန်းအဆင့် ကျောင်းများအတွက် သတ်မှတ်ချက်"
+                  className="w-full p-2.5 border rounded-xl text-sm bg-white focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="submit"
+                  disabled={isSavingLevel}
+                  className="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{isSavingLevel ? 'သိမ်းဆည်းနေပါသည်...' : (editingLevelId ? 'ပြင်ဆင်ချက် သိမ်းဆည်းမည်' : 'အဆင့်သစ် ထည့်သွင်းမည်')}</span>
+                </button>
+                {editingLevelId && (
+                  <button
+                    type="button"
+                    onClick={handleCancelEditLevel}
+                    className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition cursor-pointer"
+                  >
+                    မလုပ်တော့ပါ
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+
+          {/* School Levels Table & List */}
+          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <div>
+                <h4 className="font-extrabold text-base text-slate-900">
+                  လက်ရှိ သတ်မှတ်ထားသော ကျောင်းအဆင့်များ စာရင်း
+                </h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  စုစုပေါင်း {schoolLevels.length} အဆင့် ရှိပါသည်
+                </p>
+              </div>
+
+              <div className="text-xs text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 font-semibold">
+                ✓ ဒေတာဘေ့စ်နှင့် တိုက်ရိုက် Sync လုပ်ထားသည်
+              </div>
+            </div>
+
+            {schoolLevels.length === 0 ? (
+              <div className="py-12 text-center text-slate-500 space-y-3">
+                <Layers className="w-10 h-10 text-slate-300 mx-auto" />
+                <p className="text-sm font-bold">ကျောင်းအဆင့်များ မရှိသေးပါ</p>
+                <button
+                  type="button"
+                  onClick={handleResetLevels}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition"
+                >
+                  မူလ အဆင့်များ ထည့်သွင်းမည်
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {/* Mobile View: Cards */}
+                <div className="sm:hidden space-y-3">
+                  {schoolLevels.map((lvl, idx) => {
+                    const count = schools.filter(
+                      (s) => (s.level || '').trim().toLowerCase() === lvl.name.trim().toLowerCase()
+                    ).length;
+
+                    return (
+                      <div key={lvl.id} className="p-4 bg-white border border-slate-200 rounded-xl space-y-2.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-full bg-slate-100 inline-flex items-center justify-center text-xs font-bold text-slate-600 shrink-0">
+                              {lvl.order ?? idx + 1}
+                            </span>
+                            <span className="font-extrabold text-sm text-slate-900">{lvl.name}</span>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditLevel(lvl)}
+                              className="p-1.5 rounded-lg text-slate-600 hover:text-sky-700 hover:bg-sky-50 transition cursor-pointer"
+                              title="ပြင်ဆင်ရန်"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteLevel(lvl)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                              title="ဖျက်ပစ်ရန်"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {lvl.description && (
+                          <p className="text-xs text-slate-500 break-words">{lvl.description}</p>
+                        )}
+
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                          <span className="text-xs text-slate-500">လက်ရှိကျောင်း အရေအတွက်:</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveTab('schools');
+                              setAdminSchoolSearch(lvl.name);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sky-50 text-sky-800 border border-sky-200 text-xs font-bold hover:bg-sky-100 transition cursor-pointer"
+                          >
+                            <SchoolIcon className="w-3.5 h-3.5 text-sky-600" />
+                            <span>{count} ကျောင်း</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Tablet / Desktop View: Responsive Table */}
+                <div className="hidden sm:block border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-xs sm:text-sm text-left border-collapse table-auto">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
+                        <th className="p-3 w-16 text-center">စဉ်</th>
+                        <th className="p-3">ကျောင်းအဆင့် အမည်</th>
+                        <th className="p-3 text-center">လက်ရှိကျောင်း အရေအတွက်</th>
+                        <th className="p-3">မှတ်ချက် / ဖော်ပြချက်</th>
+                        <th className="p-3 text-right">လုပ်ဆောင်ချက်</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {schoolLevels.map((lvl, idx) => {
+                        const count = schools.filter(
+                          (s) => (s.level || '').trim().toLowerCase() === lvl.name.trim().toLowerCase()
+                        ).length;
+
+                        return (
+                          <tr key={lvl.id} className="hover:bg-slate-50/80 transition">
+                            <td className="p-3 text-center font-bold text-slate-500">
+                              <span className="w-6 h-6 rounded-full bg-slate-100 inline-flex items-center justify-center text-xs">
+                                {lvl.order ?? idx + 1}
+                              </span>
+                            </td>
+                            <td className="p-3 font-extrabold text-slate-900">
+                              <div className="flex items-center gap-2">
+                                <span>{lvl.name}</span>
+                                {editingLevelId === lvl.id && (
+                                  <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">
+                                    ပြင်ဆင်နေသည်
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveTab('schools');
+                                  setAdminSchoolSearch(lvl.name);
+                                }}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sky-50 text-sky-800 border border-sky-200 text-xs font-bold hover:bg-sky-100 transition cursor-pointer"
+                                title="ဤအဆင့်ရှိ ကျောင်းများကို ကြည့်ရန်"
+                              >
+                                <SchoolIcon className="w-3.5 h-3.5 text-sky-600" />
+                                <span>{count} ကျောင်း</span>
+                              </button>
+                            </td>
+                            <td className="p-3 text-slate-600 text-xs break-words max-w-xs">
+                              {lvl.description || '-'}
+                            </td>
+                            <td className="p-3 text-right">
+                              <div className="inline-flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEditLevel(lvl)}
+                                  className="p-1.5 rounded-lg text-slate-600 hover:text-sky-700 hover:bg-sky-50 transition cursor-pointer"
+                                  title="ပြင်ဆင်ရန်"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteLevel(lvl)}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                                  title="ဖျက်ပစ်ရန်"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
