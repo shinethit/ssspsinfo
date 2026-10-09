@@ -1,9 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Announcement } from '../types';
 import { useData, getAnnouncementTimestamp } from '../context/DataContext';
-import { OfflineSyncStatusBadge } from '../components/OfflineSyncStatusBadge';
-import { Tag, Calendar, ChevronLeft, ChevronRight, Search, FileText } from 'lucide-react';
+import { Tag, Calendar, ChevronLeft, ChevronRight, Search, FileText, ArrowLeft } from 'lucide-react';
 
 export const ANNOUNCEMENT_CATEGORIES = [
   { id: 'all', label: 'အားလုံး', labelEn: 'All', color: 'bg-slate-100 text-slate-700 border-slate-200' },
@@ -31,6 +30,7 @@ export function getCategoryBadge(categoryId?: string) {
 }
 
 export default function Announcements() {
+  const navigate = useNavigate();
   const { announcements, loading } = useData();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -78,21 +78,42 @@ export default function Announcements() {
   }, [filteredAnnouncements, currentPage]);
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto">
+    <div className="space-y-6 max-w-5xl mx-auto">
+      {/* Top Action Bar with Back Button */}
+      <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+        <button
+          type="button"
+          onClick={() => {
+            if (window.history.length > 1) {
+              navigate(-1);
+            } else {
+              navigate('/');
+            }
+          }}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-sky-950 font-bold text-xs sm:text-sm transition cursor-pointer shadow-2xs"
+          title="နောက်သို့ (Back)"
+        >
+          <ArrowLeft className="w-4 h-4 text-sky-800" />
+          <span>နောက်သို့ (Back)</span>
+        </button>
+
+        <Link
+          to="/"
+          className="text-xs font-semibold text-slate-600 hover:text-sky-800 px-2.5 py-1 rounded-lg hover:bg-slate-100 transition"
+        >
+          ပင်မစာမျက်နှာ ➔
+        </Link>
+      </div>
+
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
-        <div>
-          <h2 className="text-3xl font-extrabold text-sky-950 flex items-center gap-3">
-            <FileText className="w-8 h-8 text-sky-600" />
-            ကြေညာချက်များ <span className="text-lg font-normal text-slate-500">(Announcements)</span>
-          </h2>
-          <p className="text-slate-600 mt-2 text-sm sm:text-base">
-            ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း၏ တရားဝင် ထုတ်ပြန်ချက်များနှင့် သတင်းအချက်အလက်များ
-          </p>
-        </div>
-        <div className="shrink-0">
-          <OfflineSyncStatusBadge />
-        </div>
+      <div className="border-b border-slate-200 pb-4">
+        <h2 className="text-3xl font-extrabold text-sky-950 flex items-center gap-3">
+          <FileText className="w-8 h-8 text-sky-600" />
+          ကြေညာချက်များ <span className="text-lg font-normal text-slate-500">(Announcements)</span>
+        </h2>
+        <p className="text-slate-600 mt-2 text-sm sm:text-base">
+          ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း၏ တရားဝင် ထုတ်ပြန်ချက်များနှင့် သတင်းအချက်အလက်များ
+        </p>
       </div>
 
       {/* Filter & Search Bar */}

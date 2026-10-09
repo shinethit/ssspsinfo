@@ -2,10 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { collection, addDoc, query, onSnapshot, orderBy, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { MessageSquare, Send, UserCircle } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { MessageSquare, Send, UserCircle, ArrowLeft } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function Chat() {
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<any[]>([]);
   const [text, setText] = useState('');
   const [user] = useAuthState(auth);
@@ -41,6 +42,32 @@ export default function Chat() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-4 w-full">
+      {/* Top Action Bar with Back Button */}
+      <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+        <button
+          type="button"
+          onClick={() => {
+            if (window.history.length > 1) {
+              navigate(-1);
+            } else {
+              navigate('/');
+            }
+          }}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-sky-950 font-bold text-xs sm:text-sm transition cursor-pointer shadow-2xs"
+          title="နောက်သို့ (Back)"
+        >
+          <ArrowLeft className="w-4 h-4 text-sky-800" />
+          <span>နောက်သို့ (Back)</span>
+        </button>
+
+        <Link
+          to="/"
+          className="text-xs font-semibold text-slate-600 hover:text-sky-800 px-2.5 py-1 rounded-lg hover:bg-slate-100 transition"
+        >
+          ပင်မစာမျက်နှာ ➔
+        </Link>
+      </div>
+
       <div className="border-b border-slate-200 pb-3">
         <h2 className="text-2xl sm:text-3xl font-extrabold text-sky-950 flex items-center gap-2.5">
           <MessageSquare className="w-7 h-7 sm:w-8 sm:h-8 text-sky-600 shrink-0" />

@@ -1,5 +1,5 @@
-import { History, GitCommit, Sparkles, CheckCircle2, Shield, Calendar, Tag } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { History, GitCommit, Sparkles, CheckCircle2, Shield, Calendar, Tag, ArrowLeft } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface VersionItem {
   version: string;
@@ -14,9 +14,53 @@ interface VersionItem {
 
 const VERSIONS: VersionItem[] = [
   {
-    version: 'v2.8',
+    version: 'v2.10',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'Back (နောက်သို့) ခလုတ် ထည့်သွင်းခြင်း၊ Admin သီးသန့် ခလုတ်များ ဖယ်ရှားခြင်းနှင့် Header ရှင်းလင်းမှု (Header Clean & Navigation UX)',
+    changes: [
+      {
+        type: 'feat',
+        text: 'Navbar ထိပ်တန်းတွင် ပင်မစာမျက်နှာမှအပ မည်သည့်စာမျက်နှာမဆို ရှေ့သို့ ချက်ချင်းပြန်သွားနိုင်သော "နောက်သို့ (Back)" ခလုတ် ထည့်သွင်းပေးခြင်း',
+      },
+      {
+        type: 'feat',
+        text: 'အသင်းဝင်ကျောင်းများ စာမျက်နှာ ထိပ်ပိုင်းတွင် သီးခြား "နောက်သို့ (Back)" ခလုတ် ထည့်သွင်းပေးခြင်း',
+      },
+      {
+        type: 'improve',
+        text: 'အသင်းဝင်ကျောင်းများ စာမျက်နှာတွင် သာမန်အသုံးပြုသူများအတွက် မလိုအပ်သော Admin ခလုတ်များ (Offline Sync၊ Excel Template၊ Admin Excel သွင်းရန်) ကို ရှင်းထုတ်ပေးပြီး စာမျက်နှာအမြင် သန့်ရှင်းကျစ်လျစ်စေခြင်း',
+      },
+      {
+        type: 'improve',
+        text: 'Navbar ထိပ်တန်းမှ Version Update အမဲခလုတ်ကို ဖြုတ်ပယ်ပြီး Sidebar မီနူးထဲတွင်သာ သပ်ရပ်စွာ ထားရှိပေးခြင်း',
+      },
+    ],
+  },
+  {
+    version: 'v2.9',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
+    title: 'ဖုန်း Screen ပေါ်တွင် ကျောင်းအမည် အပြည့်အစုံ ပေါ်လွင်စေခြင်းနှင့် ရှာဖွေမှု / ကဏ္ဍ ရွေးချယ်မှု နေရာယူမှု အလွန်ကျစ်လျစ်အောင် ပြင်ဆင်ခြင်း (Mobile UI Optimization)',
+    changes: [
+      {
+        type: 'fix',
+        text: 'ဖုန်းဖြင့် ကြည့်ရှုချိန်တွင် ကျောင်းအမည်များ ခလုတ်များကြား ညပ်ပြီး ပျောက်ကွယ်မသွားစေဘဲ ထိပ်ဆုံးတွင် အကျယ်ပြန့်ဆုံး နေရာယူကာ မြန်မာစာ စာလုံးမပြတ် အပြည့်အစုံ ပေါ်လွင်အောင် ပြင်ဆင်ပေးခြင်း',
+      },
+      {
+        type: 'improve',
+        text: 'ကျောင်းကတ်တစ်ခုစီရှိ "ဖုန်းခေါ်ရန်" နှင့် "အသေးစိတ်" ခလုတ်များကို ဖုန်းတွင် သီးခြား အောက်ဘက်တန်းသို့ သပ်ရပ်စွာ ခွဲထုတ်ပေးသဖြင့် လက်မဖြင့် နှိပ်ရ ပိုမိုလွယ်ကူစေခြင်း',
+      },
+      {
+        type: 'improve',
+        text: 'စာမျက်နှာထိပ်ရှိ Category Select၊ Search Bar နှင့် Filter ကတ်များကို တစ်ခုတည်းအဖြစ် ပေါင်းစည်းကျစ်လျစ်စေပြီး မိုဘိုင်းမျက်နှာပြင်တွင် နေရာယူမှု ၆၅% အထိ လျှော့ချပေးခြင်းဖြင့် ကျောင်းစာရင်းများကို ချက်ချင်း မြင်တွေ့စေခြင်း',
+      },
+    ],
+  },
+  {
+    version: 'v2.8',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'အသင်းနှင့် အမှုဆောင်အဖွဲ့ဝင်များ ပြင်ဆင်နိုင်သည့် စနစ် (Association Edit & Committee Update)၊ မြန်မာစာ တတ်နိုင်သမျှ စာလုံးမပျောက်ဘဲ အပြည့်အစုံ ဖော်ပြမှု ပြင်ဆင်ခြင်း',
     changes: [
       {
@@ -491,8 +535,36 @@ const VERSIONS: VersionItem[] = [
 ];
 
 export default function VersionHistory() {
+  const navigate = useNavigate();
+
   return (
-    <div className="space-y-8 max-w-4xl mx-auto w-full">
+    <div className="space-y-6 max-w-4xl mx-auto w-full">
+      {/* Top Back Action Bar */}
+      <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+        <button
+          type="button"
+          onClick={() => {
+            if (window.history.length > 1) {
+              navigate(-1);
+            } else {
+              navigate('/');
+            }
+          }}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-sky-950 font-bold text-xs sm:text-sm transition cursor-pointer shadow-2xs"
+          title="နောက်သို့ (Back)"
+        >
+          <ArrowLeft className="w-4 h-4 text-sky-800" />
+          <span>နောက်သို့ (Back)</span>
+        </button>
+
+        <Link
+          to="/"
+          className="text-xs font-semibold text-slate-600 hover:text-sky-800 px-2.5 py-1 rounded-lg hover:bg-slate-100 transition"
+        >
+          ပင်မစာမျက်နှာ ➔
+        </Link>
+      </div>
+
       {/* Page Header */}
       <div className="border-b border-slate-200 pb-5">
         <div className="flex items-center gap-3">
@@ -528,8 +600,8 @@ export default function VersionHistory() {
                   {item.version}
                 </span>
                 {item.isLatest && (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-black px-3 py-1 rounded-full bg-black text-white border border-neutral-700 shadow-xs">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Version Update (အမဲ) • လက်ရှိဗားရှင်း (Latest)
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-sky-900 text-white shadow-xs">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-sky-300" /> လက်ရှိဗားရှင်း (Latest Version)
                   </span>
                 )}
               </div>

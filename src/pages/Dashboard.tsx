@@ -1,8 +1,7 @@
 import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { School, STUDENT_RANGE_TIERS, getStudentRangeTier } from '../types';
 import { useData, getAnnouncementTimestamp } from '../context/DataContext';
-import { OfflineSyncStatusBadge } from '../components/OfflineSyncStatusBadge';
 import { getCategoryBadge } from './Announcements';
 import { getUnifiedSchoolLevels, isSchoolInLevel } from '../lib/schoolLevels';
 import {
@@ -27,9 +26,11 @@ import {
   BarChart3,
   Layers,
   Table,
+  ArrowLeft,
 } from 'lucide-react';
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { schools, announcements, schoolLevels, loading } = useData();
 
   // Annual Fee Breakdown Tab: 'level' | 'student_range' | 'amount' | 'matrix'
@@ -276,6 +277,32 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-10">
+      {/* Top Action Bar with Back Button */}
+      <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+        <button
+          type="button"
+          onClick={() => {
+            if (window.history.length > 1) {
+              navigate(-1);
+            } else {
+              navigate('/');
+            }
+          }}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-sky-950 font-bold text-xs sm:text-sm transition cursor-pointer shadow-2xs"
+          title="နောက်သို့ (Back)"
+        >
+          <ArrowLeft className="w-4 h-4 text-sky-800" />
+          <span>နောက်သို့ (Back)</span>
+        </button>
+
+        <Link
+          to="/"
+          className="text-xs font-semibold text-slate-600 hover:text-sky-800 px-2.5 py-1 rounded-lg hover:bg-slate-100 transition"
+        >
+          ပင်မစာမျက်နှာ ➔
+        </Link>
+      </div>
+
       {/* 1. HERO BANNER */}
       <section className="relative overflow-hidden bg-gradient-to-br from-sky-950 via-sky-900 to-indigo-950 text-white rounded-3xl p-5 sm:p-7 shadow-xl border border-sky-800">
         <div className="absolute top-0 right-0 w-80 h-80 bg-sky-500/10 rounded-full blur-3xl pointer-events-none -mr-10 -mt-10" />
@@ -292,7 +319,6 @@ export default function Dashboard() {
           </p>
 
           <div className="pt-2 flex flex-wrap items-center justify-center gap-2 text-xs font-semibold">
-            <OfflineSyncStatusBadge compact />
             <Link
               to="/contacts"
               className="px-3.5 py-2 bg-sky-500 hover:bg-sky-400 text-sky-950 rounded-xl transition flex items-center gap-1.5 shadow-xs font-bold"

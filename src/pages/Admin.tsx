@@ -53,6 +53,7 @@ import {
   HardDriveDownload,
   Database,
   Save,
+  ArrowLeft,
   FileJson,
   Check,
   ArrowDownToLine,
@@ -2116,7 +2117,33 @@ export default function Admin() {
   };
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto p-4 sm:p-6">
+    <div className="space-y-6 max-w-5xl mx-auto p-4 sm:p-6">
+      {/* Top Action Bar with Back Button */}
+      <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+        <button
+          type="button"
+          onClick={() => {
+            if (window.history.length > 1) {
+              navigate(-1);
+            } else {
+              navigate('/');
+            }
+          }}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-sky-950 font-bold text-xs sm:text-sm transition cursor-pointer shadow-2xs"
+          title="နောက်သို့ (Back)"
+        >
+          <ArrowLeft className="w-4 h-4 text-sky-800" />
+          <span>နောက်သို့ (Back)</span>
+        </button>
+
+        <Link
+          to="/"
+          className="text-xs font-semibold text-slate-600 hover:text-sky-800 px-2.5 py-1 rounded-lg hover:bg-slate-100 transition"
+        >
+          ပင်မစာမျက်နှာ ➔
+        </Link>
+      </div>
+
       {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
