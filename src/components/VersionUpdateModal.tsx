@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, X, ArrowRight, CheckCircle2, History, Smartphone, Megaphone, CheckSquare, Shield, Activity, Layers, Crown, LayoutDashboard, Bell, Newspaper, Coins, KeyRound, Download } from 'lucide-react';
+import { Sparkles, X, ArrowRight, History, Layers, Bell, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-export const CURRENT_VERSION = 'v2.3';
+export const CURRENT_VERSION = 'v2.4';
 const STORAGE_KEY = 'pss_last_viewed_version';
 
 export const VersionUpdateModal: React.FC = () => {
@@ -19,6 +19,12 @@ export const VersionUpdateModal: React.FC = () => {
     } catch {
       // In case localStorage is blocked
     }
+
+    const handleOpen = () => {
+      setIsOpen(true);
+    };
+    window.addEventListener('sssps_open_version_modal', handleOpen);
+    return () => window.removeEventListener('sssps_open_version_modal', handleOpen);
   }, []);
 
   const handleDismiss = () => {
@@ -37,13 +43,13 @@ export const VersionUpdateModal: React.FC = () => {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in"
       role="dialog"
       aria-modal="true"
     >
-      <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden space-y-0 animate-in zoom-in-95 duration-200">
-        {/* Modal Header with Gradient Banner */}
-        <div className="bg-gradient-to-r from-sky-900 via-indigo-900 to-slate-900 p-6 text-white relative">
+      <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden space-y-0 animate-in zoom-in-95 duration-200">
+        {/* Modal Header with Black Banner (Version Update အမဲ) */}
+        <div className="bg-black p-6 text-white relative border-b border-neutral-800">
           <button
             onClick={handleDismiss}
             className="absolute top-4 right-4 p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
@@ -53,8 +59,8 @@ export const VersionUpdateModal: React.FC = () => {
           </button>
 
           <div className="flex items-center gap-2 mb-2">
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-400 text-amber-950 shadow-xs">
-              <Sparkles className="w-3.5 h-3.5" /> ဗားရှင်းအသစ် ထွက်ရှိပါပြီ
+            <span className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full text-xs font-black bg-neutral-900 text-amber-300 border border-neutral-700 shadow-xs">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Version Update (အမဲ)
             </span>
             <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-white/20 text-white">
               {CURRENT_VERSION}
@@ -64,57 +70,70 @@ export const VersionUpdateModal: React.FC = () => {
           <h2 className="text-xl sm:text-2xl font-black leading-[1.6]">
             ဘာတွေ အသစ်ပါဝင်လာသလဲ? (What's New)
           </h2>
-          <p className="text-indigo-200 text-xs sm:text-sm mt-1 leading-normal">
-            ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း ဝဘ်ဆိုက်၏ နောက်ဆုံးရ လုပ်ဆောင်ချက်များ
+          <p className="text-slate-300 text-xs sm:text-sm mt-1 leading-normal">
+            ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း ဝဘ်ဆိုက်၏ နောက်ဆုံးရ ပြင်ဆင်မွမ်းမံမှုများ
           </p>
         </div>
 
         {/* Feature Highlights Body */}
-        <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-          <div className="space-y-3">
-            {/* Feature 1: Admin Password Management & Direct Reset */}
-            <div className="flex items-start gap-3 p-3 rounded-2xl bg-sky-50/80 border border-sky-100">
-              <div className="p-2 rounded-xl bg-sky-800 text-white shrink-0 mt-0.5">
-                <KeyRound className="w-5 h-5" />
-              </div>
-              <div className="space-y-0.5 text-xs">
-                <h4 className="font-bold text-sky-950 text-sm">
-                  Admin စကားဝှက် (Password) လုံခြုံရေးနှင့် စိတ်ကြိုက် ပြောင်းလဲနိုင်မှု
-                </h4>
-                <p className="text-slate-600 leading-normal">
-                  Admin စနစ်သို့ မူလစကားဝှက်ဖြင့် အလွယ်တကူ ဝင်ရောက်နိုင်ပြီး Admin Panel အတွင်းမှသော်လည်းကောင်း၊ Login စာမျက်နှာမှသော်လည်းကောင်း မိမိစိတ်ကြိုက် စကားဝှက်အသစ်သို့ အချိန်မရွေး လွတ်လပ်စွာ ပြောင်းလဲသတ်မှတ်နိုင်ပါပြီ။
-                </p>
-              </div>
+        <div className="p-6 space-y-3.5 max-h-[60vh] overflow-y-auto">
+          {/* Feature 1: School Levels 3-way Synchronization */}
+          <div className="flex items-start gap-3 p-3 rounded-2xl bg-sky-50/80 border border-sky-100">
+            <div className="p-2 rounded-xl bg-sky-900 text-white shrink-0 mt-0.5">
+              <Layers className="w-5 h-5" />
             </div>
-
-            {/* Feature 2: Contact Person 1 & 2 + Multi Phones */}
-            <div className="flex items-start gap-3 p-3 rounded-2xl bg-indigo-50/80 border border-indigo-100">
-              <div className="p-2 rounded-xl bg-indigo-600 text-white shrink-0 mt-0.5">
-                <Download className="w-5 h-5" />
-              </div>
-              <div className="space-y-0.5 text-xs">
-                <h4 className="font-bold text-indigo-950 text-sm">
-                  တာဝန်ခံ (၁/၂) ခွဲခြားမှုနှင့် ကျောင်းစာရင်း Excel Export
-                </h4>
-                <p className="text-slate-600 leading-normal">
-                  ကျောင်းများတွင် တာဝန်ခံ (၁) နှင့် (၂) အမည်၊ ရာထူး၊ ဖုန်းနံပါတ်များ သီးခြားစီ ထည့်သွင်းနိုင်ပြီး အချက်အလက်အားလုံးကို Excel (.xlsx) အဖြစ် တစ်ချက်နှိပ်ရုံဖြင့် ဒေါင်းလုဒ်ထုတ်ယူနိုင်ပါသည်။
-                </p>
-              </div>
+            <div className="space-y-0.5 text-xs">
+              <h4 className="font-bold text-sky-950 text-sm">
+                ကျောင်းအဆင့်များ သုံးဘက်ညီ (Contacts, Dashboard, Admin) တပြေးညီ ချိတ်ဆက်မှု
+              </h4>
+              <p className="text-slate-600 leading-normal">
+                Contacts (ပထမပုံ)၊ Dashboard (ဒုတိယပုံ) နှင့် Admin (တတိယပုံ) တို့ရှိ ကျောင်းအဆင့် စစ်ထုတ်မှုများနှင့် အရေအတွက်များကို တပြေးညီ (Inline Real-time Sync) ဖြစ်စေပြီး Admin တွင် ပြင်ဆင်/အတိုးအလျှော့ ပြုလုပ်မှုတိုင်း မျက်နှာပြင်အားလုံးတွင် တိုက်ရိုက် အလိုအလျောက် ပြောင်းလဲသွားစေပါသည်။
+              </p>
             </div>
+          </div>
 
-            {/* Feature 3: Annual Fee Analytics */}
-            <div className="flex items-start gap-3 p-3 rounded-2xl bg-emerald-50/80 border border-emerald-100">
-              <div className="p-2 rounded-xl bg-emerald-600 text-white shrink-0 mt-0.5">
-                <Coins className="w-5 h-5" />
-              </div>
-              <div className="space-y-0.5 text-xs">
-                <h4 className="font-bold text-emerald-950 text-sm">
-                  နှစ်စဉ်ကြေး စာရင်းအင်းနှင့် Real-Time Instant Sync
-                </h4>
-                <p className="text-slate-600 leading-normal">
-                  ကျောင်းအဆင့်၊ ကျောင်းသားဦးရေ Range နှင့် နှစ်စဉ်ကြေး ထည့်ဝင်မှုအလိုက် Dashboard Matrix ဇယားများဖြင့် တိကျစွာ ခွဲခြမ်းစစ်ထုတ်နိုင်ပါသည်။
-                </p>
-              </div>
+          {/* Feature 2: Prominent Notification Bell */}
+          <div className="flex items-start gap-3 p-3 rounded-2xl bg-amber-50/80 border border-amber-200">
+            <div className="p-2 rounded-xl bg-amber-600 text-white shrink-0 mt-0.5">
+              <Bell className="w-5 h-5" />
+            </div>
+            <div className="space-y-0.5 text-xs">
+              <h4 className="font-bold text-amber-950 text-sm">
+                ခေါင်းလောင်း အသိပေးချက် (Notification Bell) အမြဲမပြတ် ပေါ်လွင်စွာ မြင်တွေ့နိုင်ခြင်း
+              </h4>
+              <p className="text-slate-600 leading-normal">
+                Preview နှင့် မည်သည့် မျက်နှာပြင်တွင်မဆို ခေါင်းလောင်း notification icon ကို မပျောက်ကွယ်ဘဲ အမြဲတစေ ပေါ်လွင်ထင်ရှားစွာ မြင်တွေ့နိုင်အောင် ဖန်တီးပေးပြီး စနစ်လုပ်ဆောင်ချက်များ (ကျောင်းထည့်/ပြင်/ဖျက်) နှင့် ဗားရှင်းအသစ်များကို အချိန်နှင့်တပြေးညီ အသိပေးစေပါသည်။
+              </p>
+            </div>
+          </div>
+
+          {/* Feature 3: Black Version Update Badge */}
+          <div className="flex items-start gap-3 p-3 rounded-2xl bg-slate-900 text-white border border-slate-800">
+            <div className="p-2 rounded-xl bg-black text-amber-400 border border-neutral-700 shrink-0 mt-0.5">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div className="space-y-0.5 text-xs">
+              <h4 className="font-bold text-white text-sm">
+                အနက်ရောင် Version Update (အမဲ) တံဆိပ် စနစ်သစ်
+              </h4>
+              <p className="text-slate-300 leading-normal">
+                စနစ်တစ်ခုခု ပြောင်းလဲတိုင်း၊ ပြင်တိုင်း၊ Improve လုပ်တိုင်း နဂိုအခြေအနေနှင့် မတူညီသည်များကို အလွယ်တကူ သိရှိစေရန် အနက်ရောင် (Black) 'Version Update v2.4' တံဆိပ်ကို Header၊ Sidebar နှင့် Navigation များတွင် အထင်အရှား ထည့်သွင်းပေးထားပါသည်။
+              </p>
+            </div>
+          </div>
+
+          {/* Feature 4: Compact Clean Notification Strip */}
+          <div className="flex items-start gap-3 p-3 rounded-2xl bg-emerald-50/80 border border-emerald-100">
+            <div className="p-2 rounded-xl bg-emerald-700 text-white shrink-0 mt-0.5">
+              <Activity className="w-5 h-5" />
+            </div>
+            <div className="space-y-0.5 text-xs">
+              <h4 className="font-bold text-emerald-950 text-sm">
+                ကျစ်လျစ်သပ်ရပ်သော Compact Notification & Toast စနစ်
+              </h4>
+              <p className="text-slate-600 leading-normal">
+                အသုံးပြုသူ ကြည့်ရှုအသုံးပြုရာတွင် အဆင်မပြေဖြစ်စေသော အရှည်ကြီးဖြစ်နေသည့် Notification များနှင့် Toast များကို ကျစ်လျစ်သိပ်သည်းပြီး မျက်စိရှင်းလင်းစွာ ဖတ်ရှုနိုင်သော Compact Alert Strip နှင့် စက္ကန့်တို Toast များဖြင့် ပြောင်းလဲပြင်ဆင်ထားပါသည်။
+              </p>
             </div>
           </div>
         </div>
@@ -133,7 +152,7 @@ export const VersionUpdateModal: React.FC = () => {
           <button
             onClick={handleDismiss}
             type="button"
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-sky-900 text-white hover:bg-sky-800 transition cursor-pointer shadow-xs"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-black text-white hover:bg-neutral-800 transition cursor-pointer shadow-xs border border-neutral-800"
           >
             <span>သိရှိပါပြီ (Got it)</span>
             <ArrowRight className="w-4 h-4" />

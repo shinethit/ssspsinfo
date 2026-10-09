@@ -84,7 +84,7 @@ export default function NewsTickerBar() {
       role="region"
       aria-label="အရေးကြီး စာတန်းပြေး အသိပေးချက်"
     >
-      <div className="w-full flex items-center justify-between h-10 px-2 sm:px-4 gap-2 text-xs">
+      <div className="w-full flex items-center justify-between h-9 px-2 sm:px-3 gap-2 text-xs">
         {/* Left Badge: Icon + Label + Live Pulse */}
         <div className="flex items-center gap-1.5 shrink-0 z-10 bg-inherit pr-2">
           <div

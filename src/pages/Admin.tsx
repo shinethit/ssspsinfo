@@ -11,6 +11,7 @@ import { ANNOUNCEMENT_CATEGORIES, getCategoryBadge } from './Announcements';
 import { Association, NewsTicker, AuditLog, AdminUser, STUDENT_RANGE_TIERS, getStudentRangeTier, SchoolLevelItem } from '../types';
 import { recordAuditLog } from '../lib/audit';
 import { useData, sortAnnouncementsByEventDate } from '../context/DataContext';
+import { isSchoolInLevel } from '../lib/schoolLevels';
 import {
   FileText,
   School as SchoolIcon,
@@ -660,7 +661,7 @@ export default function Admin() {
   };
 
   const handleDeleteLevel = async (lvl: SchoolLevelItem) => {
-    const schoolsInLevel = schools.filter(s => (s.level || '').trim().toLowerCase() === lvl.name.trim().toLowerCase());
+    const schoolsInLevel = schools.filter(s => isSchoolInLevel(s, lvl.name));
     const confirmMsg = schoolsInLevel.length > 0
       ? `ဤကျောင်းအဆင့် "${lvl.name}" တွင် လက်ရှိ ကျောင်း (${schoolsInLevel.length}) ကျောင်း သတ်မှတ်ထားဆဲ ဖြစ်ပါသည်။ အမှန်တကယ် ဖျက်ပစ်ပါမည်လား?`
       : `ကျောင်းအဆင့် "${lvl.name}" ကို အပြီးပိုင် ဖျက်ပစ်ပါမည်လား?`;
@@ -1393,7 +1394,7 @@ export default function Admin() {
         entityName: school.name,
         details: `ကျောင်းအခြေအနေကို "${statusLabel}" အဖြစ် ပြောင်းလဲခဲ့သည်`,
       });
-      toast.success(`"${school.name}" ၏ အခြေအနေကို "${statusLabel}" အဖြစ် ပြောင်းလဲလိုက်ပါပြီ`);
+      toast.success(`"${school.name}" အခြေအနေ ပြောင်းပြီးပါပြီ`);
       fetchAuditLogs();
     } catch (err) {
       toast.error('အခြေအနေ ပြောင်းလဲ၍ မရပါ');
@@ -1416,8 +1417,8 @@ export default function Admin() {
       });
       toast.success(
         nextStatus
-          ? `"${school.name}" ၏ နှစ်စဉ်ကြေးကို ပေးသွင်းပြီးအဖြစ် ပြောင်းလဲလိုက်ပါပြီ`
-          : `"${school.name}" ၏ နှစ်စဉ်ကြေးကို မပေးသွင်းရသေးအဖြစ် ပြောင်းလဲလိုက်ပါပြီ`
+          ? `"${school.name}" နှစ်စဉ်ကြေး ပေးပြီးပါပြီ`
+          : `"${school.name}" နှစ်စဉ်ကြေး မပေးရသေးပါ`
       );
       fetchAuditLogs();
     } catch (err) {
@@ -1663,7 +1664,7 @@ export default function Admin() {
     });
 
     if (duplicatesToDelete.length === 0) {
-      toast.success('ထပ်နေသော (Duplicate) ကျောင်း မတွေ့ရှိပါ။ ကျောင်းစာရင်းများ သန့်ရှင်းပြီးဖြစ်ပါသည်');
+      toast.success('ထပ်နေသောကျောင်း မရှိပါ');
       return;
     }
 
@@ -1683,7 +1684,7 @@ export default function Admin() {
         entityType: 'school',
         details: `ထပ်နေသော Duplicate ကျောင်း (${duplicatesToDelete.length}) ခုကို ရှင်းလင်းဖျက်ပစ်ခဲ့သည်`,
       });
-      toast.success(`ထပ်နေသော ကျောင်း (${duplicatesToDelete.length}) ခုကို အောင်မြင်စွာ ဖယ်ရှားရှင်းလင်းပြီးပါပြီ`);
+      toast.success(`Duplicate (${duplicatesToDelete.length}) ခု ရှင်းပြီးပါပြီ`);
       fetchSchools();
       fetchAuditLogs();
     } catch (err) {
@@ -1922,9 +1923,7 @@ export default function Admin() {
           stats: statsResult,
         });
 
-        toast.success(
-          `Excel တင်သွင်းမှု အောင်မြင်ပါသည်: အသစ် (${newCount}) ခု၊ Update (${updatedCount}) ခု၊ ကျော်ခဲ့ (${skippedCount}) ခု`
-        );
+        toast.success(`Excel တင်သွင်းပြီးပါပြီ (+${newCount}, ↺${updatedCount})`);
 
         await fetchSchools();
         await fetchAuditLogs();
@@ -2749,188 +2748,98 @@ export default function Admin() {
               </div>
             </div>
 
-            {/* Uploading Progress Indicator Card (လုပ်နေရင် လုပ်နေကြောင်း ပြသခြင်း) */}
+            {/* Uploading Progress Indicator Strip (ကျစ်လျစ်သော အခြေအနေပြသမှု) */}
             {isUploadingExcel && (
-              <div className="bg-sky-50 border-2 border-sky-400 p-5 rounded-2xl shadow-md space-y-3.5 animate-in fade-in zoom-in-95">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-sky-600 text-white shadow-xs">
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-extrabold text-sky-950 text-sm sm:text-base">
-                          Excel ဖိုင် တင်သွင်းနေပါသည် (Uploading Excel...)
-                        </h4>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-200 text-sky-900 animate-pulse">
-                          လုပ်ဆောင်နေဆဲ
-                        </span>
-                      </div>
-                      <p className="text-xs text-sky-700 mt-0.5 flex items-center gap-1.5 font-medium">
-                        <FileSpreadsheet className="w-3.5 h-3.5 text-sky-600" />
-                        <span>ဖိုင်အမည်: <strong className="font-bold text-sky-900">{excelUploadState.fileName}</strong></span>
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <span className="text-2xl sm:text-3xl font-black text-sky-900">
-                      {excelUploadState.progressPercent}%
+              <div className="bg-sky-50 border border-sky-300 px-3.5 py-2.5 rounded-xl shadow-xs flex items-center justify-between gap-3 animate-in fade-in">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Loader2 className="w-4 h-4 text-sky-600 animate-spin shrink-0" />
+                  <div className="min-w-0 flex items-center gap-2 text-xs">
+                    <span className="font-bold text-sky-950 truncate">
+                      Excel တင်သွင်းနေဆဲ ({excelUploadState.progressPercent}%)
                     </span>
-                  </div>
-                </div>
-
-                {/* Animated Progress Bar */}
-                <div className="space-y-1.5">
-                  <div className="w-full bg-sky-200/80 rounded-full h-3 overflow-hidden p-0.5">
-                    <div
-                      className="bg-gradient-to-r from-sky-500 via-sky-600 to-indigo-600 h-full rounded-full transition-all duration-300 ease-out"
-                      style={{ width: `${excelUploadState.progressPercent}%` }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between text-[11px] text-sky-850 font-semibold">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-sky-600 animate-ping" />
-                      <span>{excelUploadState.stageText}</span>
+                    <span className="text-[11px] text-sky-700 hidden sm:inline truncate">
+                      {excelUploadState.stageText}
                     </span>
                     {excelUploadState.totalRows ? (
-                      <span className="text-sky-900 font-bold">
-                        {excelUploadState.processedRows} / {excelUploadState.totalRows} ကျောင်း
+                      <span className="text-[10px] bg-sky-200/80 text-sky-900 px-1.5 py-0.5 rounded-md font-semibold shrink-0">
+                        {excelUploadState.processedRows}/{excelUploadState.totalRows}
                       </span>
                     ) : null}
                   </div>
                 </div>
-
-                <div className="bg-white/90 border border-sky-200 rounded-xl p-2.5 text-xs text-slate-700 flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-sky-600 shrink-0" />
-                  <span>ကျေးဇူးပြု၍ စောင့်ဆိုင်းပေးပါ။ ဒေတာဘေ့စ် (Firestore) သို့ တိုက်ရိုက် ရေးသွင်းနေသဖြင့် Browser စာမျက်နှာကို မပိတ်ပါနှင့်။</span>
+                <div className="w-20 sm:w-28 bg-sky-200 h-2 rounded-full overflow-hidden shrink-0">
+                  <div
+                    className="bg-sky-600 h-full rounded-full transition-all duration-200"
+                    style={{ width: `${excelUploadState.progressPercent}%` }}
+                  />
                 </div>
               </div>
             )}
 
-            {/* Upload Completed Report Card (ပြီးရင် ပြီးကြောင်း အသေးစိတ် ပြသခြင်း) */}
+            {/* Upload Completed Compact Notification Strip (ကျစ်လျစ်သော အောင်မြင်ကြောင်း အသိပေးချက်) */}
             {excelUploadState.status === 'completed' && excelUploadState.stats && (
-              <div className="bg-emerald-50/90 border-2 border-emerald-400 p-5 sm:p-6 rounded-2xl shadow-md space-y-4 animate-in fade-in zoom-in-95">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="p-3 rounded-2xl bg-emerald-600 text-white shadow-xs shrink-0">
-                      <CheckCircle2 className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="font-extrabold text-emerald-950 text-base sm:text-lg">
-                          Excel တင်သွင်းခြင်း အောင်မြင်စွာ ပြီးဆုံးပါပြီ!
-                        </h4>
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-200 text-emerald-900 border border-emerald-300">
-                          <Check className="w-3.5 h-3.5" /> ၁၀၀% ပြီးစီး
-                        </span>
-                      </div>
-                      <p className="text-xs text-emerald-800 mt-1 flex items-center gap-2 flex-wrap">
-                        <span>ဖိုင်အမည်: <strong className="font-bold text-emerald-950">{excelUploadState.stats.fileName}</strong></span>
-                        <span>•</span>
-                        <span>ပြီးဆုံးချိန်: <strong className="font-bold text-emerald-950">{excelUploadState.stats.timestamp}</strong></span>
-                      </p>
-                    </div>
+              <div className="bg-emerald-50 border border-emerald-300 px-3.5 py-2 rounded-xl shadow-xs flex flex-wrap items-center justify-between gap-2 animate-in fade-in">
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="text-xs font-bold text-emerald-950">
+                    Excel တင်သွင်းပြီးပါပြီ ({excelUploadState.stats.totalInFile} ကျောင်း)
+                  </span>
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold">
+                    <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
+                      +{excelUploadState.stats.newCount} အသစ်
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded-md bg-sky-100 text-sky-800">
+                      ↺{excelUploadState.stats.updatedCount} ပြင်
+                    </span>
+                    {excelUploadState.stats.skippedCount > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800">
+                        {excelUploadState.stats.skippedCount} ကျော်
+                      </span>
+                    )}
                   </div>
+                </div>
+
+                <div className="flex items-center gap-2 ml-auto">
+                  <a
+                    href="#admin-schools-table"
+                    className="text-[11px] text-emerald-800 hover:text-emerald-950 hover:underline font-bold"
+                  >
+                    ကြည့်ရှုရန် &rarr;
+                  </a>
                   <button
                     onClick={() => setExcelUploadState(prev => ({ ...prev, status: 'idle' }))}
                     type="button"
-                    className="text-emerald-700 hover:text-emerald-950 hover:bg-emerald-100 px-2 py-1 rounded-lg transition text-xs font-bold cursor-pointer"
+                    className="text-slate-400 hover:text-slate-700 hover:bg-emerald-100/60 px-1.5 py-0.5 rounded-md text-xs font-bold transition cursor-pointer"
                     title="ပိတ်ရန်"
                   >
-                    ✕ ပိတ်ရန်
+                    ✕
                   </button>
-                </div>
-
-                {/* Statistics 4-Cards Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 pt-1">
-                  <div className="bg-white p-3 rounded-xl border border-emerald-200 shadow-2xs">
-                    <p className="text-[11px] text-slate-500 font-medium">ဖိုင်ထဲရှိ စုစုပေါင်း</p>
-                    <p className="text-lg sm:text-xl font-black text-slate-800 mt-0.5">
-                      {excelUploadState.stats.totalInFile} <span className="text-xs font-normal text-slate-500">ကျောင်း</span>
-                    </p>
-                  </div>
-
-                  <div className="bg-white p-3 rounded-xl border border-emerald-200 shadow-2xs">
-                    <p className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
-                      <Plus className="w-3 h-3" /> ကျောင်းအသစ်
-                    </p>
-                    <p className="text-lg sm:text-xl font-black text-emerald-700 mt-0.5">
-                      +{excelUploadState.stats.newCount} <span className="text-xs font-normal text-emerald-600">ကျောင်း</span>
-                    </p>
-                  </div>
-
-                  <div className="bg-white p-3 rounded-xl border border-sky-200 shadow-2xs">
-                    <p className="text-[11px] text-sky-700 font-medium flex items-center gap-1">
-                      <RefreshCw className="w-3 h-3" /> Update ပြုလုပ်ပြီး
-                    </p>
-                    <p className="text-lg sm:text-xl font-black text-sky-700 mt-0.5">
-                      {excelUploadState.stats.updatedCount} <span className="text-xs font-normal text-sky-600">ကျောင်း</span>
-                    </p>
-                  </div>
-
-                  <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs">
-                    <p className="text-[11px] text-amber-700 font-medium flex items-center gap-1">
-                      <CopyCheck className="w-3 h-3" /> ကျော်ခဲ့သော Duplicate
-                    </p>
-                    <p className="text-lg sm:text-xl font-black text-amber-700 mt-0.5">
-                      {excelUploadState.stats.skippedCount} <span className="text-xs font-normal text-amber-600">ကျောင်း</span>
-                    </p>
-                  </div>
-                </div>
-
-                {/* Status Notice & Action Buttons */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-emerald-200/80">
-                  <div className="flex items-center gap-2 text-xs text-emerald-900 font-medium">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                    <span>ကျောင်းစာရင်း ဒေတာများအားလုံး Cloud Firestore သို့ အပြည့်အဝ ရောက်ရှိပြီးဖြစ်၍ လက်ရှိစနစ်တွင် ချက်ချင်း အသုံးပြုနိုင်ပါပြီ။</span>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                    <a
-                      href="#admin-schools-table"
-                      className="bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Users className="w-3.5 h-3.5" /> ကျောင်းစာရင်း ကြည့်ရှုမည်
-                    </a>
-                    <button
-                      onClick={() => setExcelUploadState(prev => ({ ...prev, status: 'idle' }))}
-                      type="button"
-                      className="bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer"
-                    >
-                      ပြီးပါပြီ (Done)
-                    </button>
-                  </div>
                 </div>
               </div>
             )}
 
-            {/* Upload Error Alert Card */}
+            {/* Upload Error Compact Strip */}
             {excelUploadState.status === 'error' && (
-              <div className="bg-rose-50 border-2 border-rose-300 p-5 rounded-2xl shadow-md space-y-3 animate-in fade-in">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2.5 rounded-xl bg-rose-600 text-white shrink-0">
-                      <AlertCircle className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-rose-950 text-sm sm:text-base">
-                        {excelUploadState.stageText || 'Excel တင်သွင်းရာတွင် အမှားဖြစ်ပွားပါသည်'}
-                      </h4>
-                      <p className="text-xs text-rose-800 mt-1">
-                        {excelUploadState.errorMsg || 'ဖိုင်အတွင်းရှိ အချက်အလက်များကို ဖတ်ရှု၍ မရပါ။'}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setExcelUploadState(prev => ({ ...prev, status: 'idle' }))}
-                    type="button"
-                    className="text-rose-600 hover:text-rose-800 text-xs font-bold p-1 cursor-pointer"
-                  >
-                    ✕ ပိတ်ရန်
-                  </button>
+              <div className="bg-rose-50 border border-rose-300 px-3.5 py-2 rounded-xl shadow-xs flex items-center justify-between gap-2 animate-in fade-in">
+                <div className="flex items-center gap-2 min-w-0">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span className="text-xs font-bold text-rose-950 truncate">
+                    {excelUploadState.stageText || 'Excel တင်သွင်းရာတွင် အမှားဖြစ်ပွားပါသည်'}
+                  </span>
+                  {excelUploadState.errorMsg && (
+                    <span className="text-[11px] text-rose-700 hidden sm:inline truncate max-w-xs">
+                      ({excelUploadState.errorMsg})
+                    </span>
+                  )}
                 </div>
-                <div className="flex items-center gap-2 pt-1 text-xs text-rose-700">
-                  <span>💡 အကြံပြုချက်: "Excel Template ဒေါင်းလုဒ်လုပ်ရန်" ခလုတ်မှ Template ဖိုင်ကို ရယူပြီး ကော်လံခေါင်းစဉ်များ အတိုင်း စစ်ဆေးတင်သွင်းပေးပါ။</span>
-                </div>
+                <button
+                  onClick={() => setExcelUploadState(prev => ({ ...prev, status: 'idle' }))}
+                  type="button"
+                  className="text-slate-400 hover:text-slate-700 hover:bg-rose-100 px-1.5 py-0.5 rounded-md text-xs font-bold transition cursor-pointer shrink-0"
+                  title="ပိတ်ရန်"
+                >
+                  ✕
+                </button>
               </div>
             )}
 
@@ -5111,7 +5020,7 @@ export default function Admin() {
                 <div className="sm:hidden space-y-3">
                   {schoolLevels.map((lvl, idx) => {
                     const count = schools.filter(
-                      (s) => (s.level || '').trim().toLowerCase() === lvl.name.trim().toLowerCase()
+                      (s) => isSchoolInLevel(s, lvl.name)
                     ).length;
 
                     return (
@@ -5181,7 +5090,7 @@ export default function Admin() {
                     <tbody className="divide-y divide-slate-100">
                       {schoolLevels.map((lvl, idx) => {
                         const count = schools.filter(
-                          (s) => (s.level || '').trim().toLowerCase() === lvl.name.trim().toLowerCase()
+                          (s) => isSchoolInLevel(s, lvl.name)
                         ).length;
 
                         return (

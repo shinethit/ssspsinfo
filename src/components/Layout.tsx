@@ -14,6 +14,7 @@ import {
   History,
   Sparkles,
   BarChart3,
+  Bell,
 } from 'lucide-react';
 import NewsTickerBar from './NewsTickerBar';
 import { PWAInstallButton } from './PWAInstallButton';
@@ -37,7 +38,7 @@ export default function Layout() {
 
   const utilityLinks = [
     { to: '/admin', label: 'အက်ဒမင် ဧရိယာ', labelEn: 'Admin Portal', icon: ShieldCheck, badge: 'Admin' },
-    { to: '/versions', label: 'ဗားရှင်းမှတ်တမ်း', labelEn: 'Version History', icon: History, badge: 'v2.3' },
+    { to: '/versions', label: 'ဗားရှင်းမှတ်တမ်း', labelEn: 'Version History', icon: History, badge: 'v2.4' },
   ];
 
   const closeSidebar = () => setSidebarOpen(false);
@@ -48,9 +49,9 @@ export default function Layout() {
         1. FIXED TOP HEADER (Scroll လုပ်ရင် လိုက်မတက်သွားစေရန် fixed အဖြစ် ထားရှိထားပါသည်)
       */}
       <header className="fixed top-0 left-0 right-0 h-16 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs z-40 w-full flex items-center">
-        <div className="w-full px-4 sm:px-6 flex items-center justify-between gap-3">
+        <div className="w-full px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-3">
           {/* Left: Hamburger Button (for Sidebar toggle) + Brand Title */}
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
               type="button"
               onClick={() => setSidebarOpen(prev => !prev)}
@@ -63,13 +64,13 @@ export default function Layout() {
             <Link
               to="/"
               onClick={closeSidebar}
-              className="flex items-center gap-2.5 min-w-0 hover:opacity-90 transition"
+              className="flex items-center gap-2 min-w-0 hover:opacity-90 transition"
             >
               <div className="bg-sky-600 p-2 rounded-xl text-white shadow-xs shrink-0">
                 <Newspaper className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <span className="block font-bold text-sm sm:text-base text-sky-950 truncate leading-normal">
+                <span className="block font-bold text-xs sm:text-base text-sky-950 truncate leading-normal">
                   သတင်းနှင့် ပြန်ကြားရေးဌာန
                 </span>
                 <span className="hidden sm:block text-[11px] text-slate-500 truncate leading-normal">
@@ -79,32 +80,41 @@ export default function Layout() {
             </Link>
           </div>
 
-          {/* Right: Offline Sync, Notification Bell, PWA Install, Quick Version Tag & Admin Shortcut */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {/* Right: Black Version Update Badge, Offline Sync, Notification Bell, PWA & Admin */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* BLACK Version Update Badge (Version Update အမဲ) - Prominent on both mobile and desktop */}
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('sssps_open_version_modal'))}
+              className="bg-black hover:bg-neutral-800 text-white font-bold text-xs px-2 sm:px-3 py-1.5 rounded-xl border border-neutral-700 shadow-xs inline-flex items-center gap-1 sm:gap-1.5 transition cursor-pointer shrink-0"
+              title="Version Update v2.4 (အသစ်ပါဝင်မှုများ ကြည့်ရန်)"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="hidden md:inline font-bold whitespace-nowrap">Version Update</span>
+              <span className="md:hidden font-bold text-[11px]">Update</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-neutral-800 text-amber-300 font-mono font-bold">
+                v2.4
+              </span>
+            </button>
+
             {/* Offline Sync State Badge & Manual Sync */}
             <OfflineSyncStatusBadge compact />
 
-            {/* Audit Logs Notification Bell Icon */}
+            {/* PWA In-App Install Button - shown on sm+ header */}
+            <div className="hidden sm:inline-flex shrink-0">
+              <PWAInstallButton variant="header" />
+            </div>
+
+            {/* Audit Logs Notification Bell Icon - ALWAYS VISIBLE */}
             <AuditNotificationBell />
-
-            {/* PWA In-App Install Button */}
-            <PWAInstallButton variant="header" />
-
-            <Link
-              to="/versions"
-              onClick={closeSidebar}
-              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition shadow-2xs"
-            >
-              <Sparkles className="w-3.5 h-3.5" /> v2.3
-            </Link>
 
             <Link
               to="/admin"
               onClick={closeSidebar}
-              className="bg-sky-900 text-white px-3 sm:px-4 py-1.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 hover:bg-sky-800 transition shadow-xs"
+              className="bg-sky-900 text-white px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 hover:bg-sky-800 transition shadow-xs shrink-0"
             >
-              <ShieldCheck className="w-4 h-4" />
-              <span>Admin</span>
+              <ShieldCheck className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Admin</span>
             </Link>
           </div>
         </div>
@@ -171,6 +181,43 @@ export default function Layout() {
             <p className="px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
               စီမံခန့်ခွဲမှုနှင့် မှတ်တမ်း (System)
             </p>
+
+            {/* Black Version Update Button in Sidebar */}
+            <button
+              type="button"
+              onClick={() => {
+                closeSidebar();
+                window.dispatchEvent(new CustomEvent('sssps_open_version_modal'));
+              }}
+              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold transition group bg-black text-white hover:bg-neutral-800 shadow-xs cursor-pointer mb-1"
+            >
+              <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                <span className="truncate">Version Update (အမဲ)</span>
+              </div>
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-neutral-800 text-amber-300 border border-neutral-700 shrink-0">
+                v2.4
+              </span>
+            </button>
+
+            {/* Mobile Notification Bell Trigger */}
+            <button
+              type="button"
+              onClick={() => {
+                closeSidebar();
+                window.dispatchEvent(new CustomEvent('sssps_open_notifications'));
+              }}
+              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold text-slate-700 hover:bg-sky-50 hover:text-sky-950 transition cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                <Bell className="w-4 h-4 text-amber-500 shrink-0" />
+                <span className="truncate">ခေါင်းလောင်း အသိပေးချက်</span>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 shrink-0">
+                နိုတီ
+              </span>
+            </button>
+
             {utilityLinks.map(link => {
               const Icon = link.icon;
               const isActive = location.pathname.startsWith(link.to);
@@ -219,14 +266,14 @@ export default function Layout() {
           <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1.5 shadow-2xs">
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-sky-950">System Version</span>
-              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
-                v2.3 (Admin Security & Password Control)
+              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-black text-amber-300 border border-neutral-800">
+                v2.4 (Version Update အမဲ)
               </span>
             </div>
             <p className="text-[11px] text-slate-500 leading-normal">
               ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း
             </p>
-            <div className="pt-1">
+            <div className="pt-1 flex items-center justify-between">
               <Link
                 to="/versions"
                 onClick={closeSidebar}
@@ -234,6 +281,16 @@ export default function Layout() {
               >
                 ဗားရှင်းမှတ်တမ်း ကြည့်ရန် →
               </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  closeSidebar();
+                  window.dispatchEvent(new CustomEvent('sssps_open_version_modal'));
+                }}
+                className="text-[11px] text-slate-500 hover:text-black font-semibold"
+              >
+                What's New
+              </button>
             </div>
           </div>
         </div>
@@ -258,10 +315,14 @@ export default function Layout() {
             <p className="font-medium text-slate-700">
               ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း — သတင်းနှင့် ပြန်ကြားရေးဌာန
             </p>
-            <div className="flex items-center gap-4 text-xs text-slate-500">
-              <Link to="/versions" className="hover:text-sky-800 transition underline">
-                Version v2.3
-              </Link>
+            <div className="flex items-center gap-3 text-xs text-slate-500">
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent('sssps_open_version_modal'))}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black text-white text-xs font-mono font-bold border border-neutral-800 hover:bg-neutral-800 transition cursor-pointer"
+              >
+                <Sparkles className="w-3 h-3 text-amber-400" /> Version Update v2.4
+              </button>
               <span>•</span>
               <p>© 2026 All rights reserved</p>
             </div>
@@ -275,7 +336,20 @@ export default function Layout() {
       {/* What's New Version Update Modal Popup */}
       <VersionUpdateModal />
 
-      <Toaster position="top-right" />
+      <Toaster
+        position="top-right"
+        richColors
+        closeButton
+        duration={2200}
+        visibleToasts={2}
+        toastOptions={{
+          className: 'text-xs font-medium py-2 px-3 shadow-md rounded-xl max-w-xs',
+          style: {
+            maxWidth: '300px',
+            fontSize: '12px',
+          },
+        }}
+      />
     </div>
   );
 }

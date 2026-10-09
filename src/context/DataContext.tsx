@@ -11,6 +11,7 @@ import {
   getDocs,
   setDoc,
   getDoc,
+  writeBatch,
 } from 'firebase/firestore';
 import { db, cleanFirestoreData } from '../lib/firebase';
 import { School, Announcement, Association, DEFAULT_SCHOOL_LEVELS, SchoolLevelItem } from '../types';
@@ -318,12 +319,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         if (force) {
-          toast.success('အချက်အလက်များ အောင်မြင်စွာ နောက်ဆုံးဗားရှင်းသို့ Sync လုပ်ပြီးပါပြီ');
+          toast.success('Sync အောင်မြင်ပါသည်');
         }
       } catch (err) {
         console.error('Offline Sync background error:', err);
         if (force) {
-          toast.error('အင်တာနက် အချိတ်အဆက် မရရှိသေးသဖြင့် Offline Data ကို ဆက်လက် အသုံးပြုနေပါသည်');
+          toast.error('Offline ဒေတာ အသုံးပြုနေပါသည်');
         }
       } finally {
         setIsSyncing(false);
@@ -487,6 +488,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateSchoolLevel = useCallback(
     async (id: string, data: Partial<SchoolLevelItem>): Promise<void> => {
+      const existing = schoolLevels.find((l) => l.id === id);
+      const oldName = existing?.name?.trim();
+      const newName = data.name?.trim();
+
       setSchoolLevels((prev) => {
         const next = prev
           .map((l) => (l.id === id ? { ...l, ...data } : l))
@@ -500,32 +505,87 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!id.startsWith('default-')) {
         await updateDoc(doc(db, 'school_levels', id), data);
       } else {
-        const existing = schoolLevels.find((l) => l.id === id);
         const payload = {
-          name: data.name ?? existing?.name ?? '',
+          name: newName ?? existing?.name ?? '',
           description: data.description ?? existing?.description ?? '',
           order: data.order ?? existing?.order ?? 1,
           createdAt: new Date().toISOString(),
         };
         await addDoc(collection(db, 'school_levels'), payload);
       }
+
+      // If level name changed, automatically migrate all schools under the old level name
+      if (oldName && newName && oldName.toLowerCase() !== newName.toLowerCase()) {
+        const affectedSchools = schools.filter(
+          (s) => (s.level || '').trim().toLowerCase() === oldName.toLowerCase()
+        );
+        if (affectedSchools.length > 0) {
+          setSchools((prev) =>
+            prev.map((s) =>
+              (s.level || '').trim().toLowerCase() === oldName.toLowerCase()
+                ? { ...s, level: newName }
+                : s
+            )
+          );
+          try {
+            const batch = writeBatch(db);
+            affectedSchools.forEach((s) => {
+              batch.update(doc(db, 'schools', s.id), { level: newName });
+            });
+            await batch.commit();
+          } catch (e) {
+            console.warn('Batch update schools on level rename error:', e);
+          }
+        }
+      }
     },
-    [schoolLevels]
+    [schoolLevels, schools]
   );
 
-  const deleteSchoolLevel = useCallback(async (id: string): Promise<void> => {
-    setSchoolLevels((prev) => {
-      const next = prev.filter((l) => l.id !== id);
-      try {
-        localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
+  const deleteSchoolLevel = useCallback(
+    async (id: string): Promise<void> => {
+      const existing = schoolLevels.find((l) => l.id === id);
+      const oldName = existing?.name?.trim();
 
-    if (!id.startsWith('default-')) {
-      await deleteDoc(doc(db, 'school_levels', id));
-    }
-  }, []);
+      setSchoolLevels((prev) => {
+        const next = prev.filter((l) => l.id !== id);
+        try {
+          localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(next));
+        } catch (e) {}
+        return next;
+      });
+
+      if (!id.startsWith('default-')) {
+        await deleteDoc(doc(db, 'school_levels', id));
+      }
+
+      // If deleted level had schools, update local schools so they don't break
+      if (oldName) {
+        const affectedSchools = schools.filter(
+          (s) => (s.level || '').trim().toLowerCase() === oldName.toLowerCase()
+        );
+        if (affectedSchools.length > 0) {
+          setSchools((prev) =>
+            prev.map((s) =>
+              (s.level || '').trim().toLowerCase() === oldName.toLowerCase()
+                ? { ...s, level: '' }
+                : s
+            )
+          );
+          try {
+            const batch = writeBatch(db);
+            affectedSchools.forEach((s) => {
+              batch.update(doc(db, 'schools', s.id), { level: '' });
+            });
+            await batch.commit();
+          } catch (e) {
+            console.warn('Batch clear school levels on delete error:', e);
+          }
+        }
+      }
+    },
+    [schoolLevels, schools]
+  );
 
   const resetSchoolLevelsToDefault = useCallback(async (): Promise<void> => {
     const defaults = getDefaultSchoolLevels();
@@ -547,7 +607,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           createdAt: item.createdAt,
         });
       }
-      toast.success('ကျောင်းအဆင့်များကို မူလ သတ်မှတ်ချက်အတိုင်း ပြန်လည်သတ်မှတ်ပြီးပါပြီ');
+      toast.success('ကျောင်းအဆင့်များ မူလအတိုင်း ပြန်ထားပါပြီ');
     } catch (e) {
       console.warn('Reset school levels error in Firestore:', e);
     }

@@ -4,6 +4,7 @@ import { School, STUDENT_RANGE_TIERS, getStudentRangeTier } from '../types';
 import { useData, getAnnouncementTimestamp } from '../context/DataContext';
 import { OfflineSyncStatusBadge } from '../components/OfflineSyncStatusBadge';
 import { getCategoryBadge } from './Announcements';
+import { getUnifiedSchoolLevels, isSchoolInLevel } from '../lib/schoolLevels';
 import {
   School as SchoolIcon,
   Activity,
@@ -92,38 +93,21 @@ export default function Dashboard() {
 
   // 2. Breakdown By School Level (ကျောင်းအဆင့်အလိုက် - Configurable & Database School Levels)
   const levelBreakdown = useMemo(() => {
-    const configuredNames = (schoolLevels || []).map(l => l.name.trim()).filter(Boolean);
-    const distinctSchoolLevels = Array.from(new Set(schools.map(s => (s.level || '').trim()).filter(Boolean)));
-    const allLevelNames = [...configuredNames];
-    distinctSchoolLevels.forEach(lvl => {
-      if (!allLevelNames.some(existing => existing.toLowerCase() === lvl.toLowerCase())) {
-        allLevelNames.push(lvl);
-      }
-    });
+    const unified = getUnifiedSchoolLevels(schoolLevels, schools).filter(l => !l.isUnassigned || l.total > 0);
 
-    if (allLevelNames.length === 0) {
-      allLevelNames.push('အထက်တန်း');
-    }
-
-    const colorPalettes = ['sky', 'emerald', 'teal', 'cyan', 'blue', 'indigo', 'purple', 'violet', 'amber', 'rose'];
-
-    return allLevelNames.map((levelName, idx) => {
-      const allInLevel = schools.filter(s => {
-        const sl = (s.level || '').trim();
-        return sl === levelName || sl.toLowerCase() === levelName.toLowerCase();
-      });
+    return unified.map((item, idx) => {
+      const allInLevel = item.schools;
       const paidInLevel = allInLevel.filter(s => !!s.isAnnualFeePaid);
       const unpaidInLevel = allInLevel.filter(s => !s.isAnnualFeePaid);
       const collected = paidInLevel.reduce((sum, s) => sum + getSchoolFee(s), 0);
       const expected = allInLevel.reduce((sum, s) => sum + getSchoolFee(s), 0);
       const pct = allInLevel.length > 0 ? Math.round((paidInLevel.length / allInLevel.length) * 100) : 0;
-      const color = colorPalettes[idx % colorPalettes.length];
 
       return {
-        key: levelName,
-        label: levelName,
-        sub: `ကျောင်းအဆင့် (${idx + 1})`,
-        color,
+        key: item.name,
+        label: item.name,
+        sub: item.description || `ကျောင်းအဆင့် (${idx + 1})`,
+        color: item.color,
         total: allInLevel.length,
         paid: paidInLevel.length,
         unpaid: unpaidInLevel.length,
@@ -201,7 +185,7 @@ export default function Dashboard() {
     return levelBreakdown.map(lvl => {
       const rowRanges = STUDENT_RANGE_TIERS.map(tier => {
         const matching = schools.filter(
-          s => (s.level || '').trim().toLowerCase() === lvl.key.toLowerCase() && getSchoolRangeKey(s) === tier.key
+          s => isSchoolInLevel(s, lvl.key) && getSchoolRangeKey(s) === tier.key
         );
         const paid = matching.filter(s => !!s.isAnnualFeePaid).length;
         const total = matching.length;
@@ -268,10 +252,9 @@ export default function Dashboard() {
 
         const matchStatus = selectedStatus === 'all' || (school.status || 'active') === selectedStatus;
 
-        const schoolLvl = (school.level || '').trim().toLowerCase();
         const matchLevel =
           selectedLevel === 'all' ||
-          schoolLvl === selectedLevel.trim().toLowerCase();
+          isSchoolInLevel(school, selectedLevel);
 
         const schoolRange = getSchoolRangeKey(school);
         const matchRange = selectedRange === 'all' || selectedRange === schoolRange;
@@ -527,8 +510,17 @@ export default function Dashboard() {
                 </div>
 
                 <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px] font-semibold text-sky-800">
-                  <span>စာရင်းစစ်ထုတ်ကြည့်ရန်</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
+                  <span className="flex items-center gap-1">
+                    <span>စစ်ထုတ်မည်</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </span>
+                  <Link
+                    to={`/contacts?level=${encodeURIComponent(item.key)}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-[10px] text-sky-600 hover:text-sky-900 hover:underline font-bold"
+                  >
+                    ကျောင်းစာရင်း &rarr;
+                  </Link>
                 </div>
               </div>
             ))}

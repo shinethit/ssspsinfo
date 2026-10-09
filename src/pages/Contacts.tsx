@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { School } from '../types';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useData } from '../context/DataContext';
@@ -27,152 +27,13 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { downloadSchoolTemplate, exportSchoolsToExcel } from '../lib/excel';
+import {
+  getUnifiedSchoolLevels,
+  UnifiedSchoolLevel,
+  isSchoolInLevel,
+} from '../lib/schoolLevels';
 
-export type CategoryKey = 'all' | 'high' | 'middle' | 'primary' | 'preschool' | 'other';
 export type SortOption = 'category_name' | 'name_asc' | 'name_desc' | 'newest' | 'oldest';
-
-interface CategoryConfig {
-  key: string;
-  title: string;
-  shortLabel: string;
-  badgeLabel: string;
-  order: number;
-  icon: typeof SchoolIcon;
-  description: string;
-  color: {
-    bg: string;
-    border: string;
-    headerGradient: string;
-    badge: string;
-    tagBadge: string;
-    text: string;
-    accent: string;
-    iconBg: string;
-  };
-  match: (level: string) => boolean;
-}
-
-const CATEGORY_DEFINITIONS: CategoryConfig[] = [
-  {
-    key: 'high',
-    title: 'အထက်တန်းအဆင့် ကျောင်းများ',
-    shortLabel: 'အထက်တန်း',
-    badgeLabel: 'အထက်တန်းအဆင့်',
-    description: 'အထက်တန်းပညာ သင်ကြားခွင့်ရ အသင်းဝင် ကိုယ်ပိုင်ကျောင်းများ',
-    order: 1,
-    icon: GraduationCap,
-    match: (level: string) => level.includes('အထက်တန်း') || level.toLowerCase().includes('high'),
-    color: {
-      bg: 'bg-sky-50/50',
-      border: 'border-sky-200',
-      headerGradient: 'from-sky-900 via-sky-850 to-sky-800 text-white',
-      badge: 'bg-sky-100 text-sky-800 border-sky-300',
-      tagBadge: 'bg-sky-50 text-sky-700 border-sky-200',
-      text: 'text-sky-950',
-      accent: 'text-sky-600',
-      iconBg: 'bg-sky-100 text-sky-700',
-    },
-  },
-  {
-    key: 'middle',
-    title: 'အလယ်တန်းအဆင့် ကျောင်းများ',
-    shortLabel: 'အလယ်တန်း',
-    badgeLabel: 'အလယ်တန်းအဆင့်',
-    description: 'အလယ်တန်းပညာ သင်ကြားခွင့်ရ အသင်းဝင် ကိုယ်ပိုင်ကျောင်းများ',
-    order: 2,
-    icon: BookOpen,
-    match: (level: string) => level.includes('အလယ်တန်း') || level.toLowerCase().includes('middle'),
-    color: {
-      bg: 'bg-emerald-50/50',
-      border: 'border-emerald-200',
-      headerGradient: 'from-emerald-900 via-emerald-850 to-emerald-800 text-white',
-      badge: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-      tagBadge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      text: 'text-emerald-950',
-      accent: 'text-emerald-600',
-      iconBg: 'bg-emerald-100 text-emerald-700',
-    },
-  },
-  {
-    key: 'primary',
-    title: 'မူလတန်းအဆင့် ကျောင်းများ',
-    shortLabel: 'မူလတန်း',
-    badgeLabel: 'မူလတန်းအဆင့်',
-    description: 'မူလတန်းပညာ သင်ကြားခွင့်ရ အသင်းဝင် ကိုယ်ပိုင်ကျောင်းများ',
-    order: 3,
-    icon: SchoolIcon,
-    match: (level: string) =>
-      (level.includes('မူလတန်း') && !level.includes('မူလတန်းကြို') && !level.includes('မူကြို')) ||
-      level.toLowerCase().includes('primary'),
-    color: {
-      bg: 'bg-amber-50/50',
-      border: 'border-amber-200',
-      headerGradient: 'from-amber-900 via-amber-850 to-amber-800 text-white',
-      badge: 'bg-amber-100 text-amber-900 border-amber-300',
-      tagBadge: 'bg-amber-50 text-amber-800 border-amber-200',
-      text: 'text-amber-950',
-      accent: 'text-amber-600',
-      iconBg: 'bg-amber-100 text-amber-800',
-    },
-  },
-  {
-    key: 'preschool',
-    title: 'မူလတန်းကြို / မူကြို ကျောင်းများ',
-    shortLabel: 'မူလတန်းကြို',
-    badgeLabel: 'မူကြိုအဆင့်',
-    description: 'မူလတန်းကြိုနှင့် KG ပညာရေး သင်ကြားခွင့်ရ ကိုယ်ပိုင်ကျောင်းများ',
-    order: 4,
-    icon: Sparkles,
-    match: (level: string) =>
-      level.includes('မူလတန်းကြို') ||
-      level.includes('မူကြို') ||
-      level.toLowerCase().includes('pre') ||
-      level.toLowerCase().includes('kg') ||
-      level.toLowerCase().includes('kindergarten'),
-    color: {
-      bg: 'bg-purple-50/50',
-      border: 'border-purple-200',
-      headerGradient: 'from-purple-900 via-purple-850 to-purple-800 text-white',
-      badge: 'bg-purple-100 text-purple-800 border-purple-300',
-      tagBadge: 'bg-purple-50 text-purple-700 border-purple-200',
-      text: 'text-purple-950',
-      accent: 'text-purple-600',
-      iconBg: 'bg-purple-100 text-purple-700',
-    },
-  },
-  {
-    key: 'other',
-    title: 'အခြား ကျောင်းများ',
-    shortLabel: 'အခြား',
-    badgeLabel: 'အခြားအဆင့်',
-    description: 'အထွေထွေနှင့် အခြားအဆင့် ကိုယ်ပိုင်ကျောင်းများ',
-    order: 5,
-    icon: Building2,
-    match: () => true,
-    color: {
-      bg: 'bg-slate-50/50',
-      border: 'border-slate-200',
-      headerGradient: 'from-slate-900 via-slate-850 to-slate-800 text-white',
-      badge: 'bg-slate-100 text-slate-850 border-slate-300',
-      tagBadge: 'bg-slate-100 text-slate-700 border-slate-200',
-      text: 'text-slate-950',
-      accent: 'text-slate-600',
-      iconBg: 'bg-slate-100 text-slate-700',
-    },
-  },
-];
-
-// Helper to determine category
-const getSchoolCategory = (school: School): CategoryConfig => {
-  const levelText = (school.category || school.level || '').trim();
-  for (const def of CATEGORY_DEFINITIONS) {
-    if (def.key === 'other') continue;
-    if (def.match(levelText)) {
-      return def;
-    }
-  }
-  return CATEGORY_DEFINITIONS.find((d) => d.key === 'other')!;
-};
 
 // Burmese numbers converter
 const toBurmeseNumber = (num: number): string => {
@@ -183,9 +44,9 @@ const toBurmeseNumber = (num: number): string => {
 export default function Contacts() {
   const [searchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') || '';
-  const initialCategory = searchParams.get('category') || 'all';
+  const initialCategory = searchParams.get('category') || searchParams.get('level') || 'all';
 
-  const { schools, loading, isSyncing, syncData } = useData();
+  const { schools, loading, isSyncing, syncData, schoolLevels } = useData();
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [selectedCategoryTab, setSelectedCategoryTab] = useState<string>(initialCategory);
   const [sortOption, setSortOption] = useState<SortOption>('category_name');
@@ -196,37 +57,46 @@ export default function Contacts() {
   const [levelFilter, setLevelFilter] = useState<string>('all');
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
 
+  // Dynamic School Levels unified from database & school records
+  const unifiedLevels = useMemo(() => {
+    return getUnifiedSchoolLevels(schoolLevels, schools);
+  }, [schoolLevels, schools]);
+
+  // Helper to determine unified level category of any school
+  const getSchoolCategory = useCallback(
+    (school: School): UnifiedSchoolLevel => {
+      for (const lvl of unifiedLevels) {
+        if (lvl.isUnassigned) continue;
+        if (isSchoolInLevel(school, lvl.name)) return lvl;
+      }
+      return (
+        unifiedLevels.find((l) => l.isUnassigned) ||
+        unifiedLevels[unifiedLevels.length - 1]
+      );
+    },
+    [unifiedLevels]
+  );
+
   // Update from URL params if changed
   useEffect(() => {
     const urlSearch = searchParams.get('search');
     if (urlSearch !== null && urlSearch !== searchTerm) {
       setSearchTerm(urlSearch);
     }
-    const urlCategory = searchParams.get('category');
-    if (urlCategory && urlCategory !== selectedCategoryTab) {
-      setSelectedCategoryTab(urlCategory);
-    }
     const urlLevel = searchParams.get('level');
-    if (urlLevel && urlLevel !== levelFilter) {
+    const urlCategory = searchParams.get('category');
+    if (urlLevel) {
+      setSelectedCategoryTab(urlLevel);
       setLevelFilter(urlLevel);
+    } else if (urlCategory && urlCategory !== selectedCategoryTab) {
+      setSelectedCategoryTab(urlCategory);
     }
   }, [searchParams]);
 
-  const { schoolLevels } = useData();
-
   // Distinct school levels for filter options
   const availableLevels = useMemo(() => {
-    const levels = new Set<string>();
-    (schoolLevels || []).forEach(l => {
-      if (l.name && l.name.trim()) levels.add(l.name.trim());
-    });
-    schools.forEach((s) => {
-      if (s.level && s.level.trim()) {
-        levels.add(s.level.trim());
-      }
-    });
-    return Array.from(levels);
-  }, [schools, schoolLevels]);
+    return unifiedLevels.map((l) => l.name);
+  }, [unifiedLevels]);
 
   // Fee counts
   const paidCount = useMemo(() => schools.filter((s) => s.isAnnualFeePaid).length, [schools]);
@@ -235,15 +105,12 @@ export default function Contacts() {
   // Category counts across ALL schools
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { all: schools.length };
-    CATEGORY_DEFINITIONS.forEach((def) => {
-      counts[def.key] = 0;
-    });
-    schools.forEach((s) => {
-      const cat = getSchoolCategory(s);
-      counts[cat.key] = (counts[cat.key] || 0) + 1;
+    unifiedLevels.forEach((lvl) => {
+      counts[lvl.id] = lvl.total;
+      counts[lvl.name] = lvl.total;
     });
     return counts;
-  }, [schools]);
+  }, [schools.length, unifiedLevels]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -290,22 +157,23 @@ export default function Contacts() {
         (s.contact2Phone && s.contact2Phone.toLowerCase().includes(q)) ||
         (s.contact2Phone2 && s.contact2Phone2.toLowerCase().includes(q)) ||
         (s.responsiblePerson2Phone && s.responsiblePerson2Phone.toLowerCase().includes(q)) ||
-        (Array.isArray(s.schoolPhones) && s.schoolPhones.some(p => p.toLowerCase().includes(q))) ||
-        (Array.isArray(s.contactPhones) && s.contactPhones.some(p => p.toLowerCase().includes(q))) ||
-        (Array.isArray(s.responsiblePerson1Phones) && s.responsiblePerson1Phones.some(p => p.toLowerCase().includes(q))) ||
-        (Array.isArray(s.contact2Phones) && s.contact2Phones.some(p => p.toLowerCase().includes(q))) ||
-        (Array.isArray(s.responsiblePerson2Phones) && s.responsiblePerson2Phones.some(p => p.toLowerCase().includes(q))) ||
+        (Array.isArray(s.schoolPhones) && s.schoolPhones.some((p) => p.toLowerCase().includes(q))) ||
+        (Array.isArray(s.contactPhones) && s.contactPhones.some((p) => p.toLowerCase().includes(q))) ||
+        (Array.isArray(s.responsiblePerson1Phones) && s.responsiblePerson1Phones.some((p) => p.toLowerCase().includes(q))) ||
+        (Array.isArray(s.contact2Phones) && s.contact2Phones.some((p) => p.toLowerCase().includes(q))) ||
+        (Array.isArray(s.responsiblePerson2Phones) && s.responsiblePerson2Phones.some((p) => p.toLowerCase().includes(q))) ||
         (s.founderPhone && s.founderPhone.toLowerCase().includes(q)) ||
         (s.founderPhone2 && s.founderPhone2.toLowerCase().includes(q)) ||
-        (Array.isArray(s.founderPhones) && s.founderPhones.some(p => p.toLowerCase().includes(q))) ||
+        (Array.isArray(s.founderPhones) && s.founderPhones.some((p) => p.toLowerCase().includes(q))) ||
         (s.adminPhone && s.adminPhone.toLowerCase().includes(q)) ||
         (s.adminPhone2 && s.adminPhone2.toLowerCase().includes(q)) ||
-        (Array.isArray(s.adminPhones) && s.adminPhones.some(p => p.toLowerCase().includes(q)));
+        (Array.isArray(s.adminPhones) && s.adminPhones.some((p) => p.toLowerCase().includes(q)));
 
       const matchCategoryTab =
         selectedCategoryTab === 'all'
           ? true
-          : getSchoolCategory(s).key === selectedCategoryTab;
+          : isSchoolInLevel(s, selectedCategoryTab) ||
+            (selectedCategoryTab === 'unassigned' && (!s.level || !s.level.trim()));
 
       const matchFee =
         feeFilter === 'all'
@@ -315,7 +183,7 @@ export default function Contacts() {
           : !s.isAnnualFeePaid;
 
       const matchLevel =
-        levelFilter === 'all' ? true : s.level && s.level.trim() === levelFilter;
+        levelFilter === 'all' ? true : isSchoolInLevel(s, levelFilter);
 
       return matchSearch && matchCategoryTab && matchFee && matchLevel;
     });
@@ -364,20 +232,28 @@ export default function Contacts() {
       const cmp = nameA.localeCompare(nameB, 'my', { sensitivity: 'base' });
       return cmp !== 0 ? cmp : nameA.localeCompare(nameB);
     });
-  }, [filteredSchools, sortOption]);
+  }, [filteredSchools, sortOption, getSchoolCategory]);
 
   // 3. Grouped Schools by Category for the Category View
   const groupedCategories = useMemo(() => {
     const groups: {
-      config: CategoryConfig;
+      config: UnifiedSchoolLevel;
       schools: School[];
     }[] = [];
 
-    CATEGORY_DEFINITIONS.forEach((config) => {
-      // Find schools matching this category from sortedSchools
-      const catSchools = sortedSchools.filter((s) => getSchoolCategory(s).key === config.key);
+    unifiedLevels.forEach((lvl) => {
+      const catSchools = sortedSchools.filter((s) => {
+        if (lvl.isUnassigned) {
+          return (
+            !s.level ||
+            !s.level.trim() ||
+            !unifiedLevels.some((other) => !other.isUnassigned && isSchoolInLevel(s, other.name))
+          );
+        }
+        return isSchoolInLevel(s, lvl.name);
+      });
+
       if (catSchools.length > 0) {
-        // Ensure within this category, schools are alphabetically sorted unless explicitly sorted by time
         if (sortOption === 'category_name') {
           catSchools.sort((a, b) => {
             const nameA = a.name || '';
@@ -387,14 +263,14 @@ export default function Contacts() {
           });
         }
         groups.push({
-          config,
+          config: lvl,
           schools: catSchools,
         });
       }
     });
 
     return groups;
-  }, [sortedSchools, sortOption]);
+  }, [sortedSchools, sortOption, unifiedLevels]);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto w-full pb-10">
@@ -467,26 +343,25 @@ export default function Contacts() {
             </span>
           </button>
 
-          {CATEGORY_DEFINITIONS.map((cat) => {
-            const count = categoryCounts[cat.key] || 0;
-            // Only show category pills that have schools, or show all standard categories
-            if (count === 0 && cat.key === 'other') return null;
-            const Icon = cat.icon;
-            const isSelected = selectedCategoryTab === cat.key;
+          {unifiedLevels.map((lvl) => {
+            const count = lvl.total;
+            // Only show unassigned pill if there are actually schools in it
+            if (lvl.isUnassigned && count === 0) return null;
+            const isSelected = selectedCategoryTab === lvl.id || selectedCategoryTab === lvl.name;
 
             return (
               <button
-                key={cat.key}
+                key={lvl.id}
                 type="button"
-                onClick={() => setSelectedCategoryTab(cat.key)}
+                onClick={() => setSelectedCategoryTab(isSelected ? 'all' : lvl.name)}
                 className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer border ${
                   isSelected
-                    ? `${cat.color.badge} border-current shadow-xs ring-2 ring-sky-500/20`
+                    ? `${lvl.color.badge} border-current shadow-xs ring-2 ring-sky-500/20`
                     : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700 hover:bg-slate-50'
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-current' : cat.color.accent}`} />
-                <span>{cat.shortLabel}</span>
+                <GraduationCap className={`w-3.5 h-3.5 ${isSelected ? 'text-current' : lvl.color.accent}`} />
+                <span>{lvl.shortLabel}</span>
                 <span
                   className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
                     isSelected ? 'bg-white/80 text-current' : 'bg-slate-100 text-slate-600'
@@ -748,17 +623,17 @@ export default function Contacts() {
         <div className="space-y-6">
           {groupedCategories.map((group) => {
             const { config, schools: catSchools } = group;
-            const Icon = config.icon;
-            const isCollapsed = !!collapsedCategories[config.key];
+            const Icon = config.isUnassigned ? Building2 : GraduationCap;
+            const isCollapsed = !!collapsedCategories[config.id];
 
             return (
               <section
-                key={config.key}
+                key={config.id}
                 className={`rounded-2xl border ${config.color.border} bg-white shadow-2xs overflow-hidden transition-all`}
               >
                 {/* Category Header */}
                 <div
-                  onClick={() => toggleCategoryCollapse(config.key)}
+                  onClick={() => toggleCategoryCollapse(config.id)}
                   className={`bg-gradient-to-r ${config.color.headerGradient} p-4 sm:p-4.5 flex items-center justify-between cursor-pointer select-none`}
                 >
                   <div className="flex items-center gap-3">

@@ -14,9 +14,37 @@ interface VersionItem {
 
 const VERSIONS: VersionItem[] = [
   {
-    version: 'v2.3',
+    version: 'v2.4',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'ကျောင်းအဆင့်များ သုံးဘက်ညီ (Contacts, Dashboard, Admin) တပြေးညီ ချိတ်ဆက်မှု၊ ကျစ်လျစ်သပ်ရပ်သော Notification စနစ်၊ ခေါင်းလောင်း အသိပေးချက် (Bell Notification) နှင့် Version Update အမဲ တံဆိပ် စနစ်သစ်',
+    changes: [
+      {
+        type: 'feat',
+        text: 'Contacts (ပထမပုံ)၊ Dashboard (ဒုတိယပုံ) နှင့် Admin (တတိယပုံ) တို့ရှိ ကျောင်းအဆင့် (School Levels) များကို တပြေးညီ (Inline Real-time Sync) ချိတ်ဆက်ပေးပြီး Admin တွင် ပြင်ဆင်/အတိုးအလျှော့ ပြုလုပ်မှုတိုင်း မျက်နှာပြင်အားလုံးတွင် တိုက်ရိုက် အလိုအလျောက် ပြောင်းလဲသွားစေခြင်း',
+      },
+      {
+        type: 'feat',
+        text: 'ခေါင်းလောင်း အသိပေးချက် (Notification Bell) ကို Preview နှင့် အသုံးပြုသူ မျက်နှာပြင်အားလုံးတွင် မပျောက်ကွယ်ဘဲ အမြဲတစေ ပေါ်လွင်ထင်ရှားစွာ မြင်တွေ့နိုင်အောင် ဖန်တီးပေးပြီး စနစ်လုပ်ဆောင်ချက်များ (ကျောင်းထည့်/ပြင်/ဖျက်) နှင့် ဗားရှင်းအသစ်များကို အချိန်နှင့်တပြေးညီ အသိပေးစေခြင်း',
+      },
+      {
+        type: 'feat',
+        text: 'စနစ်အတွင်း တခုခုပြောင်းတိုင်း၊ ပြင်တိုင်း၊ Improve လုပ်တိုင်း နဂိုအခြေအနေနှင့် မတူသည်များကို ချက်ချင်း သိရှိစေရန် အနက်ရောင် (Black) "Version Update v2.4" တံဆိပ်ကို Header၊ Sidebar၊ Footer နှင့် Version History တို့တွင် အထင်အရှား ထည့်သွင်းပေးခြင်း',
+      },
+      {
+        type: 'improve',
+        text: 'အသုံးပြုသူ ကြည့်ရှုအသုံးပြုရာတွင် အဆင်မပြေဖြစ်စေသော အရှည်ကြီးဖြစ်နေသည့် Notification များနှင့် Toast များကို ကျစ်လျစ်သိပ်သည်းပြီး မျက်စိရှင်းလင်းစွာ ဖတ်ရှုနိုင်သော Compact Alert Strip နှင့် စက္ကန့်တို Toast စနစ်အဖြစ် ပြောင်းလဲပြင်ဆင်ခြင်း',
+      },
+      {
+        type: 'improve',
+        text: 'Admin Excel File တင်သွင်းမှု (Import) လုပ်ဆောင်နေချိန်နှင့် ပြီးဆုံးချိန် အသိပေးချက်များကို စာကြောင်းအရှည်ကြီး မဖြစ်စေဘဲ စာရင်းအသစ် (+), အပ်ဒိတ် (↺) စသည့် တိုတိုရှင်းရှင်း အရေအတွက်ပြ Compact Status Bar ဖြင့် အစားထိုးခြင်း',
+      },
+    ],
+  },
+  {
+    version: 'v2.3',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'Admin စကားဝှက် (Password) လုံခြုံရေး စနစ်သစ်၊ မိမိစိတ်ကြိုက် စကားဝှက် ပြောင်းလဲသတ်မှတ်နိုင်မှုနှင့် Cloudflare Pages Build အဆင့်မြှင့်တင်ခြင်း',
     changes: [
       {
@@ -381,7 +409,7 @@ export default function VersionHistory() {
             key={item.version}
             className={`bg-white rounded-2xl border p-6 sm:p-8 shadow-xs transition ${
               item.isLatest
-                ? 'border-sky-300 ring-2 ring-sky-100 shadow-sm'
+                ? 'border-neutral-900 ring-2 ring-neutral-900/15 shadow-md'
                 : 'border-slate-200'
             }`}
           >
@@ -392,8 +420,8 @@ export default function VersionHistory() {
                   {item.version}
                 </span>
                 {item.isLatest && (
-                  <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                    <Sparkles className="w-3.5 h-3.5" /> လက်ရှိဗားရှင်း (Latest)
+                  <span className="inline-flex items-center gap-1.5 text-xs font-black px-3 py-1 rounded-full bg-black text-white border border-neutral-700 shadow-xs">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Version Update (အမဲ) • လက်ရှိဗားရှင်း (Latest)
                   </span>
                 )}
               </div>

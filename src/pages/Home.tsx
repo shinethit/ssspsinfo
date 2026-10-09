@@ -25,6 +25,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { PWAInstallButton } from '../components/PWAInstallButton';
+import { getUnifiedSchoolLevels } from '../lib/schoolLevels';
 
 export default function Home() {
   const { schools, announcements, associations, schoolLevels, loading } = useData();
@@ -43,34 +44,8 @@ export default function Home() {
 
   // Dynamic School Levels Stats matching reference / database
   const levelStats = useMemo(() => {
-    const configuredNames = (schoolLevels || []).map(l => l.name.trim()).filter(Boolean);
-    const distinctLevels = Array.from(new Set(schools.map(s => (s.level || '').trim()).filter(Boolean)));
-    const allNames = [...configuredNames];
-    distinctLevels.forEach(lvl => {
-      if (!allNames.some(existing => existing.toLowerCase() === lvl.toLowerCase())) {
-        allNames.push(lvl);
-      }
-    });
-
-    const colors = [
-      { bg: 'bg-sky-50/70', border: 'border-sky-200', text: 'text-sky-900', count: 'text-sky-700', bar: 'bg-sky-500', barBg: 'bg-sky-100' },
-      { bg: 'bg-emerald-50/70', border: 'border-emerald-200', text: 'text-emerald-900', count: 'text-emerald-700', bar: 'bg-emerald-500', barBg: 'bg-emerald-100' },
-      { bg: 'bg-teal-50/70', border: 'border-teal-200', text: 'text-teal-900', count: 'text-teal-700', bar: 'bg-teal-500', barBg: 'bg-teal-100' },
-      { bg: 'bg-indigo-50/70', border: 'border-indigo-200', text: 'text-indigo-900', count: 'text-indigo-700', bar: 'bg-indigo-500', barBg: 'bg-indigo-100' },
-      { bg: 'bg-purple-50/70', border: 'border-purple-200', text: 'text-purple-900', count: 'text-purple-700', bar: 'bg-purple-500', barBg: 'bg-purple-100' },
-      { bg: 'bg-amber-50/70', border: 'border-amber-200', text: 'text-amber-900', count: 'text-amber-700', bar: 'bg-amber-500', barBg: 'bg-amber-100' },
-    ];
-
-    return allNames.map((name, idx) => {
-      const count = schools.filter(s => (s.level || '').trim().toLowerCase() === name.toLowerCase()).length;
-      return {
-        name,
-        count,
-        pct: totalSchools > 0 ? (count / totalSchools) * 100 : 0,
-        style: colors[idx % colors.length],
-      };
-    });
-  }, [schools, schoolLevels, totalSchools]);
+    return getUnifiedSchoolLevels(schoolLevels, schools).filter(l => !l.isUnassigned || l.total > 0);
+  }, [schools, schoolLevels]);
 
   // Quick searched schools preview
   const filteredQuickSchools = useMemo(() => {
@@ -285,21 +260,21 @@ export default function Home() {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
           {levelStats.map((item) => (
             <Link
-              key={item.name}
+              key={item.id}
               to={`/contacts?level=${encodeURIComponent(item.name)}`}
-              className={`p-2.5 rounded-lg ${item.style.bg} border ${item.style.border} space-y-1 hover:brightness-95 transition group block`}
+              className={`p-2.5 rounded-lg ${item.color.bg} border ${item.color.border} space-y-1 hover:brightness-95 transition group block`}
             >
               <div className="flex items-center justify-between text-[10px] font-bold">
-                <span className={`${item.style.text} truncate group-hover:underline`} title={item.name}>
+                <span className={`${item.color.text} truncate group-hover:underline`} title={item.name}>
                   {item.name}
                 </span>
-                <span className={`${item.style.count} font-extrabold shrink-0 ml-1`}>
-                  {item.count}
+                <span className={`${item.color.accent} font-extrabold shrink-0 ml-1`}>
+                  {item.total}
                 </span>
               </div>
-              <div className={`w-full ${item.style.barBg} rounded-full h-1 overflow-hidden`}>
+              <div className={`w-full ${item.color.barBg} rounded-full h-1 overflow-hidden`}>
                 <div
-                  className={`${item.style.bar} h-1 rounded-full transition-all`}
+                  className={`${item.color.bar} h-1 rounded-full transition-all`}
                   style={{ width: `${item.pct}%` }}
                 />
               </div>
