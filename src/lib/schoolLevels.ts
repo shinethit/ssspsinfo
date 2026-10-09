@@ -215,22 +215,55 @@ export const getUnifiedSchoolLevels = (
   // 1. Build list of primary level items from configuredLevels
   const sortedConfigured = [...configuredLevels].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
 
+  // Deduplicate equivalent level items (e.g. "၅။ မူလတန်းဆင့်" vs "မူလတန်းဆင့်")
   const levelItems: {
     id: string;
     name: string;
     order: number;
     description: string;
-  }[] = sortedConfigured.map((l, idx) => ({
-    id: l.id || `lvl-${idx + 1}`,
-    name: l.name.trim(),
-    order: l.order ?? idx + 1,
-    description: l.description?.trim() || `${l.name} အသင်းဝင် ကိုယ်ပိုင်ကျောင်းများ`,
-  }));
+  }[] = [];
 
-  // 2. Discover any additional distinct levels from schools that aren't yet in configuredLevels
+  const seenKeys = new Map<string, number>(); // stripped key -> index in levelItems
+
+  for (const l of sortedConfigured) {
+    const rawName = l.name.trim();
+    if (!rawName) continue;
+    const strippedKey = stripLevelPrefix(rawName) || rawName.toLowerCase();
+
+    if (seenKeys.has(strippedKey)) {
+      // If we already have a level for this stripped key, keep the one with a number prefix (e.g. "၅။ ...")
+      const existingIdx = seenKeys.get(strippedKey)!;
+      const existing = levelItems[existingIdx];
+      const hasPrefixNew = /^[၀-၉0-9]/.test(rawName);
+      const hasPrefixExisting = /^[၀-၉0-9]/.test(existing.name);
+
+      if (hasPrefixNew && !hasPrefixExisting) {
+        levelItems[existingIdx] = {
+          id: l.id || existing.id,
+          name: rawName,
+          order: l.order ?? existing.order,
+          description: l.description?.trim() || existing.description,
+        };
+      }
+    } else {
+      seenKeys.set(strippedKey, levelItems.length);
+      levelItems.push({
+        id: l.id || `lvl-${levelItems.length + 1}`,
+        name: rawName,
+        order: l.order ?? levelItems.length + 1,
+        description: l.description?.trim() || `${rawName} အသင်းဝင် ကိုယ်ပိုင်ကျောင်းများ`,
+      });
+    }
+  }
+
+  // 2. Discover any additional distinct levels from schools that aren't yet in levelItems
   schools.forEach((s) => {
-    const raw = (s.level || '').trim();
-    if (raw && !levelItems.some((item) => isSchoolInLevel(s, item.name))) {
+    const raw = (s.level || s.category || '').trim();
+    if (!raw) return;
+    const strippedKey = stripLevelPrefix(raw) || raw.toLowerCase();
+
+    if (!seenKeys.has(strippedKey)) {
+      seenKeys.set(strippedKey, levelItems.length);
       levelItems.push({
         id: `discovered-${raw.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
         name: raw,
@@ -240,11 +273,16 @@ export const getUnifiedSchoolLevels = (
     }
   });
 
-  // Track schools that are matched into configured levels
+  // Track schools that are matched into configured levels (each school belongs to ONLY ONE level)
   const matchedSchoolIds = new Set<string>();
 
-  const results: UnifiedSchoolLevel[] = levelItems.map((item, idx) => {
-    const matchingSchools = schools.filter((s) => isSchoolInLevel(s, item.name));
+  const results: UnifiedSchoolLevel[] = [];
+
+  levelItems.forEach((item, idx) => {
+    // Each school is matched to the FIRST level item that fits it
+    const matchingSchools = schools.filter(
+      (s) => !matchedSchoolIds.has(s.id) && isSchoolInLevel(s, item.name)
+    );
     matchingSchools.forEach((s) => matchedSchoolIds.add(s.id));
 
     const total = matchingSchools.length;
@@ -253,7 +291,7 @@ export const getUnifiedSchoolLevels = (
     const pct = total > 0 ? Math.round((paid / total) * 100) : 0;
     const color = LEVEL_COLOR_PALETTES[idx % LEVEL_COLOR_PALETTES.length];
 
-    return {
+    results.push({
       id: item.id,
       name: item.name,
       shortLabel: item.name,
@@ -266,7 +304,7 @@ export const getUnifiedSchoolLevels = (
       unpaid,
       pct,
       schools: matchingSchools,
-    };
+    });
   });
 
   // 3. Find any schools that didn't match any level (e.g. empty level or undefined)
@@ -279,11 +317,11 @@ export const getUnifiedSchoolLevels = (
 
     results.push({
       id: 'unassigned-level',
-      name: 'အခြား / အဆင့် မသတ်မှတ်ရသေး',
-      shortLabel: 'အဆင့် မသတ်မှတ်ရသေး',
-      title: 'အခြား / အဆင့် မသတ်မှတ်ရသေးသော ကျောင်းများ',
+      name: 'အဆင့် သတ်မှတ်ရန်လို',
+      shortLabel: 'အဆင့် သတ်မှတ်ရန်လို',
+      title: 'အဆင့် သတ်မှတ်ရန်လိုသော ကျောင်းများ (အခြား / မသတ်မှတ်ရသေး)',
       order: 9999,
-      description: 'ကျောင်းအဆင့် သတ်မှတ်ချက် မထည့်သွင်းရသေးသော အသင်းဝင် ကိုယ်ပိုင်ကျောင်းများ',
+      description: 'ကျောင်းအဆင့် သတ်မှတ်ချက် မထည့်သွင်းရသေးသော သို့မဟုတ် သက်ဆိုင်ရာ Category ဖျက်လိုက်သော အသင်းဝင် ကိုယ်ပိုင်ကျောင်းများ',
       color: OTHER_LEVEL_PALETTE,
       total,
       paid,
@@ -294,5 +332,6 @@ export const getUnifiedSchoolLevels = (
     });
   }
 
-  return results;
+  // Filter out duplicate or empty discovered level entries
+  return results.filter((r) => r.total > 0 || !r.id.startsWith('discovered-'));
 };

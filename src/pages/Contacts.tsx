@@ -296,6 +296,7 @@ export default function Contacts() {
     (school: School): UnifiedSchoolLevel => {
       for (const lvl of unifiedLevels) {
         if (lvl.isUnassigned) continue;
+        if (lvl.schools.some((s) => s.id === school.id)) return lvl;
         if (isSchoolInLevel(school, lvl.name)) return lvl;
       }
       return (
@@ -380,14 +381,21 @@ export default function Contacts() {
   };
 
   const toggleCategoryCollapse = (categoryKey: string) => {
-    setCollapsedCategories((prev) => ({
-      ...prev,
-      [categoryKey]: !prev[categoryKey],
-    }));
+    setCollapsedCategories((prev) => {
+      const isCurrentlyCollapsed = prev[categoryKey] !== false;
+      return {
+        ...prev,
+        [categoryKey]: !isCurrentlyCollapsed ? true : false,
+      };
+    });
   };
 
   const expandAllCategories = () => {
-    setCollapsedCategories({});
+    const allExpanded: Record<string, boolean> = {};
+    unifiedLevels.forEach((l) => {
+      allExpanded[l.id] = false;
+    });
+    setCollapsedCategories(allExpanded);
   };
 
   const collapseAllCategories = () => {
@@ -435,11 +443,14 @@ export default function Contacts() {
         (s.adminPhone2 && s.adminPhone2.toLowerCase().includes(q)) ||
         (Array.isArray(s.adminPhones) && s.adminPhones.some((p) => p.toLowerCase().includes(q)));
 
+      const schoolCat = getSchoolCategory(s);
       const matchCategoryTab =
         activeCategory === 'all'
           ? true
-          : isSchoolInLevel(s, activeCategory) ||
-            (activeCategory === 'unassigned' && (!s.level || !s.level.trim()));
+          : schoolCat.id === activeCategory ||
+            schoolCat.name === activeCategory ||
+            isSchoolInLevel(s, activeCategory) ||
+            ((activeCategory === 'unassigned' || activeCategory === 'unassigned-level') && schoolCat.isUnassigned);
 
       const matchFee =
         feeFilter === 'all'
@@ -506,25 +517,11 @@ export default function Contacts() {
 
     unifiedLevels.forEach((lvl) => {
       const catSchools = sortedSchools.filter((s) => {
-        if (lvl.isUnassigned) {
-          return (
-            !s.level ||
-            !s.level.trim() ||
-            !unifiedLevels.some((other) => !other.isUnassigned && isSchoolInLevel(s, other.name))
-          );
-        }
-        return isSchoolInLevel(s, lvl.name);
+        const schoolCat = getSchoolCategory(s);
+        return schoolCat.id === lvl.id;
       });
 
       if (catSchools.length > 0) {
-        if (sortOption === 'category_name') {
-          catSchools.sort((a, b) => {
-            const nameA = a.name || '';
-            const nameB = b.name || '';
-            const cmp = nameA.localeCompare(nameB, 'my', { sensitivity: 'base' });
-            return cmp !== 0 ? cmp : nameA.localeCompare(nameB);
-          });
-        }
         groups.push({
           config: lvl,
           schools: catSchools,
@@ -533,7 +530,7 @@ export default function Contacts() {
     });
 
     return groups;
-  }, [sortedSchools, sortOption, unifiedLevels]);
+  }, [sortedSchools, unifiedLevels, getSchoolCategory]);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto w-full pb-10 max-w-full overflow-x-hidden">
@@ -951,7 +948,7 @@ export default function Contacts() {
             {groupedCategories.map((group) => {
             const { config, schools: catSchools } = group;
             const Icon = config.isUnassigned ? Building2 : GraduationCap;
-            const isCollapsed = !!collapsedCategories[config.id];
+            const isCollapsed = collapsedCategories[config.id] !== false;
 
             return (
               <section
