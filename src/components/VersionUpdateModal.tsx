@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sparkles, X, ArrowRight, History, Layers, Bell, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-export const CURRENT_VERSION = 'v2.6';
+export const CURRENT_VERSION = 'v2.8';
 const STORAGE_KEY = 'pss_last_viewed_version';
 
 export const VersionUpdateModal: React.FC = () => {

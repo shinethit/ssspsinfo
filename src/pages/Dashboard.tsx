@@ -93,7 +93,7 @@ export default function Dashboard() {
 
   // 2. Breakdown By School Level (ကျောင်းအဆင့်အလိုက် - Configurable & Database School Levels)
   const levelBreakdown = useMemo(() => {
-    const unified = getUnifiedSchoolLevels(schoolLevels, schools).filter(l => !l.isUnassigned || l.total > 0);
+    const unified = getUnifiedSchoolLevels(schoolLevels, schools).filter(l => l.total > 0);
 
     return unified.map((item, idx) => {
       const allInLevel = item.schools;

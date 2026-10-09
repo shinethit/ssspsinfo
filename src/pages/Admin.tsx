@@ -192,6 +192,7 @@ export default function Admin() {
   } = useData();
   const [activeTab, setActiveTab] = useState<'announcements' | 'associations' | 'schools' | 'tickers' | 'audit_logs' | 'admins' | 'levels' | 'backup'>('announcements');
   const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
+  const [editingAssociationId, setEditingAssociationId] = useState<string | null>(null);
 
   // Backup & Restore state
   const [isExportingBackup, setIsExportingBackup] = useState(false);
@@ -709,23 +710,41 @@ export default function Admin() {
     }
     setIsSavingLevel(true);
     try {
+      const newLevelName = levelNameInput.trim();
       if (editingLevelId) {
+        const targetLvl = schoolLevels.find((l) => l.id === editingLevelId);
+        const oldLevelName = targetLvl?.name;
+
         await updateSchoolLevel(editingLevelId, {
-          name: levelNameInput.trim(),
+          name: newLevelName,
           order: levelOrderInput !== '' ? Number(levelOrderInput) : undefined,
           description: levelDescInput.trim(),
         });
+
+        // Cascade level rename to all schools that currently have the old level name
+        if (oldLevelName && oldLevelName !== newLevelName) {
+          const matchingSchools = schools.filter((s) => isSchoolInLevel(s, oldLevelName));
+          if (matchingSchools.length > 0) {
+            const batch = writeBatch(db);
+            matchingSchools.forEach((s) => {
+              batch.update(doc(db, 'schools', s.id), { level: newLevelName });
+            });
+            await batch.commit();
+            toast.success(`ကျောင်း (${matchingSchools.length}) ကျောင်း၏ Category ကိုလည်း အလိုအလျောက် အဆင့်မြှင့်ပြီးပါပြီ`);
+          }
+        }
+
         await recordAuditLog({
           action: 'update',
           entityType: 'school_level',
           entityId: editingLevelId,
-          entityName: levelNameInput.trim(),
-          details: `ကျောင်းအဆင့် "${levelNameInput.trim()}" ကို ပြင်ဆင်ခဲ့သည်`,
+          entityName: newLevelName,
+          details: `ကျောင်းအဆင့် "${newLevelName}" ကို ပြင်ဆင်ခဲ့သည်`,
         });
-        toast.success(`ကျောင်းအဆင့် "${levelNameInput.trim()}" ကို ပြင်ဆင်ပြီးပါပြီ`);
+        toast.success(`ကျောင်းအဆင့် "${newLevelName}" ကို ပြင်ဆင်ပြီးပါပြီ`);
       } else {
         const newId = await addSchoolLevel(
-          levelNameInput.trim(),
+          newLevelName,
           levelDescInput.trim(),
           levelOrderInput !== '' ? Number(levelOrderInput) : undefined
         );
@@ -733,10 +752,10 @@ export default function Admin() {
           action: 'create',
           entityType: 'school_level',
           entityId: newId,
-          entityName: levelNameInput.trim(),
-          details: `ကျောင်းအဆင့်သစ် "${levelNameInput.trim()}" ကို ထည့်သွင်းခဲ့သည်`,
+          entityName: newLevelName,
+          details: `ကျောင်းအဆင့်သစ် "${newLevelName}" ကို ထည့်သွင်းခဲ့သည်`,
         });
-        toast.success(`ကျောင်းအဆင့်သစ် "${levelNameInput.trim()}" ကို ထည့်သွင်းပြီးပါပြီ`);
+        toast.success(`ကျောင်းအဆင့်သစ် "${newLevelName}" ကို ထည့်သွင်းပြီးပါပြီ`);
       }
       handleCancelEditLevel();
       fetchAuditLogs();
@@ -1303,20 +1322,68 @@ export default function Admin() {
     }
   };
 
+  const startEditAssociation = (assoc: Association) => {
+    setActiveTab('associations');
+    setEditingAssociationId(assoc.id);
+    associationForm.reset({
+      name: assoc.name || '',
+      township: assoc.township || '',
+      address: assoc.address || '',
+      phone: assoc.phone || '',
+      email: assoc.email || '',
+      logoUrl: assoc.logoUrl || '',
+      description: assoc.description || '',
+      members: assoc.members && assoc.members.length > 0
+        ? assoc.members
+        : [{ name: '', role: 'ဥက္ကဋ္ဌ', school: '', phone: '', viber: '', telegram: '', photoUrl: '' }],
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelEditAssociation = () => {
+    setEditingAssociationId(null);
+    associationForm.reset({
+      name: '',
+      township: '',
+      address: '',
+      phone: '',
+      email: '',
+      logoUrl: '',
+      description: '',
+      members: [{ name: '', role: 'ဥက္ကဋ္ဌ', school: '', phone: '', viber: '', telegram: '', photoUrl: '' }],
+    });
+  };
+
   const onAssociationSubmit = async (data: any) => {
     try {
-      const docRef = await addDoc(collection(db, 'associations'), {
-        ...data,
-        createdAt: new Date().toISOString(),
-      });
-      await recordAuditLog({
-        action: 'create',
-        entityType: 'association',
-        entityId: docRef.id,
-        entityName: data.name,
-        details: `အသင်းနှင့် အမှုဆောင်အချက်အလက် "${data.name}" ထည့်သွင်းခဲ့သည်`,
-      });
-      toast.success('အသင်းနှင့် အမှုဆောင်အဖွဲ့ဝင်များ ထည့်သွင်းပြီးပါပြီ');
+      if (editingAssociationId) {
+        await updateDoc(doc(db, 'associations', editingAssociationId), {
+          ...data,
+          updatedAt: new Date().toISOString(),
+        });
+        await recordAuditLog({
+          action: 'update',
+          entityType: 'association',
+          entityId: editingAssociationId,
+          entityName: data.name,
+          details: `အသင်းနှင့် အမှုဆောင်အချက်အလက် "${data.name}" ကို ပြင်ဆင်မွမ်းမံခဲ့သည်`,
+        });
+        toast.success('အသင်းနှင့် အမှုဆောင်အဖွဲ့ဝင်များ ပြင်ဆင်ပြီးပါပြီ');
+        setEditingAssociationId(null);
+      } else {
+        const docRef = await addDoc(collection(db, 'associations'), {
+          ...data,
+          createdAt: new Date().toISOString(),
+        });
+        await recordAuditLog({
+          action: 'create',
+          entityType: 'association',
+          entityId: docRef.id,
+          entityName: data.name,
+          details: `အသင်းနှင့် အမှုဆောင်အချက်အလက် "${data.name}" ထည့်သွင်းခဲ့သည်`,
+        });
+        toast.success('အသင်းနှင့် အမှုဆောင်အဖွဲ့ဝင်များ ထည့်သွင်းပြီးပါပြီ');
+      }
       associationForm.reset({
         name: '',
         township: '',
@@ -1331,7 +1398,7 @@ export default function Admin() {
       fetchAuditLogs();
     } catch (err) {
       console.error(err);
-      toast.error('အသင်း ထည့်သွင်းရာတွင် အမှားဖြစ်ပွားပါသည်');
+      toast.error('အသင်း အချက်အလက် သိမ်းဆည်းရာတွင် အမှားဖြစ်ပွားပါသည်');
     }
   };
 
@@ -2538,9 +2605,28 @@ export default function Admin() {
             onSubmit={associationForm.handleSubmit(onAssociationSubmit)}
             className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-xs space-y-6"
           >
-            <h3 className="font-bold text-xl text-sky-950 flex items-center gap-2">
-              <Plus className="w-5 h-5 text-sky-600" /> အသင်းအသစ်နှင့် အမှုဆောင်များ ထည့်သွင်းရန် (Add Association & Committee)
-            </h3>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <h3 className="font-bold text-xl text-sky-950 flex items-center gap-2">
+                {editingAssociationId ? (
+                  <>
+                    <Edit2 className="w-5 h-5 text-amber-600" /> အသင်း အချက်အလက် ပြင်ဆင်ရန် (Edit Association)
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-5 h-5 text-sky-600" /> အသင်းအသစ်နှင့် အမှုဆောင်များ ထည့်သွင်းရန် (Add Association & Committee)
+                  </>
+                )}
+              </h3>
+              {editingAssociationId && (
+                <button
+                  type="button"
+                  onClick={cancelEditAssociation}
+                  className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 bg-slate-50 hover:bg-slate-100 text-xs font-bold flex items-center gap-1 transition cursor-pointer"
+                >
+                  <XCircle className="w-4 h-4 text-slate-500" /> ပြင်ဆင်မှု ဖျက်သိမ်းမည် (Cancel Edit)
+                </button>
+              )}
+            </div>
 
             {/* Association Basic Info */}
             <div className="grid sm:grid-cols-2 gap-4">
@@ -2715,9 +2801,15 @@ export default function Admin() {
             <button
               type="submit"
               disabled={associationForm.formState.isSubmitting}
-              className="w-full bg-sky-900 text-white p-3.5 rounded-xl font-bold text-sm hover:bg-sky-800 transition cursor-pointer disabled:opacity-50"
+              className={`w-full p-3.5 rounded-xl font-bold text-sm transition cursor-pointer disabled:opacity-50 text-white ${
+                editingAssociationId
+                  ? 'bg-amber-600 hover:bg-amber-700'
+                  : 'bg-sky-900 hover:bg-sky-800'
+              }`}
             >
-              အသင်းနှင့် အမှုဆောင်အဖွဲ့ဝင်များ သိမ်းဆည်းမည် (Save Association)
+              {editingAssociationId
+                ? 'ပြင်ဆင်ထားသော အသင်း အချက်အလက်များ သိမ်းဆည်းမည် (Update Association)'
+                : 'အသင်းနှင့် အမှုဆောင်အဖွဲ့ဝင်များ သိမ်းဆည်းမည် (Save Association)'}
             </button>
           </form>
 
@@ -2747,14 +2839,24 @@ export default function Admin() {
                         အမှုဆောင်အဖွဲ့ဝင်: {assoc.members ? assoc.members.length : 0} ဦး | ဖုန်း: {assoc.phone || 'မရှိပါ'}
                       </p>
                     </div>
-                    <button
-                      onClick={() => deleteAssociation(assoc.id)}
-                      type="button"
-                      className="text-rose-600 hover:text-rose-800 p-2 rounded-lg hover:bg-rose-50 transition cursor-pointer self-end sm:self-center"
-                      title="ဖျက်ရန်"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-2 self-end sm:self-center">
+                      <button
+                        onClick={() => startEditAssociation(assoc)}
+                        type="button"
+                        className="text-amber-700 hover:text-amber-900 px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-200 transition text-xs font-bold flex items-center gap-1 cursor-pointer"
+                        title="အသင်းနှင့် အမှုဆောင်များ ပြင်ဆင်ရန်"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" /> ပြင်ဆင်မည် (Edit)
+                      </button>
+                      <button
+                        onClick={() => deleteAssociation(assoc.id)}
+                        type="button"
+                        className="text-rose-600 hover:text-rose-800 p-2 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                        title="ဖျက်ရန်"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -3052,48 +3154,35 @@ export default function Admin() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  ကျောင်းအဆင့် * (ဥပမာ - ၁။ အထက်တန်း၊ ၂။ အထက်တန်း(မူဆင့်မပါ)၊ ၂။ ထက်ဆင့်...)
+                  ကျောင်းအဆင့် / Category * (Dropdown မီနူးမှ ရွေးချယ်ပါ)
                 </label>
-                <div className="space-y-1.5">
-                  <div className="flex gap-2">
-                    <input
-                      {...schoolForm.register('level')}
-                      list="school-levels-datalist"
-                      placeholder="ကျောင်းအဆင့် ရွေးချယ်ပါ သို့မဟုတ် ရိုက်ထည့်ပါ"
-                      className="flex-1 p-2.5 border rounded-lg text-sm bg-white"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('levels')}
-                      className="px-2.5 py-1 text-xs text-sky-800 bg-sky-50 hover:bg-sky-100 rounded-lg border border-sky-200 font-semibold cursor-pointer whitespace-nowrap"
-                      title="ကျောင်းအဆင့်များ စီမံပြင်ဆင်ရန်"
-                    >
-                      အဆင့်များ စီမံရန် ⚙️
-                    </button>
-                  </div>
-                  <datalist id="school-levels-datalist">
-                    {schoolLevels.map(l => (
-                      <option key={l.id} value={l.name} />
-                    ))}
-                  </datalist>
-                  {/* Quick Pill Buttons */}
-                  <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto p-1 bg-slate-50 rounded-lg border border-slate-100">
-                    <span className="text-[10px] text-slate-400 font-medium self-center mr-1">အမြန်ရွေး:</span>
-                    {schoolLevels.map(l => (
-                      <button
-                        key={l.id}
-                        type="button"
-                        onClick={() => schoolForm.setValue('level', l.name)}
-                        className={`text-[11px] px-2 py-0.5 rounded border transition cursor-pointer ${
-                          schoolForm.watch('level') === l.name
-                            ? 'bg-sky-600 text-white border-sky-600 font-bold'
-                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
+                <div className="flex items-center gap-2">
+                  <select
+                    {...schoolForm.register('level')}
+                    className="flex-1 p-2.5 border rounded-lg text-sm bg-white font-bold text-slate-900 focus:ring-2 focus:ring-sky-500 cursor-pointer shadow-2xs"
+                  >
+                    <option value="">-- ကျောင်းအဆင့် ရွေးချယ်ပါ (Select Category) --</option>
+                    {schoolLevels.map((l) => (
+                      <option key={l.id} value={l.name}>
                         {l.name}
-                      </button>
+                      </option>
                     ))}
-                  </div>
+                    {/* Fallback option if school has a custom level value not in schoolLevels */}
+                    {schoolForm.watch('level') && !schoolLevels.some((l) => l.name === schoolForm.watch('level')) && (
+                      <option value={schoolForm.watch('level')}>
+                        {schoolForm.watch('level')}
+                      </option>
+                    )}
+                    <option value="အဆင့် သတ်မှတ်ရန်လို">အဆင့် သတ်မှတ်ရန်လို (Unassigned / မသတ်မှတ်ရသေး)</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('levels')}
+                    className="px-3 py-2.5 text-xs text-sky-800 bg-sky-50 hover:bg-sky-100 rounded-lg border border-sky-200 font-semibold cursor-pointer whitespace-nowrap shrink-0 shadow-2xs"
+                    title="ကျောင်းအဆင့်များ စီမံပြင်ဆင်ရန်"
+                  >
+                    အဆင့်များ စီမံရန် ⚙️
+                  </button>
                 </div>
               </div>
               <div className="sm:col-span-2">

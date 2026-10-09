@@ -239,7 +239,7 @@ export const AuditNotificationBell: React.FC = () => {
             <div className="px-3 py-1.5 bg-neutral-950 text-white flex items-center justify-between border-b border-neutral-800 shrink-0 text-xs">
               <div className="flex items-center gap-1.5 min-w-0">
                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-neutral-800 text-amber-300 text-[10px] font-mono font-bold border border-neutral-700 shrink-0">
-                  <Sparkles className="w-2.5 h-2.5 text-amber-400" /> v2.6
+                  <Sparkles className="w-2.5 h-2.5 text-amber-400" /> v2.8
                 </span>
                 <span className="text-neutral-200 font-medium truncate text-[11px]">
                   Version Update (အမဲ) စနစ်သစ်

@@ -288,7 +288,7 @@ export default function Contacts() {
 
   // Dynamic School Levels unified from database & school records
   const unifiedLevels = useMemo(() => {
-    return getUnifiedSchoolLevels(schoolLevels, schools);
+    return getUnifiedSchoolLevels(schoolLevels, schools).filter(l => l.total > 0);
   }, [schoolLevels, schools]);
 
   // Helper to determine unified level category of any school

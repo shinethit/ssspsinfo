@@ -185,7 +185,7 @@ export default function Associations() {
               <div className="p-5 sm:p-8 space-y-4">
                 <div className="flex items-center gap-2 text-slate-900 font-bold text-base sm:text-lg border-b border-slate-100 pb-3">
                   <Award className="w-5 h-5 text-amber-600 shrink-0" />
-                  <span className="truncate">အမှုဆောင်အဖွဲ့ဝင်များ (Executive Committee)</span>
+                  <span className="break-words">အမှုဆောင်အဖွဲ့ဝင်များ (Executive Committee)</span>
                   <span className="text-xs font-normal text-slate-400 shrink-0 ml-1">
                     ({assoc.members ? assoc.members.length : 0} ဦး)
                   </span>
@@ -225,9 +225,9 @@ export default function Associations() {
                         </div>
 
                         {member.school && (
-                          <p className="text-xs text-slate-600 flex items-center gap-1.5 min-w-0">
-                            <SchoolIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                            <span className="truncate">{member.school}</span>
+                          <p className="text-xs text-slate-700 flex items-start gap-1.5 min-w-0 font-medium">
+                            <SchoolIcon className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                            <span className="break-words leading-snug">{member.school}</span>
                           </p>
                         )}
 

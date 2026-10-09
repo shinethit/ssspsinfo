@@ -44,7 +44,7 @@ export default function Home() {
 
   // Dynamic School Levels Stats matching reference / database
   const levelStats = useMemo(() => {
-    return getUnifiedSchoolLevels(schoolLevels, schools).filter(l => !l.isUnassigned || l.total > 0);
+    return getUnifiedSchoolLevels(schoolLevels, schools).filter(l => l.total > 0);
   }, [schools, schoolLevels]);
 
   // Quick searched schools preview
