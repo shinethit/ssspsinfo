@@ -11,7 +11,7 @@ import { ANNOUNCEMENT_CATEGORIES, getCategoryBadge } from './Announcements';
 import { Association, NewsTicker, AuditLog, AdminUser, STUDENT_RANGE_TIERS, getStudentRangeTier, SchoolLevelItem } from '../types';
 import { recordAuditLog } from '../lib/audit';
 import { useData, sortAnnouncementsByEventDate } from '../context/DataContext';
-import { isSchoolInLevel } from '../lib/schoolLevels';
+import { isSchoolInLevel, getUnifiedSchoolLevels } from '../lib/schoolLevels';
 import {
   FileText,
   School as SchoolIcon,
@@ -239,6 +239,11 @@ export default function Admin() {
   const sortedAnnouncements = useMemo(() => {
     return sortAnnouncementsByEventDate(announcements as any);
   }, [announcements]);
+
+  const unifiedLevels = useMemo(
+    () => getUnifiedSchoolLevels(schoolLevels, schools),
+    [schoolLevels, schools]
+  );
 
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
   const [loadingAssociations, setLoadingAssociations] = useState(false);
@@ -721,19 +726,6 @@ export default function Admin() {
           order: levelOrderInput !== '' ? Number(levelOrderInput) : undefined,
           description: levelDescInput.trim(),
         });
-
-        // Cascade level rename to all schools that currently have the old level name
-        if (oldLevelName && oldLevelName !== newLevelName) {
-          const matchingSchools = schools.filter((s) => isSchoolInLevel(s, oldLevelName));
-          if (matchingSchools.length > 0) {
-            const batch = writeBatch(db);
-            matchingSchools.forEach((s) => {
-              batch.update(doc(db, 'schools', s.id), { level: newLevelName });
-            });
-            await batch.commit();
-            toast.success(`ကျောင်း (${matchingSchools.length}) ကျောင်း၏ Category ကိုလည်း အလိုအလျောက် အဆင့်မြှင့်ပြီးပါပြီ`);
-          }
-        }
 
         await recordAuditLog({
           action: 'update',
@@ -5290,9 +5282,9 @@ export default function Admin() {
                 {/* Mobile View: Cards */}
                 <div className="sm:hidden space-y-3">
                   {schoolLevels.map((lvl, idx) => {
-                    const count = schools.filter(
-                      (s) => isSchoolInLevel(s, lvl.name)
-                    ).length;
+                    const count = unifiedLevels.find(
+                      (u) => u.id === lvl.id || u.name.toLowerCase() === lvl.name.trim().toLowerCase()
+                    )?.total ?? 0;
 
                     return (
                       <div key={lvl.id} className="p-4 bg-white border border-slate-200 rounded-xl space-y-2.5">
@@ -5360,9 +5352,9 @@ export default function Admin() {
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {schoolLevels.map((lvl, idx) => {
-                        const count = schools.filter(
-                          (s) => isSchoolInLevel(s, lvl.name)
-                        ).length;
+                        const count = unifiedLevels.find(
+                          (u) => u.id === lvl.id || u.name.toLowerCase() === lvl.name.trim().toLowerCase()
+                        )?.total ?? 0;
 
                         return (
                           <tr key={lvl.id} className="hover:bg-slate-50/80 transition">

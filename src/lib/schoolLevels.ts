@@ -215,7 +215,7 @@ export const getUnifiedSchoolLevels = (
   // 1. Build list of primary level items from configuredLevels
   const sortedConfigured = [...configuredLevels].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
 
-  // Deduplicate equivalent level items (e.g. "၅။ မူလတန်းဆင့်" vs "မူလတန်းဆင့်")
+  // Keep configured levels distinct; only deduplicate exact duplicate names
   const levelItems: {
     id: string;
     name: string;
@@ -223,30 +223,15 @@ export const getUnifiedSchoolLevels = (
     description: string;
   }[] = [];
 
-  const seenKeys = new Map<string, number>(); // stripped key -> index in levelItems
+  const seenExactNames = new Set<string>();
 
   for (const l of sortedConfigured) {
     const rawName = l.name.trim();
     if (!rawName) continue;
-    const strippedKey = stripLevelPrefix(rawName) || rawName.toLowerCase();
+    const lowerKey = rawName.toLowerCase();
 
-    if (seenKeys.has(strippedKey)) {
-      // If we already have a level for this stripped key, keep the one with a number prefix (e.g. "၅။ ...")
-      const existingIdx = seenKeys.get(strippedKey)!;
-      const existing = levelItems[existingIdx];
-      const hasPrefixNew = /^[၀-၉0-9]/.test(rawName);
-      const hasPrefixExisting = /^[၀-၉0-9]/.test(existing.name);
-
-      if (hasPrefixNew && !hasPrefixExisting) {
-        levelItems[existingIdx] = {
-          id: l.id || existing.id,
-          name: rawName,
-          order: l.order ?? existing.order,
-          description: l.description?.trim() || existing.description,
-        };
-      }
-    } else {
-      seenKeys.set(strippedKey, levelItems.length);
+    if (!seenExactNames.has(lowerKey)) {
+      seenExactNames.add(lowerKey);
       levelItems.push({
         id: l.id || `lvl-${levelItems.length + 1}`,
         name: rawName,
@@ -260,10 +245,15 @@ export const getUnifiedSchoolLevels = (
   schools.forEach((s) => {
     const raw = (s.level || s.category || '').trim();
     if (!raw) return;
-    const strippedKey = stripLevelPrefix(raw) || raw.toLowerCase();
+    const lowerKey = raw.toLowerCase();
 
-    if (!seenKeys.has(strippedKey)) {
-      seenKeys.set(strippedKey, levelItems.length);
+    // Check if this school level doesn't match any configured level (even via prefix)
+    const matchesConfigured = levelItems.some(
+      (item) => item.name.toLowerCase() === lowerKey || isSchoolInLevel(s, item.name)
+    );
+
+    if (!matchesConfigured && !seenExactNames.has(lowerKey)) {
+      seenExactNames.add(lowerKey);
       levelItems.push({
         id: `discovered-${raw.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
         name: raw,
@@ -275,16 +265,36 @@ export const getUnifiedSchoolLevels = (
 
   // Track schools that are matched into configured levels (each school belongs to ONLY ONE level)
   const matchedSchoolIds = new Set<string>();
+  const levelSchoolMap = new Map<string, School[]>();
+  levelItems.forEach((item) => levelSchoolMap.set(item.id, []));
+
+  // Pass 1: Exact matches first! (Priority)
+  schools.forEach((s) => {
+    const sLvl = (s.level || s.category || '').trim().toLowerCase();
+    if (!sLvl) return;
+    const exactMatch = levelItems.find((item) => item.name.trim().toLowerCase() === sLvl);
+    if (exactMatch) {
+      levelSchoolMap.get(exactMatch.id)!.push(s);
+      matchedSchoolIds.add(s.id);
+    }
+  });
+
+  // Pass 2: Fallback prefix matching for remaining unmatched schools
+  schools.forEach((s) => {
+    if (matchedSchoolIds.has(s.id)) return;
+    const sLvl = (s.level || s.category || '').trim();
+    if (!sLvl) return;
+    const fuzzyMatch = levelItems.find((item) => isSchoolInLevel(s, item.name));
+    if (fuzzyMatch) {
+      levelSchoolMap.get(fuzzyMatch.id)!.push(s);
+      matchedSchoolIds.add(s.id);
+    }
+  });
 
   const results: UnifiedSchoolLevel[] = [];
 
   levelItems.forEach((item, idx) => {
-    // Each school is matched to the FIRST level item that fits it
-    const matchingSchools = schools.filter(
-      (s) => !matchedSchoolIds.has(s.id) && isSchoolInLevel(s, item.name)
-    );
-    matchingSchools.forEach((s) => matchedSchoolIds.add(s.id));
-
+    const matchingSchools = levelSchoolMap.get(item.id) || [];
     const total = matchingSchools.length;
     const paid = matchingSchools.filter((s) => !!s.isAnnualFeePaid).length;
     const unpaid = total - paid;

@@ -463,25 +463,80 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     async (name: string, description?: string, order?: number): Promise<string> => {
       const cleanName = name.trim();
       if (!cleanName) throw new Error('ကျောင်းအဆင့် အမည် လိုအပ်ပါသည်');
-      const newOrder = order ?? (schoolLevels.length + 1);
-      const payload = {
-        name: cleanName,
-        description: description?.trim() || '',
-        order: newOrder,
-        createdAt: new Date().toISOString(),
-      };
-      const docRef = await addDoc(collection(db, 'school_levels'), payload);
-      const newItem: SchoolLevelItem = { id: docRef.id, ...payload };
-      setSchoolLevels((prev) => {
-        const next = [...prev.filter((l) => l.id !== docRef.id), newItem].sort(
-          (a, b) => (a.order ?? 999) - (b.order ?? 999)
-        );
+      const newOrder =
+        order !== undefined
+          ? order
+          : schoolLevels.length > 0
+          ? Math.max(...schoolLevels.map((l) => l.order ?? 0)) + 1
+          : 1;
+
+      const hasDefaultIds = schoolLevels.some((l) => l.id.startsWith('default-'));
+
+      if (hasDefaultIds) {
+        // Persist all existing default items + new item in an atomic batch
+        const batch = writeBatch(db);
+        const newDocRef = doc(collection(db, 'school_levels'));
+        const nextLevels: SchoolLevelItem[] = [];
+
+        schoolLevels.forEach((l) => {
+          const docRef = l.id.startsWith('default-') ? doc(collection(db, 'school_levels')) : doc(db, 'school_levels', l.id);
+          const item: SchoolLevelItem = {
+            id: docRef.id,
+            name: l.name,
+            order: l.order,
+            description: l.description,
+            createdAt: l.createdAt || new Date().toISOString(),
+          };
+          batch.set(docRef, {
+            name: item.name,
+            order: item.order,
+            description: item.description,
+            createdAt: item.createdAt,
+          });
+          nextLevels.push(item);
+        });
+
+        const newItem: SchoolLevelItem = {
+          id: newDocRef.id,
+          name: cleanName,
+          description: description?.trim() || '',
+          order: newOrder,
+          createdAt: new Date().toISOString(),
+        };
+        batch.set(newDocRef, {
+          name: newItem.name,
+          order: newItem.order,
+          description: newItem.description,
+          createdAt: newItem.createdAt,
+        });
+        nextLevels.push(newItem);
+
+        await batch.commit();
+        setSchoolLevels(nextLevels.sort((a, b) => (a.order ?? 999) - (b.order ?? 999)));
         try {
-          localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(next));
+          localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(nextLevels));
         } catch (e) {}
-        return next;
-      });
-      return docRef.id;
+        return newDocRef.id;
+      } else {
+        const payload = {
+          name: cleanName,
+          description: description?.trim() || '',
+          order: newOrder,
+          createdAt: new Date().toISOString(),
+        };
+        const docRef = await addDoc(collection(db, 'school_levels'), payload);
+        const newItem: SchoolLevelItem = { id: docRef.id, ...payload };
+        setSchoolLevels((prev) => {
+          const next = [...prev.filter((l) => l.id !== docRef.id), newItem].sort(
+            (a, b) => (a.order ?? 999) - (b.order ?? 999)
+          );
+          try {
+            localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(next));
+          } catch (e) {}
+          return next;
+        });
+        return docRef.id;
+      }
     },
     [schoolLevels]
   );
@@ -490,39 +545,85 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     async (id: string, data: Partial<SchoolLevelItem>): Promise<void> => {
       const existing = schoolLevels.find((l) => l.id === id);
       const oldName = existing?.name?.trim();
-      const newName = data.name?.trim();
+      const newName = data.name !== undefined ? data.name.trim() : oldName;
 
-      setSchoolLevels((prev) => {
-        const next = prev
-          .map((l) => (l.id === id ? { ...l, ...data } : l))
-          .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+      const hasDefaultIds = schoolLevels.some((l) => l.id.startsWith('default-'));
+
+      if (hasDefaultIds) {
+        // Persist all current levels to Firestore in an atomic batch, updating ONLY target item
+        const batch = writeBatch(db);
+        const nextLevels: SchoolLevelItem[] = [];
+
+        schoolLevels.forEach((l) => {
+          if (l.id === id) {
+            const docRef = doc(collection(db, 'school_levels'));
+            const updatedItem: SchoolLevelItem = {
+              id: docRef.id,
+              name: newName ?? l.name,
+              order: data.order !== undefined ? data.order : l.order,
+              description: data.description !== undefined ? data.description : l.description,
+              createdAt: l.createdAt || new Date().toISOString(),
+            };
+            batch.set(docRef, {
+              name: updatedItem.name,
+              order: updatedItem.order,
+              description: updatedItem.description,
+              createdAt: updatedItem.createdAt,
+            });
+            nextLevels.push(updatedItem);
+          } else {
+            const docRef = l.id.startsWith('default-') ? doc(collection(db, 'school_levels')) : doc(db, 'school_levels', l.id);
+            const item: SchoolLevelItem = {
+              id: docRef.id,
+              name: l.name,
+              order: l.order,
+              description: l.description,
+              createdAt: l.createdAt || new Date().toISOString(),
+            };
+            batch.set(docRef, {
+              name: item.name,
+              order: item.order,
+              description: item.description,
+              createdAt: item.createdAt,
+            });
+            nextLevels.push(item);
+          }
+        });
+
+        await batch.commit();
+        setSchoolLevels(nextLevels.sort((a, b) => (a.order ?? 999) - (b.order ?? 999)));
         try {
-          localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(next));
+          localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(nextLevels));
         } catch (e) {}
-        return next;
-      });
-
-      if (!id.startsWith('default-')) {
-        await updateDoc(doc(db, 'school_levels', id), data);
       } else {
-        const payload = {
-          name: newName ?? existing?.name ?? '',
-          description: data.description ?? existing?.description ?? '',
-          order: data.order ?? existing?.order ?? 1,
-          createdAt: new Date().toISOString(),
-        };
-        await addDoc(collection(db, 'school_levels'), payload);
+        // Normal update: only update this single document in Firestore
+        setSchoolLevels((prev) => {
+          const next = prev
+            .map((l) => (l.id === id ? { ...l, ...data, name: newName ?? l.name } : l))
+            .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+          try {
+            localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(next));
+          } catch (e) {}
+          return next;
+        });
+
+        const updatePayload: Record<string, any> = {};
+        if (data.name !== undefined) updatePayload.name = newName;
+        if (data.order !== undefined) updatePayload.order = data.order;
+        if (data.description !== undefined) updatePayload.description = data.description;
+
+        await updateDoc(doc(db, 'school_levels', id), updatePayload);
       }
 
-      // If level name changed, automatically migrate all schools under the old level name
+      // If level name changed, automatically migrate ONLY schools that EXACTLY have oldName
       if (oldName && newName && oldName.toLowerCase() !== newName.toLowerCase()) {
         const affectedSchools = schools.filter(
-          (s) => (s.level || '').trim().toLowerCase() === oldName.toLowerCase()
+          (s) => (s.level || s.category || '').trim().toLowerCase() === oldName.toLowerCase()
         );
         if (affectedSchools.length > 0) {
           setSchools((prev) =>
             prev.map((s) =>
-              (s.level || '').trim().toLowerCase() === oldName.toLowerCase()
+              (s.level || s.category || '').trim().toLowerCase() === oldName.toLowerCase()
                 ? { ...s, level: newName }
                 : s
             )
@@ -547,35 +648,66 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const existing = schoolLevels.find((l) => l.id === id);
       const oldName = existing?.name?.trim();
 
-      setSchoolLevels((prev) => {
-        const next = prev.filter((l) => l.id !== id);
-        try {
-          localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(next));
-        } catch (e) {}
-        return next;
-      });
+      const hasDefaultIds = schoolLevels.some((l) => l.id.startsWith('default-'));
 
-      if (!id.startsWith('default-')) {
+      if (hasDefaultIds) {
+        const batch = writeBatch(db);
+        const nextLevels: SchoolLevelItem[] = [];
+
+        schoolLevels.forEach((l) => {
+          if (l.id !== id) {
+            const docRef = l.id.startsWith('default-') ? doc(collection(db, 'school_levels')) : doc(db, 'school_levels', l.id);
+            const item: SchoolLevelItem = {
+              id: docRef.id,
+              name: l.name,
+              order: l.order,
+              description: l.description,
+              createdAt: l.createdAt || new Date().toISOString(),
+            };
+            batch.set(docRef, {
+              name: item.name,
+              order: item.order,
+              description: item.description,
+              createdAt: item.createdAt,
+            });
+            nextLevels.push(item);
+          }
+        });
+
+        await batch.commit();
+        setSchoolLevels(nextLevels.sort((a, b) => (a.order ?? 999) - (b.order ?? 999)));
+        try {
+          localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(nextLevels));
+        } catch (e) {}
+      } else {
+        setSchoolLevels((prev) => {
+          const next = prev.filter((l) => l.id !== id);
+          try {
+            localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(next));
+          } catch (e) {}
+          return next;
+        });
+
         await deleteDoc(doc(db, 'school_levels', id));
       }
 
-      // If deleted level had schools, update local schools so they don't break
+      // If deleted level had schools, update local schools to unassigned so data is preserved
       if (oldName) {
         const affectedSchools = schools.filter(
-          (s) => (s.level || '').trim().toLowerCase() === oldName.toLowerCase()
+          (s) => (s.level || s.category || '').trim().toLowerCase() === oldName.toLowerCase()
         );
         if (affectedSchools.length > 0) {
           setSchools((prev) =>
             prev.map((s) =>
-              (s.level || '').trim().toLowerCase() === oldName.toLowerCase()
-                ? { ...s, level: '' }
+              (s.level || s.category || '').trim().toLowerCase() === oldName.toLowerCase()
+                ? { ...s, level: 'အဆင့် သတ်မှတ်ရန်လို' }
                 : s
             )
           );
           try {
             const batch = writeBatch(db);
             affectedSchools.forEach((s) => {
-              batch.update(doc(db, 'schools', s.id), { level: '' });
+              batch.update(doc(db, 'schools', s.id), { level: 'အဆင့် သတ်မှတ်ရန်လို' });
             });
             await batch.commit();
           } catch (e) {
@@ -589,27 +721,43 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const resetSchoolLevelsToDefault = useCallback(async (): Promise<void> => {
     const defaults = getDefaultSchoolLevels();
-    setSchoolLevels(defaults);
-    try {
-      localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(defaults));
-    } catch (e) {}
 
     try {
       const snap = await getDocs(collection(db, 'school_levels'));
-      for (const d of snap.docs) {
-        await deleteDoc(doc(db, 'school_levels', d.id));
-      }
-      for (const item of defaults) {
-        await addDoc(collection(db, 'school_levels'), {
+      const batch = writeBatch(db);
+
+      snap.docs.forEach((d) => {
+        batch.delete(doc(db, 'school_levels', d.id));
+      });
+
+      const nextLevels: SchoolLevelItem[] = [];
+      defaults.forEach((item) => {
+        const docRef = doc(collection(db, 'school_levels'));
+        const docItem: SchoolLevelItem = {
+          id: docRef.id,
           name: item.name,
           order: item.order,
           description: item.description,
           createdAt: item.createdAt,
+        };
+        batch.set(docRef, {
+          name: docItem.name,
+          order: docItem.order,
+          description: docItem.description,
+          createdAt: docItem.createdAt,
         });
-      }
+        nextLevels.push(docItem);
+      });
+
+      await batch.commit();
+      setSchoolLevels(nextLevels.sort((a, b) => (a.order ?? 999) - (b.order ?? 999)));
+      try {
+        localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(nextLevels));
+      } catch (e) {}
       toast.success('ကျောင်းအဆင့်များ မူလအတိုင်း ပြန်ထားပါပြီ');
     } catch (e) {
       console.warn('Reset school levels error in Firestore:', e);
+      toast.error('Reset မအောင်မြင်ပါ');
     }
   }, []);
 

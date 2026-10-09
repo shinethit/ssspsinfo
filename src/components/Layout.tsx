@@ -215,7 +215,7 @@ export default function Layout() {
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-sky-950">System Version</span>
               <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
-                v2.10
+                v2.11
               </span>
             </div>
             <p className="text-[11px] text-slate-500 leading-normal">
@@ -256,7 +256,7 @@ export default function Layout() {
                 to="/versions"
                 className="text-slate-600 hover:text-sky-900 font-medium hover:underline"
               >
-                ဗားရှင်းမှတ်တမ်း (v2.10)
+                ဗားရှင်းမှတ်တမ်း (v2.11)
               </Link>
               <span>•</span>
               <p>© 2026 All rights reserved</p>
