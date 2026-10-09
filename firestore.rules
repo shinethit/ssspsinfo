@@ -1,66 +1,41 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Schools (Public read for member directory, write for admin management)
-    match /schools/{schoolId} {
-      allow read, write: if true;
+    function isSignedIn() { return request.auth != null; }
+    function adminDoc() { return get(/databases/$(database)/documents/admins/$(request.auth.uid)).data; }
+    function isAdmin() { return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+    function isSuperAdmin() { return isAdmin() && adminDoc().role == 'super_admin'; }
+
+    match /{document=**} { allow read, write: if false; }
+
+    match /schools/{id}        { allow read: if true; allow write: if isAdmin(); }
+    match /announcements/{id}  { allow read: if true; allow write: if isAdmin(); }
+    match /tickers/{id}        { allow read: if true; allow write: if isAdmin(); }
+    match /gallery/{id}        { allow read: if true; allow write: if isAdmin(); }
+    match /associations/{id}   { allow read: if true; allow write: if isAdmin(); }
+    match /school_levels/{id}  { allow read: if true; allow write: if isAdmin(); }
+    match /contacts/{id}       { allow read: if true; allow write: if isAdmin(); } // TODO: tighten to isSignedIn() if contacts contain private phone numbers
+
+    match /messages/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.senderUid == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 2000;
+      allow update: if false;
+      allow delete: if isAdmin();
     }
 
-    // Contacts
-    match /contacts/{contactId} {
-      allow read, write: if true;
+    match /audit_logs/{id} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if false;
     }
 
-    // Announcements
-    match /announcements/{announcementId} {
-      allow read, write: if true;
-    }
-
-    // Tickers (Marquee / Running Announcement Bar)
-    match /tickers/{tickerId} {
-      allow read, write: if true;
-    }
-
-    // Messages & Chat Rooms
-    match /messages/{messageId} {
-      allow read, write: if true;
-    }
-    match /rooms/{roomId} {
-      allow read, write: if true;
-      match /messages/{messageId} {
-        allow read, write: if true;
-      }
-    }
-
-    // Gallery
-    match /gallery/{galleryId} {
-      allow read, write: if true;
-    }
-
-    // Associations & Committee members
-    match /associations/{associationId} {
-      allow read, write: if true;
-    }
-
-    // School Levels (Customizable by Admin, read by all)
-    match /school_levels/{levelId} {
-      allow read, write: if true;
-    }
-
-    // Audit Logs (Track who performed which action and when)
-    match /audit_logs/{logId} {
-      allow read, write: if true;
-    }
-
-    // Admins Collection (Manage authorized admin profiles)
-    match /admins/{adminId} {
-      allow read, write: if true;
-    }
-
-    // Fallback for any newly created document in database
-    match /{document=**} {
-      allow read, write: if true;
+    match /admins/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if isSuperAdmin();
     }
   }
 }

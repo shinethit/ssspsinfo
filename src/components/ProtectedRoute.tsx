@@ -1,24 +1,51 @@
 import { useState, useEffect } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
-import { auth } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { getAdminSession } from '../lib/adminAuth';
+import { doc, getDoc } from 'firebase/firestore';
 
 export default function ProtectedRoute() {
   const [user, loading] = useAuthState(auth);
-  const [session, setSession] = useState(getAdminSession());
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [checkingAdmin, setCheckingAdmin] = useState(true);
 
   useEffect(() => {
-    const handleAuthChange = () => {
-      setSession(getAdminSession());
+    let isMounted = true;
+
+    async function checkAdminStatus() {
+      if (!user) {
+        if (isMounted) {
+          setIsAdmin(false);
+          setCheckingAdmin(false);
+        }
+        return;
+      }
+
+      try {
+        const snap = await getDoc(doc(db, 'admins', user.uid));
+        if (isMounted) {
+          setIsAdmin(snap.exists());
+          setCheckingAdmin(false);
+        }
+      } catch (err) {
+        console.error('Failed to verify admin status from admins/{uid}:', err);
+        if (isMounted) {
+          setIsAdmin(false);
+          setCheckingAdmin(false);
+        }
+      }
+    }
+
+    if (!loading) {
+      checkAdminStatus();
+    }
+
+    return () => {
+      isMounted = false;
     };
-    window.addEventListener('sssps_admin_auth_changed', handleAuthChange);
-    return () => window.removeEventListener('sssps_admin_auth_changed', handleAuthChange);
-  }, []);
+  }, [user, loading]);
 
-  const isAuthed = session.isLoggedIn || !!user;
-
-  if (loading && !session.isLoggedIn) {
+  if (loading || checkingAdmin) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
         <div className="flex items-center gap-2 text-slate-500 text-sm">
@@ -29,7 +56,7 @@ export default function ProtectedRoute() {
     );
   }
 
-  if (!isAuthed) {
+  if (!user || !isAdmin) {
     return <Navigate to="/login" replace />;
   }
 

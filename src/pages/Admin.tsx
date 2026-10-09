@@ -33,6 +33,8 @@ import {
   Link as LinkIcon,
   CheckCircle,
   Eye,
+  EyeOff,
+  Lock,
   CheckCircle2,
   XCircle,
   CopyCheck,
@@ -61,7 +63,16 @@ import {
   Loader2,
   FileSpreadsheet,
 } from 'lucide-react';
-import { getAdminSession, clearAdminSession, changeAdminPassword } from '../lib/adminAuth';
+import { initializeApp, deleteApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword, signOut as secondarySignOut } from 'firebase/auth';
+import { firebaseConfig } from '../lib/firebase';
+import {
+  getAdminSession,
+  clearAdminSession,
+  changeAdminPassword,
+  sendAdminPasswordReset,
+  mapFirebaseAuthError,
+} from '../lib/adminAuth';
 import { downloadSchoolTemplate, normalizeSchoolRow, exportSchoolsToExcel } from '../lib/excel';
 import ImageUploadDropzone from '../components/ImageUploadDropzone';
 import { getCloudinaryConfig, saveCloudinaryConfig, isCloudinaryConfigured } from '../lib/cloudinary';
@@ -231,6 +242,8 @@ export default function Admin() {
 
   // Admin Management form state
   const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [showNewAdminPassword, setShowNewAdminPassword] = useState(false);
   const [newAdminName, setNewAdminName] = useState('');
   const [newAdminRole, setNewAdminRole] = useState<'admin' | 'editor' | 'super_admin'>('admin');
   const [newAdminPhone, setNewAdminPhone] = useState('');
@@ -265,19 +278,20 @@ export default function Admin() {
 
   // Admin Password Management Modal State
   const [isChangingPassModal, setIsChangingPassModal] = useState(false);
-  const [targetChangePassEmail, setTargetChangePassEmail] = useState('khunthanshwe@gmail.com');
+  const [targetChangePassEmail, setTargetChangePassEmail] = useState('');
   const [newAdminPasswordInput, setNewAdminPasswordInput] = useState('');
   const [savingNewPassword, setSavingNewPassword] = useState(false);
+  const [isSendingResetEmail, setIsSendingResetEmail] = useState(false);
 
   const handleSaveNewPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newAdminPasswordInput.trim() || newAdminPasswordInput.trim().length < 4) {
-      toast.error('စကားဝှက်သည် အနည်းဆုံး စာလုံး ၄ လုံး ရှိရပါမည်');
+    if (!newAdminPasswordInput.trim() || newAdminPasswordInput.trim().length < 6) {
+      toast.error('စကားဝှက်သည် အနည်းဆုံး စာလုံး ၆ လုံး ရှိရပါမည်');
       return;
     }
     setSavingNewPassword(true);
     try {
-      const res = await changeAdminPassword(targetChangePassEmail, newAdminPasswordInput);
+      const res = await changeAdminPassword(targetChangePassEmail, newAdminPasswordInput.trim());
       if (!res.success) {
         toast.error(res.error || 'စကားဝှက် ပြောင်း၍ မရပါ');
         return;
@@ -288,13 +302,31 @@ export default function Admin() {
         entityName: targetChangePassEmail,
         details: `"${targetChangePassEmail}" ၏ စကားဝှက် (Password) အား အသစ်ပြောင်းလဲခဲ့သည်`,
       });
-      toast.success(`"${targetChangePassEmail}" ၏ စကားဝှက်ကို အောင်မြင်စွာ ပြောင်းလဲလိုက်ပါပြီ`);
+      toast.success(res.error || `"${targetChangePassEmail}" ၏ စကားဝှက်ကို အောင်မြင်စွာ ပြောင်းလဲလိုက်ပါပြီ`);
       setIsChangingPassModal(false);
       setNewAdminPasswordInput('');
     } catch (err: any) {
       toast.error('စကားဝှက် ပြောင်းလဲရာတွင် အမှားဖြစ်ပွားပါသည်');
     } finally {
       setSavingNewPassword(false);
+    }
+  };
+
+  const handleSendResetEmailFromModal = async () => {
+    if (!targetChangePassEmail) return;
+    setIsSendingResetEmail(true);
+    try {
+      const res = await sendAdminPasswordReset(targetChangePassEmail);
+      if (res.success) {
+        toast.success(`စကားဝှက် ပြောင်းလဲရန် လင့်ခ်ကို "${targetChangePassEmail}" သို့ ပို့ပေးပြီးပါပြီ`);
+        setIsChangingPassModal(false);
+      } else {
+        toast.error(res.error || 'Reset လင့်ခ် ပို့၍မရပါ');
+      }
+    } catch (err: any) {
+      toast.error('အီးမေးလ် ပို့ရာတွင် အမှားဖြစ်ပွားပါသည်');
+    } finally {
+      setIsSendingResetEmail(false);
     }
   };
 
@@ -524,21 +556,58 @@ export default function Admin() {
 
   const handleAddAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (adminSession.role !== 'super_admin') {
+      toast.error('Super Admin သာလျှင် အက်ဒမင်အသစ်များ ခန့်အပ်ခွင့် ရှိပါသည်');
+      return;
+    }
+
     const cleanEmail = newAdminEmail.trim().toLowerCase();
+    const cleanPassword = newAdminPassword.trim();
+
     if (!cleanEmail || !cleanEmail.includes('@')) {
       toast.error('မှန်ကန်သော အီးမေးလ်လိပ်စာ (Email Address) ထည့်သွင်းပေးပါ');
+      return;
+    }
+    if (!cleanPassword || cleanPassword.length < 6) {
+      toast.error('စကားဝှက်သည် အနည်းဆုံး စာလုံး ၆ လုံး ရှိရပါမည်');
       return;
     }
 
     try {
       setAddingAdmin(true);
+
+      // Create Auth user using a secondary Firebase app instance so current session isn't signed out
+      const secondaryAppName = `secondaryAdminWorker_${Date.now()}`;
+      const secondaryApp = initializeApp(firebaseConfig, secondaryAppName);
+      const secondaryAuth = getAuth(secondaryApp);
+
+      let newUid = '';
+      try {
+        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, cleanEmail, cleanPassword);
+        newUid = userCredential.user.uid;
+      } catch (authErr: any) {
+        const code = authErr.code || authErr.message || '';
+        if (code === 'auth/email-already-in-use') {
+          toast.error('ဤအီးမေးလ်သည် Firebase Auth တွင် အကောင့်ဖွင့်ထားပြီး ဖြစ်ပါသည်');
+        } else {
+          toast.error(mapFirebaseAuthError(code));
+        }
+        return;
+      } finally {
+        try {
+          await secondarySignOut(secondaryAuth);
+          await deleteApp(secondaryApp);
+        } catch {}
+      }
+
       const cleanPhones = [
         newAdminPhone.trim(),
         ...extraAdminUserPhones.map((p) => p.trim()),
       ].filter(Boolean);
 
-      // Use email as doc ID for easy lookup in firestore.rules
-      await setDoc(doc(db, 'admins', cleanEmail), {
+      // Write document at admins/{newUid}
+      await setDoc(doc(db, 'admins', newUid), {
+        uid: newUid,
         email: cleanEmail,
         name: newAdminName.trim() || 'အက်ဒမင်',
         role: newAdminRole,
@@ -551,14 +620,18 @@ export default function Admin() {
         addedBy: auth.currentUser?.email || adminSession.email || 'Super Admin',
         createdAt: new Date().toISOString(),
       });
+
       await recordAuditLog({
         action: 'create',
         entityType: 'admin',
+        entityId: newUid,
         entityName: cleanEmail,
-        details: `အက်ဒမင်အသစ် "${cleanEmail}" (${newAdminRole}) အား ဖုန်းနံပါတ် (${cleanPhones.length} ခု) ဖြင့် စီမံခွင့် ပေးအပ်ခဲ့သည်`,
+        details: `အက်ဒမင်အသစ် "${cleanEmail}" (${newAdminRole}) အား UID (${newUid}) ဖြင့် စီမံခွင့် ပေးအပ်ခဲ့သည်`,
       });
+
       toast.success(`အက်ဒမင်သစ် "${cleanEmail}" ကို အောင်မြင်စွာ ခန့်အပ်ထည့်သွင်းပြီးပါပြီ`);
       setNewAdminEmail('');
+      setNewAdminPassword('');
       setNewAdminName('');
       setNewAdminPhone('');
       setExtraAdminUserPhones([]);
@@ -566,28 +639,33 @@ export default function Admin() {
       setNewAdminRole('admin');
       fetchAdmins();
       fetchAuditLogs();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error('အက်ဒမင် ထည့်သွင်းရာတွင် အမှားဖြစ်ပွားပါသည်');
+      toast.error('အက်ဒမင် ထည့်သွင်းရာတွင် အမှားဖြစ်ပွားပါသည်: ' + (err.message || ''));
     } finally {
       setAddingAdmin(false);
     }
   };
 
   const handleDeleteAdmin = async (admin: AdminUser) => {
-    if (admin.email === 'khunthanshwe@gmail.com') {
-      toast.error('ပင်မ Super Admin အကောင့်ကို ဖယ်ရှား၍ မရပါ');
+    if (adminSession.role !== 'super_admin') {
+      toast.error('Super Admin သာလျှင် အက်ဒမင်များ ဖယ်ရှားခွင့် ရှိပါသည်');
+      return;
+    }
+    if (admin.id === auth.currentUser?.uid || admin.email === auth.currentUser?.email) {
+      toast.error('မိမိကိုယ်တိုင်၏ အက်ဒမင် အကောင့်ကို ဖယ်ရှား၍ မရပါ');
       return;
     }
     if (!confirm(`"${admin.email}" ၏ အက်ဒမင်စီမံခွင့်ကို ပယ်ဖျက်ရန် သေချာပါသလား?`)) return;
 
     try {
-      await deleteDoc(doc(db, 'admins', admin.id || admin.email));
+      await deleteDoc(doc(db, 'admins', admin.id));
       await recordAuditLog({
         action: 'delete',
         entityType: 'admin',
+        entityId: admin.id,
         entityName: admin.email,
-        details: `"${admin.email}" ၏ အက်ဒမင် စီမံခွင့်ကို ပယ်ဖျက်ခဲ့သည်`,
+        details: `"${admin.email}" (UID: ${admin.id}) ၏ အက်ဒမင် စီမံခွင့်ကို ပယ်ဖျက်ခဲ့သည်`,
       });
       toast.success(`"${admin.email}" ၏ အက်ဒမင်အခွင့်အရေးကို ဖယ်ရှားလိုက်ပါပြီ`);
       fetchAdmins();
@@ -2085,7 +2163,7 @@ export default function Admin() {
             <ShieldCheck className="w-4 h-4 shrink-0 text-amber-600" />
             <span>အက်ဒမင်များ</span>
             <span className="text-[10px] font-bold px-1.5 py-0.2 bg-amber-100 text-amber-900 rounded-full">
-              {admins.length + 1}
+              {admins.length}
             </span>
           </button>
           <button
@@ -4576,140 +4654,174 @@ export default function Admin() {
           </div>
 
           {/* Add New Admin Form */}
-          <form
-            onSubmit={handleAddAdmin}
-            className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-xs space-y-5"
-          >
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-              <UserPlus className="w-5 h-5 text-amber-600" />
-              <h3 className="font-bold text-lg text-slate-900">
-                အက်ဒမင် အသစ် ထည့်သွင်းရန် (Add New Admin)
-              </h3>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  အက်ဒမင် အီးမေးလ် (Admin Email Address) *
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="email"
-                    required
-                    value={newAdminEmail}
-                    onChange={(e) => setNewAdminEmail(e.target.value)}
-                    placeholder="ဥပမာ - teacher.u.mg@gmail.com"
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-amber-500 outline-hidden"
-                  />
-                </div>
-                <span className="text-[10px] text-slate-400 mt-1 block">
-                  အသုံးပြုသူ အကောင့်ဝင်မည့် Google / Firebase အီးမေးလ်လိပ်စာ
-                </span>
+          {adminSession.role === 'super_admin' ? (
+            <form
+              onSubmit={handleAddAdmin}
+              className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-xs space-y-5"
+            >
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                <UserPlus className="w-5 h-5 text-amber-600" />
+                <h3 className="font-bold text-lg text-slate-900">
+                  အက်ဒမင် အသစ် ထည့်သွင်းရန် (Add New Admin)
+                </h3>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  အမည် / ကျောင်းအမည် (Name / School - စိတ်ကြိုက်)
-                </label>
-                <input
-                  type="text"
-                  value={newAdminName}
-                  onChange={(e) => setNewAdminName(e.target.value)}
-                  placeholder="ဥပမာ - ဆရာဦးမင်းမင်း (ရွှေမင်းသားကျောင်း)"
-                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-amber-500 outline-hidden"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  ရာထူးနှင့် စီမံခွင့် (Role Permission)
-                </label>
-                <select
-                  value={newAdminRole}
-                  onChange={(e) => setNewAdminRole(e.target.value as any)}
-                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-amber-500 outline-hidden cursor-pointer"
-                >
-                  <option value="admin">🛡️ Admin (ကျောင်း၊ ကြေညာချက်၊ စာတန်းပြေး အပြည့်အဝ စီမံခွင့်)</option>
-                  <option value="editor">✏️ Editor (ကြေညာချက်နှင့် အချက်အလက် တည်းဖြတ်ခွင့်)</option>
-                  <option value="super_admin">👑 Super Admin (အက်ဒမင်များ ခန့်အပ်ခြင်း အပါအဝင် အဆင့်မြင့် စီမံခွင့်)</option>
-                </select>
-              </div>
-
-              <div className="sm:col-span-2 border border-slate-200 p-3.5 rounded-xl space-y-2 bg-slate-50/70">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-semibold text-slate-700">
-                    ဖုန်းနံပါတ်များ (Phone Numbers - ၁ လုံးနှင့်အထက် ထည့်သွင်းနိုင်သည်)
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    အက်ဒမင် အီးမေးလ် (Admin Email Address) *
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => setExtraAdminUserPhones(prev => [...prev, ''])}
-                    className="text-xs text-amber-800 hover:text-amber-950 font-bold cursor-pointer inline-flex items-center gap-1 bg-white px-2.5 py-1 rounded-lg border border-amber-300 shadow-2xs"
-                  >
-                    + နောက်ထပ် ဖုန်းထည့်ရန်
-                  </button>
-                </div>
-                <input
-                  type="tel"
-                  value={newAdminPhone}
-                  onChange={(e) => setNewAdminPhone(e.target.value)}
-                  placeholder="အဓိက ဆက်သွယ်ရန် ဖုန်း (၁) - 09..."
-                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-amber-500 outline-hidden"
-                />
-                {extraAdminUserPhones.map((ph, idx) => (
-                  <div key={idx} className="flex items-center gap-2 animate-in fade-in">
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
-                      type="tel"
-                      value={ph}
-                      onChange={(e) => {
-                        const updated = [...extraAdminUserPhones];
-                        updated[idx] = e.target.value;
-                        setExtraAdminUserPhones(updated);
-                      }}
-                      placeholder={`နောက်ထပ် အက်ဒမင် ဖုန်းနံပါတ် (${idx + 2}) - 09...`}
-                      className="flex-1 p-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-amber-500 outline-hidden"
+                      type="email"
+                      required
+                      value={newAdminEmail}
+                      onChange={(e) => setNewAdminEmail(e.target.value)}
+                      placeholder="ဥပမာ - teacher.u.mg@gmail.com"
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-amber-500 outline-hidden"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    အသုံးပြုသူ အကောင့်ဝင်မည့် Firebase အီးမေးလ်လိပ်စာ
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    ကနဦး စကားဝှက် (Initial Password) *
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type={showNewAdminPassword ? 'text' : 'password'}
+                      required
+                      value={newAdminPassword}
+                      onChange={(e) => setNewAdminPassword(e.target.value)}
+                      placeholder="အနည်းဆုံး ၆ လုံး ရိုက်ထည့်ပါ"
+                      className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-amber-500 outline-hidden font-mono"
                     />
                     <button
                       type="button"
-                      onClick={() => setExtraAdminUserPhones(extraAdminUserPhones.filter((_, i) => i !== idx))}
-                      className="px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg border border-rose-200 cursor-pointer"
+                      onClick={() => setShowNewAdminPassword(!showNewAdminPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                     >
-                      ဖယ်ရှားရန်
+                      {showNewAdminPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
-                ))}
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    Firebase Auth အကောင့်အတွက် စကားဝှက် (အနည်းဆုံး ၆ လုံး)
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    အမည် / ကျောင်းအမည် (Name / School - စိတ်ကြိုက်)
+                  </label>
+                  <input
+                    type="text"
+                    value={newAdminName}
+                    onChange={(e) => setNewAdminName(e.target.value)}
+                    placeholder="ဥပမာ - ဆရာဦးမင်းမင်း (ရွှေမင်းသားကျောင်း)"
+                    className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-amber-500 outline-hidden"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    ရာထူးနှင့် စီမံခွင့် (Role Permission)
+                  </label>
+                  <select
+                    value={newAdminRole}
+                    onChange={(e) => setNewAdminRole(e.target.value as any)}
+                    className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-amber-500 outline-hidden cursor-pointer"
+                  >
+                    <option value="admin">🛡️ Admin (ကျောင်း၊ ကြေညာချက်၊ စာတန်းပြေး အပြည့်အဝ စီမံခွင့်)</option>
+                    <option value="editor">✏️ Editor (ကြေညာချက်နှင့် အချက်အလက် တည်းဖြတ်ခွင့်)</option>
+                    <option value="super_admin">👑 Super Admin (အက်ဒမင်များ ခန့်အပ်ခြင်း အပါအဝင် အဆင့်မြင့် စီမံခွင့်)</option>
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2 border border-slate-200 p-3.5 rounded-xl space-y-2 bg-slate-50/70">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      ဖုန်းနံပါတ်များ (Phone Numbers - ၁ လုံးနှင့်အထက် ထည့်သွင်းနိုင်သည်)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setExtraAdminUserPhones(prev => [...prev, ''])}
+                      className="text-xs text-amber-800 hover:text-amber-950 font-bold cursor-pointer inline-flex items-center gap-1 bg-white px-2.5 py-1 rounded-lg border border-amber-300 shadow-2xs"
+                    >
+                      + နောက်ထပ် ဖုန်းထည့်ရန်
+                    </button>
+                  </div>
+                  <input
+                    type="tel"
+                    value={newAdminPhone}
+                    onChange={(e) => setNewAdminPhone(e.target.value)}
+                    placeholder="အဓိက ဆက်သွယ်ရန် ဖုန်း (၁) - 09..."
+                    className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-amber-500 outline-hidden"
+                  />
+                  {extraAdminUserPhones.map((ph, idx) => (
+                    <div key={idx} className="flex items-center gap-2 animate-in fade-in">
+                      <input
+                        type="tel"
+                        value={ph}
+                        onChange={(e) => {
+                          const updated = [...extraAdminUserPhones];
+                          updated[idx] = e.target.value;
+                          setExtraAdminUserPhones(updated);
+                        }}
+                        placeholder={`နောက်ထပ် အက်ဒမင် ဖုန်းနံပါတ် (${idx + 2}) - 09...`}
+                        className="flex-1 p-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-amber-500 outline-hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setExtraAdminUserPhones(extraAdminUserPhones.filter((_, i) => i !== idx))}
+                        className="px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg border border-rose-200 cursor-pointer"
+                      >
+                        ဖယ်ရှားရန်
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    မှတ်ချက် (Remarks / Note - စိတ်ကြိုက်)
+                  </label>
+                  <input
+                    type="text"
+                    value={newAdminNote}
+                    onChange={(e) => setNewAdminNote(e.target.value)}
+                    placeholder="ဥပမာ - တောင်ကြီးမြို့နယ် တာဝန်ခံ"
+                    className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-amber-500 outline-hidden"
+                  />
+                </div>
               </div>
 
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  မှတ်ချက် (Remarks / Note - စိတ်ကြိုက်)
-                </label>
-                <input
-                  type="text"
-                  value={newAdminNote}
-                  onChange={(e) => setNewAdminNote(e.target.value)}
-                  placeholder="ဥပမာ - တောင်ကြီးမြို့နယ် တာဝန်ခံ"
-                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-amber-500 outline-hidden"
-                />
-              </div>
+              <button
+                type="submit"
+                disabled={addingAdmin}
+                className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-6 py-2.5 rounded-xl text-xs sm:text-sm transition cursor-pointer flex items-center gap-2 shadow-xs disabled:opacity-50"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>{addingAdmin ? 'ခန့်အပ်နေပါသည်...' : 'အက်ဒမင် အသစ် ခန့်အပ်မည် (Authorize Admin)'}</span>
+              </button>
+            </form>
+          ) : (
+            <div className="bg-amber-50/60 border border-amber-200 p-4 rounded-2xl flex items-center gap-2.5 text-xs text-amber-900">
+              <ShieldAlert className="w-5 h-5 text-amber-700 shrink-0" />
+              <span>အက်ဒမင် အသစ်များ ခန့်အပ်ခြင်းနှင့် ဖယ်ရှားခြင်းကို Super Admin ရာထူးရှိသူများသာ ဆောင်ရွက်ခွင့် ရှိပါသည်။</span>
             </div>
-
-            <button
-              type="submit"
-              disabled={addingAdmin}
-              className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-6 py-2.5 rounded-xl text-xs sm:text-sm transition cursor-pointer flex items-center gap-2 shadow-xs disabled:opacity-50"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>{addingAdmin ? 'ခန့်အပ်နေပါသည်...' : 'အက်ဒမင် အသစ် ခန့်အပ်မည် (Authorize Admin)'}</span>
-            </button>
-          </form>
+          )}
 
           {/* Existing Admins List */}
           <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-xs space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
               <div>
                 <h3 className="font-bold text-lg text-slate-900">
-                  လက်ရှိ ခန့်အပ်ထားသော အက်ဒမင်များ စာရင်း ({admins.length + 1})
+                  လက်ရှိ ခန့်အပ်ထားသော အက်ဒမင်များ စာရင်း ({admins.length})
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   အသင်း၏ ဒေတာဘေ့စ်ကို ဝင်ရောက် စီမံခန့်ခွဲခွင့် ရရှိထားသော အကောင့်များ
@@ -4726,64 +4838,28 @@ export default function Admin() {
             </div>
 
             <div className="divide-y divide-slate-100">
-              {/* Primary Super Admin Card (Permanent) */}
-              <div className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-50/40 -mx-2 px-3 rounded-2xl border border-amber-200/80">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-400 text-white flex items-center justify-center shadow-xs shrink-0">
-                    <Crown className="w-5 h-5" />
-                  </div>
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm text-slate-900">
-                        khunthanshwe@gmail.com
-                      </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-400 text-amber-950 flex items-center gap-1 shadow-2xs">
-                        <Crown className="w-3 h-3" /> ပင်မ Super Admin
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500">
-                      မူလ စနစ် တည်ထောင်သူ (Master Administrative Authority) &bull; အမြဲတမ်း စီမံခွင့်
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 self-start sm:self-center">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTargetChangePassEmail('khunthanshwe@gmail.com');
-                      setNewAdminPasswordInput('');
-                      setIsChangingPassModal(true);
-                    }}
-                    className="text-xs font-bold text-sky-900 bg-sky-100 hover:bg-sky-200 px-3 py-1.5 rounded-xl border border-sky-300 transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                  >
-                    <KeyRound className="w-3.5 h-3.5" />
-                    <span>စကားဝှက် ပြောင်းမည်</span>
-                  </button>
-                  <span className="text-[11px] font-semibold text-amber-800 bg-amber-100/80 px-3 py-1 rounded-lg">
-                    Protected Super Admin
-                  </span>
-                </div>
-              </div>
-
-              {/* Dynamic Added Admins List */}
               {loadingAdmins ? (
                 <p className="text-sm text-slate-400 py-6 text-center">အက်ဒမင်စာရင်းများ ဆွဲယူနေပါသည်...</p>
               ) : admins.length === 0 ? (
                 <div className="py-8 text-center text-slate-500 space-y-1">
-                  <p className="text-sm font-semibold">ထပ်ဆောင်း ခန့်အပ်ထားသော အက်ဒမင် မရှိသေးပါ</p>
+                  <p className="text-sm font-semibold">ခန့်အပ်ထားသော အက်ဒမင် မရှိသေးပါ</p>
                   <p className="text-xs text-slate-400">
-                    အထက်ပါ Form တွင် နောက်ထပ် တာဝန်ခံများ၏ Email များကို စတင်ထည့်သွင်းနိုင်ပါသည်။
+                    Firebase Console ရှိ admins collection တွင် သင်၏ UID ဖြင့် စတင်သတ်မှတ်နိုင်ပါသည်။
                   </p>
                 </div>
               ) : (
                 admins.map((adm) => (
                   <div
                     key={adm.id || adm.email}
-                    className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition hover:bg-slate-50/70 -mx-2 px-3 rounded-2xl"
+                    className={`py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition -mx-2 px-3 rounded-2xl ${
+                      adm.role === 'super_admin' ? 'bg-amber-50/40 border border-amber-200/60' : 'hover:bg-slate-50/70'
+                    }`}
                   >
                     <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
-                      <div className="w-10 h-10 rounded-full bg-sky-900 text-white flex items-center justify-center shrink-0 font-bold text-sm">
-                        {adm.name ? adm.name.charAt(0) : <Shield className="w-5 h-5" />}
+                      <div className={`w-10 h-10 rounded-full text-white flex items-center justify-center shrink-0 font-bold text-sm shadow-xs ${
+                        adm.role === 'super_admin' ? 'bg-gradient-to-tr from-amber-500 to-yellow-400' : 'bg-sky-900'
+                      }`}>
+                        {adm.role === 'super_admin' ? <Crown className="w-5 h-5" /> : adm.name ? adm.name.charAt(0) : <Shield className="w-5 h-5" />}
                       </div>
 
                       <div className="space-y-1 min-w-0 flex-1">
@@ -4792,7 +4868,7 @@ export default function Admin() {
                             {adm.email}
                           </span>
                           <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
                               adm.role === 'super_admin'
                                 ? 'bg-amber-100 text-amber-900 border-amber-300'
                                 : adm.role === 'editor'
@@ -4800,12 +4876,18 @@ export default function Admin() {
                                 : 'bg-sky-100 text-sky-900 border-sky-300'
                             }`}
                           >
+                            {adm.role === 'super_admin' && <Crown className="w-3 h-3 text-amber-600" />}
                             {adm.role === 'super_admin'
                               ? 'Super Admin'
                               : adm.role === 'editor'
                               ? 'Editor (တည်းဖြတ်)'
                               : 'Admin (စီမံခန့်ခွဲသူ)'}
                           </span>
+                          {adm.id === auth.currentUser?.uid && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-md border border-emerald-300">
+                              လက်ရှိအသုံးပြုနေသူ (You)
+                            </span>
+                          )}
                         </div>
 
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
@@ -4858,15 +4940,17 @@ export default function Admin() {
                         <KeyRound className="w-3.5 h-3.5" />
                         <span>စကားဝှက်</span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteAdmin(adm)}
-                        className="text-xs px-3 py-1.5 rounded-xl font-bold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                        title="အက်ဒမင် စီမံခွင့် ပယ်ဖျက်ရန်"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>ဖယ်ရှားမည်</span>
-                      </button>
+                      {adminSession.role === 'super_admin' && adm.id !== auth.currentUser?.uid && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAdmin(adm)}
+                          className="text-xs px-3 py-1.5 rounded-xl font-bold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                          title="အက်ဒမင် စီမံခွင့် ပယ်ဖျက်ရန်"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>ဖယ်ရှားမည်</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))
@@ -5200,7 +5284,7 @@ export default function Admin() {
             </div>
             <div className="bg-white p-3.5 rounded-2xl border border-slate-200 text-center space-y-1">
               <span className="text-[11px] text-slate-500 font-semibold block">အက်ဒမင်များ</span>
-              <strong className="text-xl font-black text-sky-950">{admins.length + 1}</strong>
+              <strong className="text-xl font-black text-sky-950">{admins.length}</strong>
             </div>
           </div>
 
@@ -5581,15 +5665,27 @@ export default function Admin() {
                 <input
                   type="text"
                   required
-                  placeholder="စကားဝှက်အသစ် ရိုက်ထည့်ပါ (အနည်းဆုံး ၄ လုံး)"
+                  placeholder="စကားဝှက်အသစ် ရိုက်ထည့်ပါ (အနည်းဆုံး ၆ လုံး)"
                   value={newAdminPasswordInput}
                   onChange={(e) => setNewAdminPasswordInput(e.target.value)}
                   className="w-full p-3 bg-white border border-slate-300 rounded-xl text-sm text-slate-900 focus:border-sky-500 outline-hidden font-mono"
                   autoFocus
                 />
                 <span className="text-[11px] text-slate-500 mt-1 block">
-                  အနည်းဆုံး စာလုံး ၄ လုံး သတ်မှတ်ပေးပါ။ သိမ်းဆည်းပြီးပါက ဤစကားဝှက်ဖြင့် ဝင်ရောက်နိုင်ပါမည်။
+                  အနည်းဆုံး စာလုံး ၆ လုံး သတ်မှတ်ပေးပါ။ သိမ်းဆည်းပြီးပါက ဤစကားဝှက်ဖြင့် ဝင်ရောက်နိုင်ပါမည်။
                 </span>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
+                <button
+                  type="button"
+                  disabled={isSendingResetEmail}
+                  onClick={handleSendResetEmailFromModal}
+                  className="w-full py-2 px-3 bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-800 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>{isSendingResetEmail ? 'ပို့နေပါသည်...' : 'သို့မဟုတ် Reset လင့်ခ်ကို အီးမေးလ်သို့ ပို့မည်'}</span>
+                </button>
               </div>
 
               <div className="flex items-center gap-3 pt-2">

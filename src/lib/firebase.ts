@@ -9,59 +9,35 @@ import {
   Firestore,
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import firebaseAppletConfig from '../../firebase-applet-config.json';
 
-const firebaseConfig = {
-  apiKey: firebaseAppletConfig.apiKey || import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: firebaseAppletConfig.authDomain || import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: firebaseAppletConfig.projectId || import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: firebaseAppletConfig.storageBucket || import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: firebaseAppletConfig.messagingSenderId || import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: firebaseAppletConfig.appId || import.meta.env.VITE_FIREBASE_APP_ID,
+export const firebaseConfig = {
+  apiKey: "AIzaSyBfH74OIc-8mJIPTjjFhD7JDwkMWBWcC_E",
+  authDomain: "southernshanstatepsinfo.firebaseapp.com",
+  projectId: "southernshanstatepsinfo",
+  storageBucket: "southernshanstatepsinfo.firebasestorage.app",
+  messagingSenderId: "474970491001",
+  appId: "1:474970491001:web:4bb740401f9e9fb73aaca8"
 };
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-const rawDatabaseId = firebaseAppletConfig.firestoreDatabaseId || import.meta.env.VITE_FIREBASE_DATABASE_ID;
-const isNamedDatabase = Boolean(rawDatabaseId && rawDatabaseId !== '(default)');
-
-// Initialize Firestore with force long polling and multi-tab persistence
+// Initialize Firestore with force long polling and multi-tab persistence on default database
 let firestoreDb: Firestore;
 try {
-  firestoreDb = isNamedDatabase
-    ? initializeFirestore(
-        app,
-        {
-          experimentalForceLongPolling: true,
-          localCache: persistentLocalCache({
-            tabManager: persistentMultipleTabManager(),
-          }),
-        },
-        rawDatabaseId
-      )
-    : initializeFirestore(app, {
-        experimentalForceLongPolling: true,
-        localCache: persistentLocalCache({
-          tabManager: persistentMultipleTabManager(),
-        }),
-      });
+  firestoreDb = initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
+  });
 } catch {
   try {
-    firestoreDb = isNamedDatabase
-      ? initializeFirestore(
-          app,
-          {
-            experimentalForceLongPolling: true,
-            localCache: memoryLocalCache(),
-          },
-          rawDatabaseId
-        )
-      : initializeFirestore(app, {
-          experimentalForceLongPolling: true,
-          localCache: memoryLocalCache(),
-        });
+    firestoreDb = initializeFirestore(app, {
+      experimentalForceLongPolling: true,
+      localCache: memoryLocalCache(),
+    });
   } catch {
-    firestoreDb = isNamedDatabase ? getFirestore(app, rawDatabaseId) : getFirestore(app);
+    firestoreDb = getFirestore(app);
   }
 }
 

@@ -18,8 +18,7 @@ export const recordAuditLog = async ({
   adminEmail?: string;
 }) => {
   try {
-    const localEmail = typeof window !== 'undefined' ? localStorage.getItem('sssps_admin_email') : null;
-    const email = adminEmail || auth.currentUser?.email || localEmail || 'khunthanshwe@gmail.com';
+    const email = adminEmail || auth.currentUser?.email || 'admin';
     await addDoc(collection(db, 'audit_logs'), {
       adminEmail: email,
       action,

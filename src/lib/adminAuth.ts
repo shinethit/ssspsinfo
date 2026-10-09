@@ -1,238 +1,278 @@
-import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
+import {
+  signInWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  sendPasswordResetEmail,
+  updatePassword,
+  onAuthStateChanged,
+  User,
+} from 'firebase/auth';
 import { db, auth } from './firebase';
-
-const ADMIN_STORAGE_KEY = 'sssps_admin_logged_in';
-const ADMIN_EMAIL_KEY = 'sssps_admin_email';
-const ADMIN_ROLE_KEY = 'sssps_admin_role';
-
-export const SUPER_ADMIN_EMAIL = 'khunthanshwe@gmail.com';
-export const DEFAULT_PASSWORD_FALLBACK = 'admin123';
 
 export interface AdminSession {
   isLoggedIn: boolean;
   email: string;
   role: 'super_admin' | 'admin' | 'editor';
+  uid?: string;
+  name?: string;
+}
+
+// In-memory cache for fast synchronous reads via getAdminSession()
+let cachedSession: AdminSession = {
+  isLoggedIn: false,
+  email: '',
+  role: 'admin',
+};
+
+// Keep in-memory cache synchronized with Firebase Auth & Firestore admins/{uid}
+if (typeof window !== 'undefined') {
+  onAuthStateChanged(auth, async (user: User | null) => {
+    if (!user) {
+      cachedSession = { isLoggedIn: false, email: '', role: 'admin' };
+      window.dispatchEvent(new Event('sssps_admin_auth_changed'));
+      return;
+    }
+
+    try {
+      const adminDocRef = doc(db, 'admins', user.uid);
+      const snap = await getDoc(adminDocRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        cachedSession = {
+          isLoggedIn: true,
+          email: user.email || data.email || '',
+          role: (data.role as 'super_admin' | 'admin' | 'editor') || 'admin',
+          uid: user.uid,
+          name: data.name || '',
+        };
+      } else {
+        cachedSession = {
+          isLoggedIn: false,
+          email: user.email || '',
+          role: 'admin',
+          uid: user.uid,
+        };
+      }
+    } catch (err) {
+      console.error('Error fetching admin profile from admins/{uid}:', err);
+      cachedSession = { isLoggedIn: false, email: user.email || '', role: 'admin' };
+    }
+    window.dispatchEvent(new Event('sssps_admin_auth_changed'));
+  });
 }
 
 /**
- * SHA-256 password hash using standard Web Crypto API
+ * Friendly Burmese error mapping for Firebase Auth error codes
  */
-export async function hashPassword(password: string): Promise<string> {
-  const cleanPass = password.trim();
-  const encoder = new TextEncoder();
-  const data = encoder.encode(cleanPass + ':sssps_salt_2025');
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+export function mapFirebaseAuthError(errorCode: string): string {
+  switch (errorCode) {
+    case 'auth/invalid-credential':
+    case 'invalid-credential':
+    case 'auth/wrong-password':
+    case 'wrong-password':
+      return 'အီးမေးလ် သို့မဟုတ် စကားဝှက် မှားယွင်းနေပါသည်။ ပြန်လည်စစ်ဆေးပါ။';
+    case 'auth/user-not-found':
+    case 'user-not-found':
+      return 'ဤအီးမေးလ်ဖြင့် မှတ်ပုံတင်ထားသော အကောင့်မရှိပါ။';
+    case 'auth/invalid-email':
+    case 'invalid-email':
+      return 'မှန်ကန်သော အီးမေးလ်လိပ်စာကို ရိုက်ထည့်ပေးပါ။';
+    case 'auth/user-disabled':
+    case 'user-disabled':
+      return 'ဤအကောင့်အား အသုံးပြုခွင့် ပိတ်ပင်ထားပါသည်။';
+    case 'auth/too-many-requests':
+    case 'too-many-requests':
+      return 'စကားဝှက် အကြိမ်ကြိမ် မှားယွင်းမှုကြောင့် ခေတ္တပိတ်ထားပါသည်။ ခဏစောင့်ပြီးမှ ပြန်လည်ကြိုးစားပါ။';
+    case 'auth/network-request-failed':
+    case 'network-request-failed':
+      return 'အင်တာနက်လိုင်း ချဆက်မှု မရှိပါ သို့မဟုတ် မတည်ငြိမ်ပါ။';
+    case 'auth/weak-password':
+    case 'weak-password':
+      return 'စကားဝှက်သည် အနည်းဆုံး စာလုံး ၆ လုံး ရှိရပါမည်။';
+    case 'permission-denied':
+    case 'auth/permission-denied':
+      return 'အချက်အလက်များ ဖတ်ရှုခွင့် ခွင့်ပြုချက် မရှိပါ (Permission Denied)။ စနစ်စီမံခန့်ခွဲသူထံ ဆက်သွယ်ပါ။';
+    case 'auth/not-an-admin':
+      return 'ဤအကောင့်သည် စနစ်တွင် အက်ဒမင် (Admin) အဖြစ် ခွင့်ပြုချက် ရရှိထားခြင်း မရှိသေးပါ';
+    default:
+      if (typeof errorCode === 'string' && errorCode.includes('permission-denied')) {
+        return 'အချက်အလက်များ ဖတ်ရှုခွင့် ခွင့်ပြုချက် မရှိပါ (Permission Denied)။ စနစ်စီမံခန့်ခွဲသူထံ ဆက်သွယ်ပါ။';
+      }
+      return 'အကောင့်ဝင်ရောက်ရာတွင် အမှားဖြစ်ပွားပါသည် (' + errorCode + ')';
+  }
 }
 
 /**
- * Verify admin credentials against Firestore admin records.
- * Securely enforces password checking without bypass.
+ * Sign in admin using Firebase Authentication (Email/Password)
+ * and enforce verification against admins/{uid} document.
  */
 export async function verifyAdminCredentials(
-  usernameOrEmail: string,
+  emailInput: string,
   passwordInput: string
-): Promise<{ success: boolean; email?: string; role?: 'super_admin' | 'admin' | 'editor'; error?: string }> {
-  const cleanInput = usernameOrEmail.trim().toLowerCase();
+): Promise<{ success: boolean; email?: string; role?: 'super_admin' | 'admin' | 'editor'; uid?: string; error?: string; errorCode?: string }> {
+  const cleanEmail = emailInput.trim();
   const cleanPass = passwordInput.trim();
 
-  if (!cleanInput) {
-    return { success: false, error: 'Admin Email သို့မဟုတ် Username ဖြည့်သွင်းပေးပါ' };
+  if (!cleanEmail) {
+    return { success: false, error: 'Admin Email ဖြည့်သွင်းပေးပါ' };
   }
   if (!cleanPass) {
     return { success: false, error: 'စကားဝှက် (Password) ထည့်သွင်းပေးပါ' };
   }
 
-  // Normalize username aliases
-  let targetEmail = cleanInput;
-  if (cleanInput === 'admin' || cleanInput === 'superadmin' || cleanInput === 'khunthanshwe') {
-    targetEmail = SUPER_ADMIN_EMAIL;
-  }
-
   try {
-    const inputHash = await hashPassword(cleanPass);
-    const defaultHash = await hashPassword(DEFAULT_PASSWORD_FALLBACK);
-    const secondaryDefaultHash = await hashPassword('123456');
+    const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, cleanPass);
+    const user = userCredential.user;
 
-    // 1. Try finding doc directly by email as doc ID
-    const directDocRef = doc(db, 'admins', targetEmail);
-    const directSnap = await getDoc(directDocRef);
-
-    let adminData: any = null;
-    let docId = targetEmail;
-
-    if (directSnap.exists()) {
-      adminData = directSnap.data();
-    } else {
-      // 2. Query by email field
-      const q = query(collection(db, 'admins'), where('email', '==', targetEmail));
-      const qSnap = await getDocs(q);
-      if (!qSnap.empty) {
-        adminData = qSnap.docs[0].data();
-        docId = qSnap.docs[0].id;
-      }
-    }
-
-    // If super admin document hasn't been created yet or is empty
-    if (!adminData && targetEmail === SUPER_ADMIN_EMAIL) {
-      if (inputHash === defaultHash || inputHash === secondaryDefaultHash) {
-        // Auto-initialize the super admin record with the entered password
-        await setDoc(
-          directDocRef,
-          {
-            email: SUPER_ADMIN_EMAIL,
-            name: 'Super Admin',
-            role: 'super_admin',
-            passwordHash: inputHash,
-            isSuperAdmin: true,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          },
-          { merge: true }
-        );
-
-        setAdminSession(SUPER_ADMIN_EMAIL, 'super_admin');
-        return { success: true, email: SUPER_ADMIN_EMAIL, role: 'super_admin' };
-      }
+    // Admin status = a document exists at admins/{uid} (the user's UID, NOT the email)
+    const adminDocRef = doc(db, 'admins', user.uid);
+    let adminSnap;
+    try {
+      adminSnap = await getDoc(adminDocRef);
+    } catch (docErr: any) {
+      const code = docErr?.code || 'permission-denied';
+      console.error('Firestore admins/{uid} verification error code (err.code):', code, docErr);
+      await firebaseSignOut(auth);
+      cachedSession = { isLoggedIn: false, email: '', role: 'admin' };
+      window.dispatchEvent(new Event('sssps_admin_auth_changed'));
       return {
         success: false,
-        error: 'စကားဝှက် မှားယွင်းနေပါသည်။ (မူလ စကားဝှက်မှာ admin123 ဖြစ်ပြီး မိမိစိတ်ကြိုက် စကားဝှက်သို့ အောက်တွင် အသစ်ပြောင်းလဲသတ်မှတ်နိုင်ပါသည်)',
+        errorCode: code,
+        error: mapFirebaseAuthError(code),
       };
     }
 
-    if (!adminData) {
+    if (!adminSnap.exists()) {
+      // User is authenticated in Firebase Auth but NOT authorized as an admin
+      await firebaseSignOut(auth);
+      cachedSession = { isLoggedIn: false, email: '', role: 'admin' };
+      window.dispatchEvent(new Event('sssps_admin_auth_changed'));
       return {
         success: false,
-        error: `"${targetEmail}" သည် စနစ်တွင် မှတ်ပုံတင်ထားသော အက်ဒမင်အကောင့် မဟုတ်သေးပါ`,
+        errorCode: 'auth/not-an-admin',
+        error: 'ဤအကောင့်သည် စနစ်တွင် အက်ဒမင် (Admin) အဖြစ် ခွင့်ပြုချက် ရရှိထားခြင်း မရှိသေးပါ',
       };
     }
 
-    // Validate password hash
-    const storedHash = adminData.passwordHash;
-    const isPasswordCorrect =
-      storedHash === inputHash ||
-      (!storedHash && (inputHash === defaultHash || inputHash === secondaryDefaultHash));
+    const adminData = adminSnap.data();
+    const role = (adminData.role as 'super_admin' | 'admin' | 'editor') || 'admin';
 
-    if (!isPasswordCorrect) {
-      return {
-        success: false,
-        error: 'စကားဝှက် (Password) မှားယွင်းနေပါသည်။ စကားဝှက်ကို ပြန်လည်စစ်ဆေးပါ သို့မဟုတ် အောက်တွင် အသစ်သတ်မှတ်ပါ။',
-      };
-    }
-
-    // Update password hash if it wasn't saved yet
-    if (!storedHash) {
-      await setDoc(doc(db, 'admins', docId), { passwordHash: inputHash }, { merge: true });
-    }
-
-    const role = (adminData.role as any) || (targetEmail === SUPER_ADMIN_EMAIL ? 'super_admin' : 'admin');
-    setAdminSession(targetEmail, role);
+    cachedSession = {
+      isLoggedIn: true,
+      email: user.email || cleanEmail,
+      role,
+      uid: user.uid,
+      name: adminData.name || '',
+    };
+    window.dispatchEvent(new Event('sssps_admin_auth_changed'));
 
     return {
       success: true,
-      email: targetEmail,
+      email: user.email || cleanEmail,
       role,
+      uid: user.uid,
     };
   } catch (err: any) {
-    console.error('Password verification error:', err);
+    const code = err?.code || err?.message || '';
+    console.error('Firebase Auth sign in error code (err.code):', err?.code || code, err);
     return {
       success: false,
-      error: 'စကားဝှက် စစ်ဆေးရာတွင် အမှားဖြစ်ပွားပါသည်: ' + (err.message || 'Error'),
+      errorCode: err?.code || code,
+      error: mapFirebaseAuthError(code),
     };
   }
 }
 
 /**
- * Set or change admin password securely
+ * Send password reset email via Firebase Auth for "forgot / change password"
  */
-export async function changeAdminPassword(
-  email: string,
-  newPassword: string
-): Promise<{ success: boolean; error?: string }> {
-  const cleanEmail = email.trim().toLowerCase();
-  const cleanPass = newPassword.trim();
-
+export async function sendAdminPasswordReset(email: string): Promise<{ success: boolean; error?: string; errorCode?: string }> {
+  const cleanEmail = email.trim();
   if (!cleanEmail) {
     return { success: false, error: 'Admin Email ထည့်သွင်းပေးပါ' };
   }
-  if (!cleanPass || cleanPass.length < 4) {
-    return { success: false, error: 'စကားဝှက်သည် အနည်းဆုံး စာလုံး ၄ လုံး ရှိရပါမည်' };
-  }
-
   try {
-    const passwordHash = await hashPassword(cleanPass);
-    const adminDocRef = doc(db, 'admins', cleanEmail);
-    const existingSnap = await getDoc(adminDocRef);
-
-    if (existingSnap.exists()) {
-      await setDoc(
-        adminDocRef,
-        {
-          passwordHash,
-          updatedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
-    } else {
-      await setDoc(
-        adminDocRef,
-        {
-          email: cleanEmail,
-          name: cleanEmail === SUPER_ADMIN_EMAIL ? 'Super Admin' : 'Admin',
-          role: cleanEmail === SUPER_ADMIN_EMAIL ? 'super_admin' : 'admin',
-          passwordHash,
-          isSuperAdmin: cleanEmail === SUPER_ADMIN_EMAIL,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
-    }
-
+    await sendPasswordResetEmail(auth, cleanEmail);
     return { success: true };
   } catch (err: any) {
-    console.error('Change password error:', err);
-    return { success: false, error: 'စကားဝှက် ပြောင်းလဲရာတွင် အမှားဖြစ်ပွားပါသည်: ' + (err.message || '') };
+    const code = err?.code || err?.message || '';
+    console.error('Password reset error code (err.code):', err?.code || code, err);
+    return { success: false, errorCode: err?.code || code, error: mapFirebaseAuthError(code) };
   }
 }
 
+/**
+ * Change admin password via Firebase Auth.
+ * If currently logged in as that user, updates password directly.
+ * Otherwise, sends a password reset email to the address.
+ */
+export async function changeAdminPassword(
+  email: string,
+  newPassword?: string
+): Promise<{ success: boolean; error?: string }> {
+  const cleanEmail = email.trim();
+  if (!cleanEmail) {
+    return { success: false, error: 'Admin Email ထည့်သွင်းပေးပါ' };
+  }
+
+  if (newPassword && auth.currentUser && auth.currentUser.email?.toLowerCase() === cleanEmail.toLowerCase()) {
+    try {
+      await updatePassword(auth.currentUser, newPassword);
+      return { success: true };
+    } catch (err: any) {
+      if (err.code === 'auth/requires-recent-login') {
+        // Send reset email if session requires recent re-authentication
+        await sendPasswordResetEmail(auth, cleanEmail);
+        return {
+          success: true,
+          error: 'လုံခြုံရေးအရ စကားဝှက် ပြောင်းလဲရန် လင့်ခ်ကို အီးမေးလ်သို့ ပေးပို့ထားပါသည်။ အီးမေးလ်မှတစ်ဆင့် စကားဝှက် ပြောင်းလဲပေးပါ။',
+        };
+      }
+      return { success: false, error: mapFirebaseAuthError(err.code || err.message) };
+    }
+  }
+
+  return sendAdminPasswordReset(cleanEmail);
+}
+
+/**
+ * Retrieve current synchronous admin session state
+ */
 export function getAdminSession(): AdminSession {
-  if (typeof window === 'undefined') {
-    return { isLoggedIn: false, email: '', role: 'admin' };
+  if (auth.currentUser && (!cachedSession.isLoggedIn || cachedSession.uid !== auth.currentUser.uid)) {
+    return {
+      isLoggedIn: true,
+      email: auth.currentUser.email || cachedSession.email,
+      role: cachedSession.role || 'admin',
+      uid: auth.currentUser.uid,
+    };
   }
-
-  const isLocalLoggedIn = localStorage.getItem(ADMIN_STORAGE_KEY) === 'true';
-  const fbUser = auth.currentUser;
-
-  const isLoggedIn = isLocalLoggedIn || !!fbUser;
-  const email =
-    localStorage.getItem(ADMIN_EMAIL_KEY) ||
-    fbUser?.email ||
-    (isLocalLoggedIn ? SUPER_ADMIN_EMAIL : '');
-  const role = (localStorage.getItem(ADMIN_ROLE_KEY) as any) || 'super_admin';
-
-  return { isLoggedIn, email, role };
+  return { ...cachedSession };
 }
 
-export function setAdminSession(
-  email = SUPER_ADMIN_EMAIL,
-  role: 'super_admin' | 'admin' | 'editor' = 'super_admin'
-) {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(ADMIN_STORAGE_KEY, 'true');
-  localStorage.setItem(ADMIN_EMAIL_KEY, email);
-  localStorage.setItem(ADMIN_ROLE_KEY, role);
-  window.dispatchEvent(new Event('sssps_admin_auth_changed'));
-}
-
-export function clearAdminSession() {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem(ADMIN_STORAGE_KEY);
-  localStorage.removeItem(ADMIN_EMAIL_KEY);
-  localStorage.removeItem(ADMIN_ROLE_KEY);
+/**
+ * Clear admin session & sign out from Firebase Auth
+ */
+export async function clearAdminSession(): Promise<void> {
+  cachedSession = { isLoggedIn: false, email: '', role: 'admin' };
   try {
-    auth.signOut().catch(() => {});
-  } catch {}
-  window.dispatchEvent(new Event('sssps_admin_auth_changed'));
+    await firebaseSignOut(auth);
+  } catch (err) {
+    console.error('Error signing out:', err);
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('sssps_admin_auth_changed'));
+  }
+}
+
+/**
+ * Compatibility stub for callers that dispatch an update
+ */
+export function setAdminSession(
+  _email = '',
+  _role: 'super_admin' | 'admin' | 'editor' = 'admin'
+) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('sssps_admin_auth_changed'));
+  }
 }

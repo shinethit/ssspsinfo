@@ -10,30 +10,24 @@ import {
   KeyRound,
   AlertCircle,
   CheckCircle2,
-  Settings,
   HelpCircle,
 } from 'lucide-react';
 import {
   verifyAdminCredentials,
-  changeAdminPassword,
-  SUPER_ADMIN_EMAIL,
-  DEFAULT_PASSWORD_FALLBACK,
+  sendAdminPasswordReset,
 } from '../lib/adminAuth';
 
 export default function Login() {
-  const [username, setUsername] = useState(SUPER_ADMIN_EMAIL);
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  // Set / Reset Password Mode
+  // Password Reset Mode (Firebase Auth Send Password Reset Email)
   const [showPasswordSetup, setShowPasswordSetup] = useState(false);
-  const [setupEmail, setSetupEmail] = useState(SUPER_ADMIN_EMAIL);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [isSettingPassword, setIsSettingPassword] = useState(false);
+  const [setupEmail, setSetupEmail] = useState('');
+  const [isSendingReset, setIsSendingReset] = useState(false);
   const [setupError, setSetupError] = useState<string | null>(null);
 
   const navigate = useNavigate();
@@ -43,20 +37,26 @@ export default function Login() {
     e.preventDefault();
     setLoginError(null);
 
-    if (!username.trim()) {
-      setLoginError('Admin Email သို့မဟုတ် Username ထည့်သွင်းပေးပါ');
+    const cleanUser = username.trim();
+    const cleanPass = password.trim();
+
+    if (!cleanUser) {
+      setLoginError('Admin Email ထည့်သွင်းပေးပါ');
       return;
     }
-    if (!password.trim()) {
+    if (!cleanPass) {
       setLoginError('စကားဝှက် (Password) ရိုက်ထည့်ပေးပါ');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const res = await verifyAdminCredentials(username, password);
+      const res = await verifyAdminCredentials(cleanUser, cleanPass);
 
       if (!res.success) {
+        if (res.errorCode) {
+          console.error('Firebase Auth error code (err.code):', res.errorCode);
+        }
         setLoginError(res.error || 'စကားဝှက် မှားယွင်းနေပါသည်');
         toast.error(res.error || 'စကားဝှက် မှားယွင်းနေပါသည်');
         return;
@@ -65,51 +65,57 @@ export default function Login() {
       toast.success(`ကြိုဆိုပါသည်! Admin Login အောင်မြင်ပါသည်။ (${res.email})`);
       navigate('/admin');
     } catch (err: any) {
-      console.error(err);
-      setLoginError('Login ဝင်ရောက်ရာတွင် အမှားဖြစ်ပွားပါသည်');
-      toast.error('Login ဝင်ရောက်ရာတွင် အမှားဖြစ်ပွားပါသည်');
+      console.error('Firebase Auth error code (err.code):', err?.code, err);
+      let errMsg = 'Login ဝင်ရောက်ရာတွင် အမှားဖြစ်ပွားပါသည်';
+      if (err?.code === 'auth/invalid-credential' || err?.code === 'invalid-credential') {
+        errMsg = 'အီးမေးလ် သို့မဟုတ် စကားဝှက် မှားယွင်းနေပါသည်။ ပြန်လည်စစ်ဆေးပါ။';
+      } else if (err?.code === 'permission-denied' || err?.code === 'auth/permission-denied' || err?.code?.includes('permission-denied')) {
+        errMsg = 'အချက်အလက်များ ဖတ်ရှုခွင့် ခွင့်ပြုချက် မရှိပါ (Permission Denied)။ စနစ်စီမံခန့်ခွဲသူထံ ဆက်သွယ်ပါ။';
+      }
+      setLoginError(errMsg);
+      toast.error(errMsg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Set / Change Password Directly
-  const handleSetPassword = async (e: React.FormEvent) => {
+  // Send Password Reset Email via Firebase Auth
+  const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setSetupError(null);
 
-    if (!setupEmail.trim()) {
+    const cleanEmail = setupEmail.trim();
+    if (!cleanEmail) {
       setSetupError('Admin Email ထည့်သွင်းပေးပါ');
       return;
     }
-    if (!newPassword.trim() || newPassword.trim().length < 4) {
-      setSetupError('စကားဝှက်အသစ်သည် အနည်းဆုံး စာလုံး ၄ လုံး ရှိရပါမည်');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setSetupError('အတည်ပြုစကားဝှက်နှင့် မတူညီပါ။ ပြန်လည်စစ်ဆေးပါ');
-      return;
-    }
 
-    setIsSettingPassword(true);
+    setIsSendingReset(true);
     try {
-      const res = await changeAdminPassword(setupEmail, newPassword);
+      const res = await sendAdminPasswordReset(cleanEmail);
 
       if (!res.success) {
-        setSetupError(res.error || 'စကားဝှက် သတ်မှတ်ရာတွင် အမှားဖြစ်ပွားပါသည်');
-        toast.error(res.error || 'စကားဝှက် သတ်မှတ်၍ မရပါ');
+        if (res.errorCode) {
+          console.error('Firebase Auth reset error code (err.code):', res.errorCode);
+        }
+        setSetupError(res.error || 'စကားဝှက် ပြန်လည်ရယူရန် လင့်ခ် ပို့၍မရပါ');
+        toast.error(res.error || 'စကားဝှက် ပြန်လည်ရယူရန် လင့်ခ် ပို့၍မရပါ');
         return;
       }
 
-      toast.success(`စကားဝှက် အသစ်ကို အောင်မြင်စွာ သတ်မှတ်ပြီးပါပြီ! ယခု စကားဝှက်ဖြင့် တိုက်ရိုက် Login ဝင်ရောက်ပါမည်။`);
-      // Automatically log in with the new password
-      await verifyAdminCredentials(setupEmail, newPassword);
-      navigate('/admin');
+      toast.success(`စကားဝှက် ပြောင်းလဲရန် လင့်ခ်ကို "${cleanEmail}" သို့ အောင်မြင်စွာ ပို့ပေးပြီးပါပြီ။ အီးမေးလ်ကို စစ်ဆေးပါ။`);
+      setShowPasswordSetup(false);
     } catch (err: any) {
-      console.error(err);
-      setSetupError('စကားဝှက် သတ်မှတ်ရာတွင် အမှားဖြစ်ပွားပါသည်');
+      console.error('Firebase Auth reset error code (err.code):', err?.code, err);
+      let errMsg = 'စကားဝှက် ပြန်လည်ရယူရာတွင် အမှားဖြစ်ပွားပါသည်';
+      if (err?.code === 'auth/invalid-credential' || err?.code === 'invalid-credential') {
+        errMsg = 'အီးမေးလ် သို့မဟုတ် စကားဝှက် မှားယွင်းနေပါသည်။ ပြန်လည်စစ်ဆေးပါ။';
+      } else if (err?.code === 'permission-denied' || err?.code === 'auth/permission-denied' || err?.code?.includes('permission-denied')) {
+        errMsg = 'အချက်အလက်များ ဖတ်ရှုခွင့် ခွင့်ပြုချက် မရှိပါ (Permission Denied)။ စနစ်စီမံခန့်ခွဲသူထံ ဆက်သွယ်ပါ။';
+      }
+      setSetupError(errMsg);
     } finally {
-      setIsSettingPassword(false);
+      setIsSendingReset(false);
     }
   };
 
@@ -142,16 +148,16 @@ export default function Login() {
                   <div className="space-y-1">
                     <p className="font-semibold">{loginError}</p>
                     <p className="text-[11px] text-rose-600">
-                      စကားဝှက် အသစ်သတ်မှတ်လိုပါက အောက်ရှိ{' '}
+                      စကားဝှက် မေ့နေပါက အောက်ရှိ{' '}
                       <button
                         type="button"
                         onClick={() => {
                           setShowPasswordSetup(true);
-                          setSetupEmail(username || SUPER_ADMIN_EMAIL);
+                          setSetupEmail(username);
                         }}
                         className="underline font-bold hover:text-rose-900 cursor-pointer"
                       >
-                        "စကားဝှက် အသစ်သတ်မှတ်ရန်"
+                        "စကားဝှက် ပြန်လည်ရယူရန်"
                       </button>{' '}
                       ကို နှိပ်ပါ။
                     </p>
@@ -161,15 +167,15 @@ export default function Login() {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Admin Email / Username
+                  Admin Email
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                     <Mail className="w-4 h-4" />
                   </div>
                   <input
-                    type="text"
-                    placeholder="khunthanshwe@gmail.com"
+                    type="email"
+                    placeholder="admin@example.com"
                     value={username}
                     onChange={(e) => {
                       setUsername(e.target.value);
@@ -190,12 +196,12 @@ export default function Login() {
                     type="button"
                     onClick={() => {
                       setShowPasswordSetup(true);
-                      setSetupEmail(username || SUPER_ADMIN_EMAIL);
+                      setSetupEmail(username);
                     }}
                     className="text-xs text-sky-700 hover:text-sky-900 font-semibold cursor-pointer hover:underline flex items-center gap-1"
                   >
                     <KeyRound className="w-3 h-3" />
-                    <span>စကားဝှက် အသစ်ပြောင်းမည်</span>
+                    <span>စကားဝှက် မေ့နေပါသလား?</span>
                   </button>
                 </div>
                 <div className="relative">
@@ -238,13 +244,13 @@ export default function Login() {
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2 text-xs text-slate-600">
                 <div className="flex items-center gap-1.5 font-bold text-slate-800">
                   <HelpCircle className="w-4 h-4 text-sky-700" />
-                  <span>စကားဝှက် အချက်အလက် (Password Info)</span>
+                  <span>စကားဝှက် အကူအညီ (Password Assistance)</span>
                 </div>
                 <p className="leading-relaxed text-[11px] text-slate-600">
-                  • မူလ သတ်မှတ်ထားသော စကားဝှက်မှာ <code className="bg-white px-1.5 py-0.5 rounded border border-slate-300 font-mono text-sky-900 font-bold">{DEFAULT_PASSWORD_FALLBACK}</code> ဖြစ်ပါသည်။
+                  • စနစ်တွင် ခွင့်ပြုထားသော Admin အကောင့်၏ Email နှင့် စကားဝှက်ဖြင့် လုံခြုံစွာ Login ဝင်ရောက်နိုင်ပါသည်။
                 </p>
                 <p className="leading-relaxed text-[11px] text-slate-600">
-                  • မိမိ မှတ်မိနေသော စကားဝှက်ဖြင့် အသုံးပြုလိုပါက အောက်ရှိ ခလုတ်ဖြင့် စကားဝှက်ကို ချက်ချင်း အသစ်သတ်မှတ်နိုင်ပါသည်။
+                  • စကားဝှက် မေ့လျော့နေပါက သို့မဟုတ် အသစ်ပြောင်းလိုပါက အောက်ရှိ ခလုတ်ဖြင့် စကားဝှက် ပြန်လည်ရယူရန် လင့်ခ်ကို အီးမေးလ်သို့ ပေးပို့နိုင်ပါသည်။
                 </p>
 
                 <div className="pt-2 border-t border-slate-200/80">
@@ -252,26 +258,26 @@ export default function Login() {
                     type="button"
                     onClick={() => {
                       setShowPasswordSetup(true);
-                      setSetupEmail(username || SUPER_ADMIN_EMAIL);
+                      setSetupEmail(username);
                     }}
                     className="w-full py-2 px-3 bg-white hover:bg-slate-100 border border-slate-300 rounded-xl text-sky-900 font-bold flex items-center justify-center gap-1.5 transition text-xs cursor-pointer shadow-2xs"
                   >
-                    <Settings className="w-3.5 h-3.5 text-sky-700" />
-                    <span>🔑 မိမိစိတ်ကြိုက် စကားဝှက် အသစ်သတ်မှတ်ရန် နှိပ်ပါ</span>
+                    <KeyRound className="w-3.5 h-3.5 text-sky-700" />
+                    <span>🔑 စကားဝှက် ပြန်လည်ရယူရန် လင့်ခ် ပို့မည်</span>
                   </button>
                 </div>
               </div>
             </form>
           ) : (
-            /* Set / Reset Password Form */
-            <form onSubmit={handleSetPassword} className="space-y-4 animate-in fade-in">
+            /* Password Reset Request Form */
+            <form onSubmit={handleResetPassword} className="space-y-4 animate-in fade-in">
               <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4 space-y-1">
                 <div className="flex items-center gap-2 font-bold text-sky-950 text-sm">
                   <KeyRound className="w-4 h-4 text-sky-700" />
-                  <span>စကားဝှက် အသစ် သတ်မှတ်ခြင်း / ပြောင်းလဲခြင်း</span>
+                  <span>စကားဝှက် ပြန်လည်ရယူခြင်း (Reset Password)</span>
                 </div>
                 <p className="text-xs text-sky-800 leading-relaxed">
-                  မိမိအသုံးပြုလိုသော စကားဝှက်အသစ်ကို ဤနေရာတွင် သတ်မှတ်နိုင်ပြီး နောင်တွင် ဤစကားဝှက်ဖြင့်သာ အမြဲတမ်း လုံခြုံစွာ Login ဝင်ရောက်နိုင်ပါမည်။
+                  အောက်ပါ အကွက်တွင် အက်ဒမင် အီးမေးလ်လိပ်စာကို ထည့်သွင်းပေးပါ။ စကားဝှက် အသစ် ပြောင်းလဲသတ်မှတ်နိုင်သော လင့်ခ်ကို အီးမေးလ်သို့ ပေးပို့ပေးပါမည်။
                 </p>
               </div>
 
@@ -290,50 +296,11 @@ export default function Login() {
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="email"
+                    placeholder="admin@example.com"
                     value={setupEmail}
                     onChange={(e) => setSetupEmail(e.target.value)}
                     required
-                    className="w-full pl-10 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-600 bg-slate-50/50 text-slate-900"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  စကားဝှက်အသစ် (New Password)
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type={showNewPassword ? 'text' : 'password'}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    required
-                    placeholder="အနည်းဆုံး ၄ လုံး ရိုက်ထည့်ပါ"
-                    className="w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-600 bg-slate-50/50 text-slate-900"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowNewPassword(!showNewPassword)}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
-                  >
-                    {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  စကားဝှက် အတည်ပြုခြင်း (Confirm New Password)
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type={showNewPassword ? 'text' : 'password'}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    placeholder="စကားဝှက်အသစ်ကို ထပ်မံရိုက်ထည့်ပါ"
+                    autoFocus
                     className="w-full pl-10 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-600 bg-slate-50/50 text-slate-900"
                   />
                 </div>
@@ -349,11 +316,11 @@ export default function Login() {
                 </button>
                 <button
                   type="submit"
-                  disabled={isSettingPassword}
+                  disabled={isSendingReset}
                   className="flex-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3 px-4 rounded-xl text-xs shadow-md hover:shadow transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>{isSettingPassword ? 'သတ်မှတ်နေပါသည်...' : 'စကားဝှက် အတည်ပြုသတ်မှတ်မည်'}</span>
+                  <span>{isSendingReset ? 'ပေးပို့နေပါသည်...' : 'Reset လင့်ခ် ပို့မည်'}</span>
                 </button>
               </div>
             </form>
