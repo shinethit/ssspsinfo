@@ -42,7 +42,7 @@ const toBurmeseNumber = (num: number): string => {
 };
 
 export default function Contacts() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') || '';
   const initialCategory = searchParams.get('category') || searchParams.get('level') || 'all';
 
@@ -54,7 +54,7 @@ export default function Contacts() {
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
 
   const [feeFilter, setFeeFilter] = useState<'all' | 'paid' | 'unpaid'>('all');
-  const [levelFilter, setLevelFilter] = useState<string>('all');
+  const [levelFilter, setLevelFilter] = useState<string>(initialCategory);
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
 
   // Dynamic School Levels unified from database & school records
@@ -77,19 +77,41 @@ export default function Contacts() {
     [unifiedLevels]
   );
 
+  // Unified Category/Level selection handler
+  const handleSelectCategory = useCallback(
+    (category: string) => {
+      setSelectedCategoryTab(category);
+      setLevelFilter(category);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (category === 'all') {
+          next.delete('category');
+          next.delete('level');
+        } else {
+          next.set('category', category);
+          next.delete('level');
+        }
+        return next;
+      });
+    },
+    [setSearchParams]
+  );
+
   // Update from URL params if changed
   useEffect(() => {
     const urlSearch = searchParams.get('search');
     if (urlSearch !== null && urlSearch !== searchTerm) {
       setSearchTerm(urlSearch);
     }
-    const urlLevel = searchParams.get('level');
-    const urlCategory = searchParams.get('category');
-    if (urlLevel) {
-      setSelectedCategoryTab(urlLevel);
-      setLevelFilter(urlLevel);
-    } else if (urlCategory && urlCategory !== selectedCategoryTab) {
-      setSelectedCategoryTab(urlCategory);
+    const urlCategory = searchParams.get('category') || searchParams.get('level');
+    if (urlCategory) {
+      if (urlCategory !== selectedCategoryTab) {
+        setSelectedCategoryTab(urlCategory);
+        setLevelFilter(urlCategory);
+      }
+    } else if (selectedCategoryTab !== 'all' && (searchParams.has('level') || searchParams.has('category'))) {
+      setSelectedCategoryTab('all');
+      setLevelFilter('all');
     }
   }, [searchParams]);
 
@@ -115,9 +137,9 @@ export default function Contacts() {
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (feeFilter !== 'all') count++;
-    if (levelFilter !== 'all') count++;
+    if (selectedCategoryTab !== 'all') count++;
     return count;
-  }, [feeFilter, levelFilter]);
+  }, [feeFilter, selectedCategoryTab]);
 
   const resetFilters = () => {
     setFeeFilter('all');
@@ -125,6 +147,7 @@ export default function Contacts() {
     setSearchTerm('');
     setSelectedCategoryTab('all');
     setSortOption('category_name');
+    setSearchParams({});
   };
 
   const toggleCategoryCollapse = (categoryKey: string) => {
@@ -134,9 +157,23 @@ export default function Contacts() {
     }));
   };
 
-  // 1. Filter schools based on search, category tab, fee status, level
+  const expandAllCategories = () => {
+    setCollapsedCategories({});
+  };
+
+  const collapseAllCategories = () => {
+    const allCollapsed: Record<string, boolean> = {};
+    unifiedLevels.forEach((l) => {
+      allCollapsed[l.id] = true;
+    });
+    setCollapsedCategories(allCollapsed);
+  };
+
+  // 1. Filter schools based on search, category tab, fee status
   const filteredSchools = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
+    const activeCategory = selectedCategoryTab !== 'all' ? selectedCategoryTab : (levelFilter !== 'all' ? levelFilter : 'all');
+
     return schools.filter((s) => {
       const matchSearch =
         !q ||
@@ -170,10 +207,10 @@ export default function Contacts() {
         (Array.isArray(s.adminPhones) && s.adminPhones.some((p) => p.toLowerCase().includes(q)));
 
       const matchCategoryTab =
-        selectedCategoryTab === 'all'
+        activeCategory === 'all'
           ? true
-          : isSchoolInLevel(s, selectedCategoryTab) ||
-            (selectedCategoryTab === 'unassigned' && (!s.level || !s.level.trim()));
+          : isSchoolInLevel(s, activeCategory) ||
+            (activeCategory === 'unassigned' && (!s.level || !s.level.trim()));
 
       const matchFee =
         feeFilter === 'all'
@@ -182,12 +219,9 @@ export default function Contacts() {
           ? s.isAnnualFeePaid === true
           : !s.isAnnualFeePaid;
 
-      const matchLevel =
-        levelFilter === 'all' ? true : isSchoolInLevel(s, levelFilter);
-
-      return matchSearch && matchCategoryTab && matchFee && matchLevel;
+      return matchSearch && matchCategoryTab && matchFee;
     });
-  }, [schools, searchTerm, selectedCategoryTab, feeFilter, levelFilter]);
+  }, [schools, searchTerm, selectedCategoryTab, levelFilter, feeFilter]);
 
   // 2. Sort schools cleanly
   const sortedSchools = useMemo(() => {
@@ -326,10 +360,10 @@ export default function Contacts() {
         <div className="flex flex-wrap items-center gap-2 pb-1">
           <button
             type="button"
-            onClick={() => setSelectedCategoryTab('all')}
+            onClick={() => handleSelectCategory('all')}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
               selectedCategoryTab === 'all'
-                ? 'bg-sky-950 text-white shadow-xs'
+                ? 'bg-sky-950 text-white shadow-xs ring-2 ring-sky-900/20'
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
             }`}
           >
@@ -353,7 +387,7 @@ export default function Contacts() {
               <button
                 key={lvl.id}
                 type="button"
-                onClick={() => setSelectedCategoryTab(isSelected ? 'all' : lvl.name)}
+                onClick={() => handleSelectCategory(isSelected ? 'all' : lvl.name)}
                 className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer border ${
                   isSelected
                     ? `${lvl.color.badge} border-current shadow-xs ring-2 ring-sky-500/20`
@@ -542,10 +576,10 @@ export default function Contacts() {
                 </label>
                 <div className="flex flex-wrap items-center gap-1.5">
                   <button
-                    onClick={() => setLevelFilter('all')}
+                    onClick={() => handleSelectCategory('all')}
                     type="button"
                     className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
-                      levelFilter === 'all'
+                      selectedCategoryTab === 'all'
                         ? 'bg-sky-900 text-white shadow-xs'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
@@ -555,10 +589,10 @@ export default function Contacts() {
                   {availableLevels.map((lvl) => (
                     <button
                       key={lvl}
-                      onClick={() => setLevelFilter(lvl)}
+                      onClick={() => handleSelectCategory(lvl)}
                       type="button"
                       className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
-                        levelFilter === lvl
+                        selectedCategoryTab === lvl
                           ? 'bg-sky-700 text-white shadow-xs'
                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                       }`}
@@ -620,8 +654,55 @@ export default function Contacts() {
         </div>
       ) : viewMode === 'grouped' ? (
         /* MODE A: GROUPED BY CATEGORY (Default & User Requested) */
-        <div className="space-y-6">
-          {groupedCategories.map((group) => {
+        <div className="space-y-4">
+          {/* Grouped Header Toolbar: Total groups + Expand/Collapse All buttons */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white p-3.5 sm:px-4 rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-sky-50 text-sky-700 border border-sky-100">
+                <Layers className="w-4 h-4" />
+              </div>
+              <span className="text-xs sm:text-sm font-bold text-slate-800">
+                ကျောင်းအဆင့် ကဏ္ဍ ({toBurmeseNumber(groupedCategories.length)}) ခု
+              </span>
+              <span className="text-slate-300">•</span>
+              <span className="text-xs text-slate-500 font-semibold">
+                ကျောင်း စုစုပေါင်း ({toBurmeseNumber(sortedSchools.length)}) ကျောင်း
+              </span>
+              {selectedCategoryTab !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => handleSelectCategory('all')}
+                  className="ml-1 text-xs text-sky-700 hover:text-sky-900 font-bold underline cursor-pointer"
+                >
+                  (အဆင့်အားလုံး ပြန်ပြရန်)
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              <button
+                type="button"
+                onClick={expandAllCategories}
+                className="px-3 py-1.5 text-xs font-bold text-sky-800 bg-sky-50 hover:bg-sky-100 rounded-xl transition border border-sky-200 cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                title="ကျောင်းအဆင့် အားလုံးကို တစ်ပြိုင်နက် ဖွင့်ပြရန်"
+              >
+                <ChevronDown className="w-3.5 h-3.5 text-sky-600" />
+                <span>အားလုံးဖွင့်ရန်</span>
+              </button>
+              <button
+                type="button"
+                onClick={collapseAllCategories}
+                className="px-3 py-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition border border-slate-200 cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                title="ကျောင်းအဆင့် အားလုံးကို တစ်ပြိုင်နက် ခေါက်သိမ်းရန်"
+              >
+                <ChevronUp className="w-3.5 h-3.5 text-slate-500" />
+                <span>အားလုံးခေါက်ရန်</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {groupedCategories.map((group) => {
             const { config, schools: catSchools } = group;
             const Icon = config.isUnassigned ? Building2 : GraduationCap;
             const isCollapsed = !!collapsedCategories[config.id];
@@ -774,6 +855,7 @@ export default function Contacts() {
               </section>
             );
           })}
+          </div>
         </div>
       ) : (
         /* MODE B: FLAT LIST VIEW (Sorted) */
