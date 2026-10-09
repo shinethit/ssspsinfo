@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sparkles, X, ArrowRight, History, Layers, Bell, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-export const CURRENT_VERSION = 'v2.4';
+export const CURRENT_VERSION = 'v2.5';
 const STORAGE_KEY = 'pss_last_viewed_version';
 
 export const VersionUpdateModal: React.FC = () => {
@@ -68,7 +68,7 @@ export const VersionUpdateModal: React.FC = () => {
           </div>
 
           <h2 className="text-xl sm:text-2xl font-black leading-[1.6]">
-            ဘာတွေ အသစ်ပါဝင်လာသလဲ? (What's New)
+            ဘာတွေ အသစ်ပါဝင်လာသလဲ? (What's New in v2.5)
           </h2>
           <p className="text-slate-300 text-xs sm:text-sm mt-1 leading-normal">
             ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း ဝဘ်ဆိုက်၏ နောက်ဆုံးရ ပြင်ဆင်မွမ်းမံမှုများ
@@ -77,62 +77,62 @@ export const VersionUpdateModal: React.FC = () => {
 
         {/* Feature Highlights Body */}
         <div className="p-6 space-y-3.5 max-h-[60vh] overflow-y-auto">
-          {/* Feature 1: School Levels 3-way Synchronization */}
+          {/* Feature 1: Direct Calling Phone Directory by Role */}
+          <div className="flex items-start gap-3 p-3 rounded-2xl bg-emerald-50/80 border border-emerald-200">
+            <div className="p-2 rounded-xl bg-emerald-700 text-white shrink-0 mt-0.5">
+              <Activity className="w-5 h-5" />
+            </div>
+            <div className="space-y-0.5 text-xs">
+              <h4 className="font-bold text-emerald-950 text-sm">
+                တန်းပြီး ဖုန်းခေါ်ဆိုနိုင်သော အသင်းဝင်ကျောင်းများ Phone Directory စနစ်
+              </h4>
+              <p className="text-slate-600 leading-normal">
+                အသင်းဝင်ကျောင်းများ စာရင်းတွင် အထဲထိ ဝင်ကြည့်စရာမလိုဘဲ တည်ထောင်သူ (ဖုန်း ၁/၂)၊ စီမံအုပ်ချုပ်သူ (ဖုန်း ၁/၂)၊ တာဝန်ခံ (၁) (ဖုန်း ၁/၂)၊ တာဝန်ခံ (၂) (ဖုန်း ၁/၂) နှင့် ကျောင်းဖုန်း (၁/၂) တို့ကို အစိမ်းရောင် Call Button များဖြင့် ၁-ချက်နှိပ်ရုံဖြင့် တန်းခေါ်ဆိုနိုင်ပါသည်။
+              </p>
+            </div>
+          </div>
+
+          {/* Feature 2: Clean Responsive Phone Grid Layout */}
           <div className="flex items-start gap-3 p-3 rounded-2xl bg-sky-50/80 border border-sky-100">
             <div className="p-2 rounded-xl bg-sky-900 text-white shrink-0 mt-0.5">
               <Layers className="w-5 h-5" />
             </div>
             <div className="space-y-0.5 text-xs">
               <h4 className="font-bold text-sky-950 text-sm">
-                ကျောင်းအဆင့်များ သုံးဘက်ညီ (Contacts, Dashboard, Admin) တပြေးညီ ချိတ်ဆက်မှု
+                လှပသပ်ရပ်သော Responsive Directory Grid Layout (လှလှလေးစီထားသော စနစ်)
               </h4>
               <p className="text-slate-600 leading-normal">
-                Contacts (ပထမပုံ)၊ Dashboard (ဒုတိယပုံ) နှင့် Admin (တတိယပုံ) တို့ရှိ ကျောင်းအဆင့် စစ်ထုတ်မှုများနှင့် အရေအတွက်များကို တပြေးညီ (Inline Real-time Sync) ဖြစ်စေပြီး Admin တွင် ပြင်ဆင်/အတိုးအလျှော့ ပြုလုပ်မှုတိုင်း မျက်နှာပြင်အားလုံးတွင် တိုက်ရိုက် အလိုအလျောက် ပြောင်းလဲသွားစေပါသည်။
+                ဖုန်းနံပါတ်များကို ပျံ့ကြဲမနေစေဘဲ မိုဘိုင်းနှင့် ကွန်ပျူတာ အလိုက် အချိုးကျ ညီညာသပ်ရပ်သော Multi-column Directory Grid အဖြစ် စီစဉ်ပေးထားပြီး အသေးစိတ် ကြည့်ရှုလိုပါကလည်း "အသေးစိတ် &rarr;" ခလုတ်ဖြင့် ဆက်လက်ဝင်ရောက်နိုင်ပါသည်။
               </p>
             </div>
           </div>
 
-          {/* Feature 2: Prominent Notification Bell */}
+          {/* Feature 3: Standardized Fee Status Terminology */}
           <div className="flex items-start gap-3 p-3 rounded-2xl bg-amber-50/80 border border-amber-200">
             <div className="p-2 rounded-xl bg-amber-600 text-white shrink-0 mt-0.5">
               <Bell className="w-5 h-5" />
             </div>
             <div className="space-y-0.5 text-xs">
               <h4 className="font-bold text-amber-950 text-sm">
-                ခေါင်းလောင်း အသိပေးချက် (Notification Bell) အမြဲမပြတ် ပေါ်လွင်စွာ မြင်တွေ့နိုင်ခြင်း
+                နှစ်စဉ်ကြေး အခေါ်အဝေါ် စံသတ်မှတ်ချက် ("နှစ်စဉ်ကြေး မသွင်းရသေး")
               </h4>
               <p className="text-slate-600 leading-normal">
-                Preview နှင့် မည်သည့် မျက်နှာပြင်တွင်မဆို ခေါင်းလောင်း notification icon ကို မပျောက်ကွယ်ဘဲ အမြဲတစေ ပေါ်လွင်ထင်ရှားစွာ မြင်တွေ့နိုင်အောင် ဖန်တီးပေးပြီး စနစ်လုပ်ဆောင်ချက်များ (ကျောင်းထည့်/ပြင်/ဖျက်) နှင့် ဗားရှင်းအသစ်များကို အချိန်နှင့်တပြေးညီ အသိပေးစေပါသည်။
+                စနစ်တစ်ခုလုံးရှိ "ကြေးမပေးရသေး" အခေါ်အဝေါ်အားလုံးကို "နှစ်စဉ်ကြေး မသွင်းရသေး" ဟူ၍ တရားဝင် စံသတ်မှတ်ပြင်ဆင်ပြီး သွင်းပြီး (Paid) နှင့် မသွင်းရသေး (Unpaid) အခြေအနေများကို အရောင်ခွဲခြား၍ ပေါ်လွင်စွာ ဖော်ပြပေးထားပါသည်။
               </p>
             </div>
           </div>
 
-          {/* Feature 3: Black Version Update Badge */}
+          {/* Feature 4: Black Version Update Badge */}
           <div className="flex items-start gap-3 p-3 rounded-2xl bg-slate-900 text-white border border-slate-800">
             <div className="p-2 rounded-xl bg-black text-amber-400 border border-neutral-700 shrink-0 mt-0.5">
               <Sparkles className="w-5 h-5" />
             </div>
             <div className="space-y-0.5 text-xs">
               <h4 className="font-bold text-white text-sm">
-                အနက်ရောင် Version Update (အမဲ) တံဆိပ် စနစ်သစ်
+                အနက်ရောင် Version Update (အမဲ) v2.5 တံဆိပ် စနစ်သစ်
               </h4>
               <p className="text-slate-300 leading-normal">
-                စနစ်တစ်ခုခု ပြောင်းလဲတိုင်း၊ ပြင်တိုင်း၊ Improve လုပ်တိုင်း နဂိုအခြေအနေနှင့် မတူညီသည်များကို အလွယ်တကူ သိရှိစေရန် အနက်ရောင် (Black) 'Version Update v2.4' တံဆိပ်ကို Header၊ Sidebar နှင့် Navigation များတွင် အထင်အရှား ထည့်သွင်းပေးထားပါသည်။
-              </p>
-            </div>
-          </div>
-
-          {/* Feature 4: Compact Clean Notification Strip */}
-          <div className="flex items-start gap-3 p-3 rounded-2xl bg-emerald-50/80 border border-emerald-100">
-            <div className="p-2 rounded-xl bg-emerald-700 text-white shrink-0 mt-0.5">
-              <Activity className="w-5 h-5" />
-            </div>
-            <div className="space-y-0.5 text-xs">
-              <h4 className="font-bold text-emerald-950 text-sm">
-                ကျစ်လျစ်သပ်ရပ်သော Compact Notification & Toast စနစ်
-              </h4>
-              <p className="text-slate-600 leading-normal">
-                အသုံးပြုသူ ကြည့်ရှုအသုံးပြုရာတွင် အဆင်မပြေဖြစ်စေသော အရှည်ကြီးဖြစ်နေသည့် Notification များနှင့် Toast များကို ကျစ်လျစ်သိပ်သည်းပြီး မျက်စိရှင်းလင်းစွာ ဖတ်ရှုနိုင်သော Compact Alert Strip နှင့် စက္ကန့်တို Toast များဖြင့် ပြောင်းလဲပြင်ဆင်ထားပါသည်။
+                စနစ်အတွင်း အသစ်ပြောင်းလဲမှု၊ ပြင်ဆင်မှုတိုင်းကို ချက်ချင်း သိရှိနိုင်စေရန် အနက်ရောင် (Black) 'Version Update v2.5' တံဆိပ်ကို Header၊ Sidebar၊ Footer နှင့် Version History တို့တွင် အထင်အရှား ထည့်သွင်းပေးထားပါသည်။
               </p>
             </div>
           </div>

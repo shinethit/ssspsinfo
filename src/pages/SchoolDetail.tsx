@@ -133,7 +133,7 @@ export default function SchoolDetail() {
               }`}
               title="နှစ်စဉ်ကြေး အခြေအနေ ပြောင်းရန်"
             >
-              {school.isAnnualFeePaid ? 'နှစ်စဉ်ကြေး: ပေးပြီး ✓' : 'နှစ်စဉ်ကြေး: မပေးသေး ✗'}
+              {school.isAnnualFeePaid ? 'နှစ်စဉ်ကြေး: သွင်းပြီး ✓' : 'နှစ်စဉ်ကြေး: မသွင်းရသေး ✗'}
             </button>
 
             {/* Edit School Button */}
@@ -205,12 +205,12 @@ export default function SchoolDetail() {
               {school.isAnnualFeePaid ? (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>နှစ်စဉ်ကြေး ပေးသွင်းပြီး</span>
+                  <span>နှစ်စဉ်ကြေး သွင်းပြီး</span>
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                  <XCircle className="w-3.5 h-3.5 text-slate-400" />
-                  <span>နှစ်စဉ်ကြေး မပေးသွင်းရသေး</span>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                  <XCircle className="w-3.5 h-3.5 text-amber-600" />
+                  <span>နှစ်စဉ်ကြေး မသွင်းရသေး</span>
                 </span>
               )}
             </div>
@@ -268,7 +268,7 @@ export default function SchoolDetail() {
               <div>
                 <p className="text-xs font-semibold text-slate-500">နှစ်စဉ်ကြေး ပေးသွင်းမှု အခြေအနေ</p>
                 <h3 className="font-extrabold text-base sm:text-lg">
-                  {school.isAnnualFeePaid ? 'နှစ်စဉ်ကြေး ပေးသွင်းပြီးဖြစ်ပါသည်' : 'နှစ်စဉ်ကြေး မပေးသွင်းရသေးပါ'}
+                  {school.isAnnualFeePaid ? 'နှစ်စဉ်ကြေး ပေးသွင်းပြီးဖြစ်ပါသည်' : 'နှစ်စဉ်ကြေး မသွင်းရသေးပါ'}
                 </h3>
               </div>
             </div>
@@ -278,8 +278,8 @@ export default function SchoolDetail() {
                   အသင်းဝင် အခွင့်အရေး အပြည့်အဝရရှိထားသည်
                 </span>
               ) : (
-                <span className="inline-block px-3 py-1 rounded-full bg-slate-200 text-slate-700 font-semibold border border-slate-300">
-                  နှစ်စဉ်ကြေး ပေးသွင်းရန် ဆိုင်းငံ့ဆဲ
+                <span className="inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-800 font-semibold border border-amber-300">
+                  နှစ်စဉ်ကြေး မသွင်းရသေးပါ (ပေးသွင်းရန် ဆိုင်းငံ့ဆဲ)
                 </span>
               )}
             </div>

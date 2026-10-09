@@ -1491,12 +1491,12 @@ export default function Admin() {
         entityType: 'school',
         entityId: school.id,
         entityName: school.name,
-        details: `နှစ်စဉ်ကြေးကို "${nextStatus ? 'ပေးသွင်းပြီး (Paid)' : 'မပေးရသေး (Unpaid)'}" အဖြစ် ပြောင်းလဲခဲ့သည်`,
+        details: `နှစ်စဉ်ကြေးကို "${nextStatus ? 'သွင်းပြီး (Paid)' : 'မသွင်းရသေး (Unpaid)'}" အဖြစ် ပြောင်းလဲခဲ့သည်`,
       });
       toast.success(
         nextStatus
-          ? `"${school.name}" နှစ်စဉ်ကြေး ပေးပြီးပါပြီ`
-          : `"${school.name}" နှစ်စဉ်ကြေး မပေးရသေးပါ`
+          ? `"${school.name}" နှစ်စဉ်ကြေး သွင်းပြီးပါပြီ`
+          : `"${school.name}" နှစ်စဉ်ကြေး မသွင်းရသေးပါ`
       );
       fetchAuditLogs();
     } catch (err) {
@@ -3869,11 +3869,11 @@ export default function Admin() {
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer shadow-2xs flex items-center gap-1 ${
                               s.isAnnualFeePaid
                                 ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                                : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                                : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
                             }`}
                             title="နှစ်စဉ်ကြေး အခြေအနေကို ၁-ချက်နှိပ်ရုံဖြင့် ပြောင်းလဲရန်"
                           >
-                            {s.isAnnualFeePaid ? 'ကြေးပေးပြီး ✓' : 'ကြေးမပေးရသေး ✗'}
+                            {s.isAnnualFeePaid ? 'နှစ်စဉ်ကြေး သွင်းပြီး ✓' : 'နှစ်စဉ်ကြေး မသွင်းရသေး ✗'}
                           </button>
                         </div>
 

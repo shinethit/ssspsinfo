@@ -46,6 +46,15 @@ export interface SchoolPhoneItem {
   cleanDial: string;
 }
 
+export interface CategorizedSchoolPhone {
+  key: string;
+  category: 'founder' | 'admin' | 'contact1' | 'contact2' | 'school';
+  fullLabel: string;
+  personName?: string;
+  number: string;
+  cleanDial: string;
+}
+
 export const extractSchoolPhoneList = (school: School): SchoolPhoneItem[] => {
   const rawList = [
     school.schoolPhone,
@@ -78,6 +87,156 @@ export const extractSchoolPhoneList = (school: School): SchoolPhoneItem[] => {
         });
       }
     }
+  }
+
+  return results;
+};
+
+export const getCategorizedSchoolPhones = (school: School): CategorizedSchoolPhone[] => {
+  const results: CategorizedSchoolPhone[] = [];
+
+  const parseNumbers = (rawInputs: (string | undefined | null | string[])[]): string[] => {
+    const list: string[] = [];
+    const seen = new Set<string>();
+
+    for (const input of rawInputs) {
+      if (!input) continue;
+      if (Array.isArray(input)) {
+        for (const item of input) {
+          if (!item || typeof item !== 'string') continue;
+          const parts = item.split(/[/,\n;]+/).map((p) => p.trim()).filter(Boolean);
+          for (const p of parts) {
+            const clean = p.replace(/[^0-9+]/g, '');
+            if (clean && clean.length >= 5 && !seen.has(clean)) {
+              seen.add(clean);
+              list.push(p);
+            }
+          }
+        }
+      } else if (typeof input === 'string') {
+        const parts = input.split(/[/,\n;]+/).map((p) => p.trim()).filter(Boolean);
+        for (const p of parts) {
+          const clean = p.replace(/[^0-9+]/g, '');
+          if (clean && clean.length >= 5 && !seen.has(clean)) {
+            seen.add(clean);
+            list.push(p);
+          }
+        }
+      }
+    }
+    return list;
+  };
+
+  const getPhoneLabel = (categoryPrefix: string, index: number): string => {
+    if (index === 0) return `${categoryPrefix} ဖုန်း (၁)`;
+    if (index === 1) return `${categoryPrefix} ဖုန်း (၂)`;
+    return `${categoryPrefix} ဖုန်း (${toBurmeseNumber(index + 1)})`;
+  };
+
+  // 1. တည်ထောင်သူ ဖုန်း
+  const founderNums = parseNumbers([
+    school.founderPhone,
+    school.founderPhone2,
+    school.founderPhones,
+  ]);
+  founderNums.forEach((num, idx) => {
+    results.push({
+      key: `founder-${idx}-${num}`,
+      category: 'founder',
+      fullLabel: getPhoneLabel('တည်ထောင်သူ', idx),
+      personName: school.founderName?.trim() || undefined,
+      number: num,
+      cleanDial: num.replace(/[^0-9+]/g, ''),
+    });
+  });
+
+  // 2. စီမံအုပ်ချုပ်သူ ဖုန်း
+  const adminNums = parseNumbers([
+    school.adminPhone,
+    school.adminPhone2,
+    school.adminPhones,
+  ]);
+  adminNums.forEach((num, idx) => {
+    results.push({
+      key: `admin-${idx}-${num}`,
+      category: 'admin',
+      fullLabel: getPhoneLabel('စီမံအုပ်ချုပ်သူ', idx),
+      personName: school.adminName?.trim() || undefined,
+      number: num,
+      cleanDial: num.replace(/[^0-9+]/g, ''),
+    });
+  });
+
+  // 3. တာဝန်ခံ (၁) ဖုန်း
+  const contact1Nums = parseNumbers([
+    school.contactPhone,
+    school.contactPhone2,
+    school.contactPhones,
+    school.responsiblePerson1Phone,
+    school.responsiblePerson1Phone2,
+    school.responsiblePerson1Phones,
+  ]);
+  const contact1Name = (school.contactName || school.responsiblePerson1Name)?.trim();
+  contact1Nums.forEach((num, idx) => {
+    results.push({
+      key: `contact1-${idx}-${num}`,
+      category: 'contact1',
+      fullLabel: getPhoneLabel('တာဝန်ခံ (၁)', idx),
+      personName: contact1Name || undefined,
+      number: num,
+      cleanDial: num.replace(/[^0-9+]/g, ''),
+    });
+  });
+
+  // 4. တာဝန်ခံ (၂) ဖုန်း
+  const contact2Nums = parseNumbers([
+    school.contact2Phone,
+    school.contact2Phone2,
+    school.contact2Phones,
+    school.responsiblePerson2Phone,
+    school.responsiblePerson2Phone2,
+    school.responsiblePerson2Phones,
+  ]);
+  const contact2Name = (school.contact2Name || school.responsiblePerson2Name)?.trim();
+  contact2Nums.forEach((num, idx) => {
+    results.push({
+      key: `contact2-${idx}-${num}`,
+      category: 'contact2',
+      fullLabel: getPhoneLabel('တာဝန်ခံ (၂)', idx),
+      personName: contact2Name || undefined,
+      number: num,
+      cleanDial: num.replace(/[^0-9+]/g, ''),
+    });
+  });
+
+  // 5. ကျောင်း ဖုန်း
+  const schoolNums = parseNumbers([
+    school.schoolPhone,
+    school.schoolPhone2,
+    school.schoolPhones,
+  ]);
+  schoolNums.forEach((num, idx) => {
+    results.push({
+      key: `school-${idx}-${num}`,
+      category: 'school',
+      fullLabel: getPhoneLabel('ကျောင်း', idx),
+      number: num,
+      cleanDial: num.replace(/[^0-9+]/g, ''),
+    });
+  });
+
+  // Fallback: If no categorized phones found, but raw extraction finds numbers
+  if (results.length === 0) {
+    const rawList = extractSchoolPhoneList(school);
+    rawList.forEach((item, idx) => {
+      results.push({
+        key: `fallback-${idx}-${item.cleanDial}`,
+        category: 'school',
+        fullLabel: getPhoneLabel('ကျောင်း', idx),
+        number: item.number,
+        cleanDial: item.cleanDial,
+      });
+    });
   }
 
   return results;
@@ -597,7 +756,7 @@ export default function Contacts() {
                     }`}
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>ပေးသွင်းပြီး ({paidCount})</span>
+                    <span>နှစ်စဉ်ကြေး သွင်းပြီး ({paidCount})</span>
                   </button>
                   <button
                     onClick={() => setFeeFilter('unpaid')}
@@ -605,11 +764,11 @@ export default function Contacts() {
                     className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1 cursor-pointer ${
                       feeFilter === 'unpaid'
                         ? 'bg-slate-800 text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
                     }`}
                   >
                     <XCircle className="w-3.5 h-3.5" />
-                    <span>မပေးသွင်းရသေး ({unpaidCount})</span>
+                    <span>နှစ်စဉ်ကြေး မသွင်းရသေး ({unpaidCount})</span>
                   </button>
                 </div>
               </div>
@@ -801,107 +960,79 @@ export default function Contacts() {
                 {!isCollapsed && (
                   <div className="p-2.5 sm:p-4 divide-y divide-slate-100 bg-white">
                     {catSchools.map((school, index) => {
-                      const schoolPhones = extractSchoolPhoneList(school);
-                      const primaryPhone = schoolPhones[0];
+                      const categorizedPhones = getCategorizedSchoolPhones(school);
                       return (
                         <div
                           key={school.id}
-                          className="group py-3 px-2 sm:px-4 rounded-xl hover:bg-slate-50/80 transition flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3.5 first:pt-1 last:pb-1"
+                          className="group py-3 px-2 sm:px-4 rounded-xl hover:bg-slate-50/80 transition flex flex-col gap-2.5 first:pt-1 last:pb-1"
                         >
-                          {/* Index & Logo & Details */}
-                          <div className="flex items-start sm:items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
-                            {/* Sequential Number badge */}
-                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-100 text-slate-600 font-extrabold text-xs sm:text-sm flex items-center justify-center shrink-0 group-hover:bg-sky-100 group-hover:text-sky-800 transition mt-0.5 sm:mt-0">
-                              {toBurmeseNumber(index + 1)}
-                            </div>
+                          {/* Index & Logo & Details + Detail Link */}
+                          <div className="flex items-start sm:items-center justify-between gap-2.5 sm:gap-3.5">
+                            <div className="flex items-start sm:items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
+                              {/* Sequential Number badge */}
+                              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-100 text-slate-600 font-extrabold text-xs sm:text-sm flex items-center justify-center shrink-0 group-hover:bg-sky-100 group-hover:text-sky-800 transition mt-0.5 sm:mt-0">
+                                {toBurmeseNumber(index + 1)}
+                              </div>
 
-                            {/* Emblem / Logo (Clickable to detail) */}
-                            <Link
-                              to={`/schools/${school.id}`}
-                              className="shrink-0 cursor-pointer block"
-                              title={`${school.name} အသေးစိတ် ကြည့်ရှုရန်`}
-                            >
-                              {school.logoUrl ? (
-                                <img
-                                  src={school.logoUrl}
-                                  alt={school.name}
-                                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl object-cover border border-slate-200 bg-white p-0.5 hover:scale-105 transition"
-                                />
-                              ) : (
-                                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-sky-900 text-white flex items-center justify-center group-hover:bg-sky-800 transition shadow-2xs">
-                                  <SchoolIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                                </div>
-                              )}
-                            </Link>
-
-                            {/* School Details */}
-                            <div className="space-y-1 min-w-0 flex-1">
+                              {/* Emblem / Logo (Clickable to detail) */}
                               <Link
                                 to={`/schools/${school.id}`}
-                                className="block font-bold text-sm sm:text-base text-sky-950 hover:text-sky-700 transition truncate cursor-pointer"
+                                className="shrink-0 cursor-pointer block"
                                 title={`${school.name} အသေးစိတ် ကြည့်ရှုရန်`}
                               >
-                                {school.name}
+                                {school.logoUrl ? (
+                                  <img
+                                    src={school.logoUrl}
+                                    alt={school.name}
+                                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl object-cover border border-slate-200 bg-white p-0.5 hover:scale-105 transition"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-sky-900 text-white flex items-center justify-center group-hover:bg-sky-800 transition shadow-2xs">
+                                    <SchoolIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                                  </div>
+                                )}
                               </Link>
 
-                              <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
-                                {/* Level badge */}
-                                {school.level && (
-                                  <span className={`inline-block px-2 py-0.5 rounded-md border font-semibold shrink-0 ${config.color.tagBadge}`}>
-                                    {school.level}
-                                  </span>
-                                )}
+                              {/* School Details */}
+                              <div className="space-y-1 min-w-0 flex-1">
+                                <Link
+                                  to={`/schools/${school.id}`}
+                                  className="block font-bold text-sm sm:text-base text-sky-950 hover:text-sky-700 transition truncate cursor-pointer"
+                                  title={`${school.name} အသေးစိတ် ကြည့်ရှုရန်`}
+                                >
+                                  {school.name}
+                                </Link>
 
-                                {/* Student Range badge */}
-                                {school.studentRange && (
-                                  <span className="inline-block px-2 py-0.5 rounded-md bg-sky-50 text-sky-800 border border-sky-100 font-medium shrink-0">
-                                    ကျောင်းသား: {school.studentRange} ဦး
-                                  </span>
-                                )}
-
-                                {/* Annual Fee Badge */}
-                                {school.isAnnualFeePaid ? (
-                                  <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold shrink-0">
-                                    ကြေးပေးပြီး ✓
-                                  </span>
-                                ) : (
-                                  <span className="inline-block px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 font-normal shrink-0">
-                                    ကြေးမပေးရသေး
-                                  </span>
-                                )}
-
-                                {/* Administrator / Coordinator preview */}
-                                {(school.adminName || school.founderName || school.contactName || school.contact2Name) && (
-                                  <span className="inline-flex items-center gap-1 text-slate-500 max-w-full">
-                                    <UserCheck className="w-3 h-3 text-slate-400 shrink-0" />
-                                    <span className="truncate max-w-[150px] sm:max-w-xs">
-                                      {school.contactName
-                                        ? `တာဝန်ခံ (၁): ${school.contactName}`
-                                        : school.contact2Name
-                                        ? `တာဝန်ခံ (၂): ${school.contact2Name}`
-                                        : school.adminName || school.founderName}
+                                <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
+                                  {/* Level badge */}
+                                  {school.level && (
+                                    <span className={`inline-block px-2 py-0.5 rounded-md border font-semibold shrink-0 ${config.color.tagBadge}`}>
+                                      {school.level}
                                     </span>
-                                  </span>
-                                )}
+                                  )}
+
+                                  {/* Student Range badge */}
+                                  {school.studentRange && (
+                                    <span className="inline-block px-2 py-0.5 rounded-md bg-sky-50 text-sky-800 border border-sky-100 font-medium shrink-0">
+                                      ကျောင်းသား: {school.studentRange} ဦး
+                                    </span>
+                                  )}
+
+                                  {/* Annual Fee Badge */}
+                                  {school.isAnnualFeePaid ? (
+                                    <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold shrink-0">
+                                      နှစ်စဉ်ကြေး သွင်းပြီး ✓
+                                    </span>
+                                  ) : (
+                                    <span className="inline-block px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 font-semibold shrink-0">
+                                      နှစ်စဉ်ကြေး မသွင်းရသေး
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          {/* Right: Actions (Direct Call Button + View Detail Link) */}
-                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 pl-9 sm:pl-0 shrink-0 max-w-full">
-                            {primaryPhone ? (
-                              <a
-                                href={`tel:${primaryPhone.cleanDial}`}
-                                className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs shadow-xs hover:shadow transition cursor-pointer max-w-full"
-                                title={`တန်းပြီး ဖုန်းခေါ်မည် (${primaryPhone.number})`}
-                              >
-                                <Phone className="w-3.5 h-3.5 shrink-0" />
-                                <span className="truncate max-w-[140px] sm:max-w-none">{primaryPhone.number}</span>
-                              </a>
-                            ) : (
-                              <span className="text-[11px] text-slate-400 italic px-1">ဖုန်းမရှိပါ</span>
-                            )}
-
+                            {/* Detail Link Button */}
                             <Link
                               to={`/schools/${school.id}`}
                               className="inline-flex items-center gap-1 text-xs font-bold text-sky-800 hover:text-sky-950 px-2.5 py-1.5 rounded-xl hover:bg-sky-50 transition shrink-0 cursor-pointer"
@@ -910,6 +1041,42 @@ export default function Contacts() {
                               <span>အသေးစိတ်</span>
                               <ArrowRight className="w-3.5 h-3.5 text-sky-600" />
                             </Link>
+                          </div>
+
+                          {/* Categorized Phone Numbers Directory (ရာထူးနှင့် အမည် အပြည့်အစုံဖော်ပြသော Grid Directory) */}
+                          <div className="pt-2.5 border-t border-slate-100/90">
+                            {categorizedPhones.length > 0 ? (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-2.5">
+                                {categorizedPhones.map((cp) => (
+                                  <div
+                                    key={cp.key}
+                                    className="flex items-center justify-between gap-2.5 p-2.5 sm:px-3 sm:py-2.5 rounded-xl bg-slate-50/90 hover:bg-emerald-50/70 border border-slate-200/90 hover:border-emerald-400 transition-colors shadow-2xs group/item"
+                                  >
+                                    <div className="min-w-0 flex-1 space-y-0.5">
+                                      <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5 leading-snug">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                                        <span className="break-words">{cp.fullLabel}</span>
+                                      </div>
+                                      {cp.personName && (
+                                        <div className="text-xs text-slate-600 pl-3 font-medium leading-snug break-words">
+                                          {cp.personName}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <a
+                                      href={`tel:${cp.cleanDial}`}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs shadow-2xs hover:shadow transition shrink-0 cursor-pointer whitespace-nowrap"
+                                      title={`တန်းပြီး ဖုန်းခေါ်မည် (${cp.fullLabel}: ${cp.number})`}
+                                    >
+                                      <Phone className="w-3.5 h-3.5 shrink-0" />
+                                      <span className="font-mono tracking-tight text-xs">{cp.number}</span>
+                                    </a>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-slate-400 italic">ဖုန်းနံပါတ် ထည့်သွင်းထားခြင်း မရှိသေးပါ</span>
+                            )}
                           </div>
                         </div>
                       );
@@ -926,109 +1093,81 @@ export default function Contacts() {
         <div className="space-y-3">
           {sortedSchools.map((s, idx) => {
             const cat = getSchoolCategory(s);
-            const schoolPhones = extractSchoolPhoneList(s);
-            const primaryPhone = schoolPhones[0];
+            const categorizedPhones = getCategorizedSchoolPhones(s);
             return (
               <div
                 key={s.id}
-                className="group bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs hover:border-sky-400 hover:shadow-md transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4"
+                className="group bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs hover:border-sky-400 hover:shadow-md transition flex flex-col gap-3"
               >
-                {/* Left: Index + Emblem / Logo + Title & Level */}
-                <div className="flex items-start sm:items-center gap-3 sm:gap-4 min-w-0 flex-1">
-                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-100 text-slate-600 font-extrabold text-xs sm:text-sm flex items-center justify-center shrink-0 group-hover:bg-sky-100 group-hover:text-sky-800 transition mt-0.5 sm:mt-0">
-                    {toBurmeseNumber(idx + 1)}
-                  </div>
+                {/* Top Row: Index + Emblem / Logo + Title & Badges + Detail Button */}
+                <div className="flex items-start sm:items-center justify-between gap-3 sm:gap-4">
+                  <div className="flex items-start sm:items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-100 text-slate-600 font-extrabold text-xs sm:text-sm flex items-center justify-center shrink-0 group-hover:bg-sky-100 group-hover:text-sky-800 transition mt-0.5 sm:mt-0">
+                      {toBurmeseNumber(idx + 1)}
+                    </div>
 
-                  <Link
-                    to={`/schools/${s.id}`}
-                    className="shrink-0 cursor-pointer block"
-                    title={`${s.name} အသေးစိတ် ကြည့်ရှုရန်`}
-                  >
-                    {s.logoUrl ? (
-                      <img
-                        src={s.logoUrl}
-                        alt={s.name}
-                        className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl object-cover border border-slate-200 bg-white p-0.5 sm:p-1 hover:scale-105 transition"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl bg-sky-900 text-white flex items-center justify-center group-hover:bg-sky-800 transition shadow-2xs">
-                        <SchoolIcon className="w-5 h-5 sm:w-7 sm:h-7" />
-                      </div>
-                    )}
-                  </Link>
-
-                  <div className="space-y-1 min-w-0 flex-1">
                     <Link
                       to={`/schools/${s.id}`}
-                      className="block font-bold text-sm sm:text-lg text-sky-950 hover:text-sky-700 transition truncate cursor-pointer"
+                      className="shrink-0 cursor-pointer block"
                       title={`${s.name} အသေးစိတ် ကြည့်ရှုရန်`}
                     >
-                      {s.name}
+                      {s.logoUrl ? (
+                        <img
+                          src={s.logoUrl}
+                          alt={s.name}
+                          className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl object-cover border border-slate-200 bg-white p-0.5 sm:p-1 hover:scale-105 transition"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl bg-sky-900 text-white flex items-center justify-center group-hover:bg-sky-800 transition shadow-2xs">
+                          <SchoolIcon className="w-5 h-5 sm:w-7 sm:h-7" />
+                        </div>
+                      )}
                     </Link>
 
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {/* Category Badge */}
-                      <span className={`text-[11px] px-2.5 py-0.5 rounded-full border font-bold shrink-0 ${cat.color.badge}`}>
-                        {cat.shortLabel}
-                      </span>
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <Link
+                        to={`/schools/${s.id}`}
+                        className="block font-bold text-sm sm:text-lg text-sky-950 hover:text-sky-700 transition truncate cursor-pointer"
+                        title={`${s.name} အသေးစိတ် ကြည့်ရှုရန်`}
+                      >
+                        {s.name}
+                      </Link>
 
-                      {/* Level if distinct */}
-                      {s.level && s.level !== cat.shortLabel && (
-                        <span className="text-[11px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 font-medium shrink-0">
-                          {s.level}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {/* Category Badge */}
+                        <span className={`text-[11px] px-2.5 py-0.5 rounded-full border font-bold shrink-0 ${cat.color.badge}`}>
+                          {cat.shortLabel}
                         </span>
-                      )}
 
-                      {/* Student Range */}
-                      {s.studentRange && (
-                        <span className="text-[11px] px-2 py-0.5 rounded-md bg-sky-50 text-sky-800 border border-sky-100 font-medium shrink-0">
-                          ကျောင်းသား: {s.studentRange} ဦး
-                        </span>
-                      )}
-
-                      {/* Fee Badge */}
-                      {s.isAnnualFeePaid ? (
-                        <span className="text-[11px] px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold shrink-0">
-                          ကြေးပေးပြီး ✓
-                        </span>
-                      ) : (
-                        <span className="text-[11px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 font-normal shrink-0">
-                          ကြေးမပေးရသေး
-                        </span>
-                      )}
-
-                      {/* Coordinator / Responsible preview */}
-                      {(s.contactName || s.contact2Name || s.adminName || s.founderName) && (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 max-w-full">
-                          <UserCheck className="w-3 h-3 text-slate-400 shrink-0" />
-                          <span className="truncate max-w-[150px] sm:max-w-xs">
-                            {s.contactName
-                              ? `တာဝန်ခံ (၁): ${s.contactName}`
-                              : s.contact2Name
-                              ? `တာဝန်ခံ (၂): ${s.contact2Name}`
-                              : s.adminName || s.founderName}
+                        {/* Level if distinct */}
+                        {s.level && s.level !== cat.shortLabel && (
+                          <span className="text-[11px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 font-medium shrink-0">
+                            {s.level}
                           </span>
-                        </span>
-                      )}
+                        )}
+
+                        {/* Student Range */}
+                        {s.studentRange && (
+                          <span className="text-[11px] px-2 py-0.5 rounded-md bg-sky-50 text-sky-800 border border-sky-100 font-medium shrink-0">
+                            ကျောင်းသား: {s.studentRange} ဦး
+                          </span>
+                        )}
+
+                        {/* Fee Badge */}
+                        {s.isAnnualFeePaid ? (
+                          <span className="text-[11px] px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold shrink-0">
+                            နှစ်စဉ်ကြေး သွင်းပြီး ✓
+                          </span>
+                        ) : (
+                          <span className="text-[11px] px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 font-semibold shrink-0">
+                            နှစ်စဉ်ကြေး မသွင်းရသေး
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Right: Actions (Direct Call Button + View Detail Link) */}
-                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 pl-9 sm:pl-0 shrink-0 max-w-full">
-                  {primaryPhone ? (
-                    <a
-                      href={`tel:${primaryPhone.cleanDial}`}
-                      className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs shadow-xs hover:shadow transition cursor-pointer max-w-full"
-                      title={`တန်းပြီး ဖုန်းခေါ်မည် (${primaryPhone.number})`}
-                    >
-                      <Phone className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate max-w-[140px] sm:max-w-none">{primaryPhone.number}</span>
-                    </a>
-                  ) : (
-                    <span className="text-[11px] text-slate-400 italic px-1">ဖုန်းမရှိပါ</span>
-                  )}
-
+                  {/* Detail Link Button */}
                   <Link
                     to={`/schools/${s.id}`}
                     className="inline-flex items-center gap-1 text-xs font-bold text-sky-800 hover:text-sky-950 px-2.5 py-1.5 rounded-xl hover:bg-sky-50 transition shrink-0 cursor-pointer"
@@ -1037,6 +1176,42 @@ export default function Contacts() {
                     <span>အသေးစိတ်</span>
                     <ArrowRight className="w-3.5 h-3.5 text-sky-600" />
                   </Link>
+                </div>
+
+                {/* Categorized Phone Numbers Directory (ရာထူးနှင့် အမည် အပြည့်အစုံဖော်ပြသော Grid Directory) */}
+                <div className="pt-2.5 border-t border-slate-100">
+                  {categorizedPhones.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-2.5">
+                      {categorizedPhones.map((cp) => (
+                        <div
+                          key={cp.key}
+                          className="flex items-center justify-between gap-2.5 p-2.5 sm:px-3 sm:py-2.5 rounded-xl bg-slate-50/90 hover:bg-emerald-50/70 border border-slate-200/90 hover:border-emerald-400 transition-colors shadow-2xs group/item"
+                        >
+                          <div className="min-w-0 flex-1 space-y-0.5">
+                            <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5 leading-snug">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                              <span className="break-words">{cp.fullLabel}</span>
+                            </div>
+                            {cp.personName && (
+                              <div className="text-xs text-slate-600 pl-3 font-medium leading-snug break-words">
+                                {cp.personName}
+                              </div>
+                            )}
+                          </div>
+                          <a
+                            href={`tel:${cp.cleanDial}`}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs shadow-2xs hover:shadow transition shrink-0 cursor-pointer whitespace-nowrap"
+                            title={`တန်းပြီး ဖုန်းခေါ်မည် (${cp.fullLabel}: ${cp.number})`}
+                          >
+                            <Phone className="w-3.5 h-3.5 shrink-0" />
+                            <span className="font-mono tracking-tight text-xs">{cp.number}</span>
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-slate-400 italic">ဖုန်းနံပါတ် ထည့်သွင်းထားခြင်း မရှိသေးပါ</span>
+                  )}
                 </div>
               </div>
             );

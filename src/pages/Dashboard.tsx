@@ -847,7 +847,7 @@ export default function Dashboard() {
           >
             <option value="all">နှစ်စဉ်ကြေး အားလုံး</option>
             <option value="paid">နှစ်စဉ်ကြေး ပေးသွင်းပြီး</option>
-            <option value="unpaid">နှစ်စဉ်ကြေး မပေးရသေး</option>
+            <option value="unpaid">နှစ်စဉ်ကြေး မသွင်းရသေး</option>
           </select>
 
           <select
@@ -912,7 +912,7 @@ export default function Dashboard() {
                         : 'bg-rose-50 text-rose-800 border border-rose-200'
                     }`}
                   >
-                    {school.isAnnualFeePaid ? 'ကြေးပေးပြီး ✓' : 'မပေးသေး ✗'}
+                    {school.isAnnualFeePaid ? 'နှစ်စဉ်ကြေး သွင်းပြီး ✓' : 'နှစ်စဉ်ကြေး မသွင်းရသေး ✗'}
                   </span>
                 </div>
               </Link>

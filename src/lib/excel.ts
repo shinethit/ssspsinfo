@@ -9,7 +9,7 @@ export const downloadSchoolTemplate = () => {
       'ကျောင်းသားဦးရေ Range': '၁၀၁ - ၁၅၀ ဦး',
       'တိကျသော ကျောင်းသားဦးရေ': '120',
       'နှစ်စဉ်ကြေး ပမာဏ (ကျပ်)': '250000',
-      'နှစ်စဉ်ကြေး (ပေးပြီး / မပေးရသေး)': 'ပေးသွင်းပြီး',
+      'နှစ်စဉ်ကြေး (သွင်းပြီး / မသွင်းရသေး)': 'သွင်းပြီး',
       'ပညာသင်နှစ်': '၂၀၂၄-၂၀၂၅',
       'ကျောင်းဖုန်း (၁)': '09123456789',
       'ကျောင်းဖုန်း (၂)': '09123456780',
@@ -59,7 +59,7 @@ export const normalizeSchoolRow = (row: Record<string, any>) => {
     if (val === undefined || val === null) return false;
     if (typeof val === 'boolean') return val;
     const s = String(val).trim().toLowerCase();
-    return s === 'ပေးပြီး' || s === 'ပေးသွင်းပြီး' || s === 'ဟုတ်' || s === 'yes' || s === 'true' || s === '1' || s === 'paid' || s === '✓' || s === '✔';
+    return s === 'သွင်းပြီး' || s === 'ပေးသွင်းပြီး' || s === 'ပေးပြီး' || s === 'ဟုတ်' || s === 'yes' || s === 'true' || s === '1' || s === 'paid' || s === '✓' || s === '✔';
   };
 
   const parseStudentRange = (val: any): string => {
@@ -214,7 +214,7 @@ export const exportSchoolsToExcel = (schools: School[], filename: string = 'Scho
     'ကျောင်းသားဦးရေ Range': s.studentRange ? `${s.studentRange} ဦး` : '',
     'တိကျသော ကျောင်းသားဦးရေ': s.studentCount ?? '',
     'နှစ်စဉ်ကြေး ပမာဏ (ကျပ်)': s.feeAmount ?? '',
-    'နှစ်စဉ်ကြေး အခြေအနေ': s.isAnnualFeePaid ? 'ပေးသွင်းပြီး' : 'မပေးရသေး',
+    'နှစ်စဉ်ကြေး အခြေအနေ': s.isAnnualFeePaid ? 'သွင်းပြီး' : 'မသွင်းရသေး',
     'ပညာသင်နှစ်': s.feeAcademicYear || '',
     'ကြေးပေးသွင်းသည့်ရက်': s.feePaidDate || '',
     'ကျောင်းအခြေအနေ': s.status === 'under_review' ? 'စိစစ်ဆဲ' : s.status === 'inactive' ? 'ယာယီရပ်နား' : 'လည်ပတ်ဆဲ',
