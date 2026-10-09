@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { collection, getDocs, addDoc, deleteDoc, doc, setDoc, writeBatch, updateDoc, query, orderBy } from 'firebase/firestore';
-import { db, auth } from '../lib/firebase';
+import { db, auth, cleanFirestoreData } from '../lib/firebase';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -57,6 +57,8 @@ import {
   Cloud,
   LogOut,
   KeyRound,
+  Loader2,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { getAdminSession, clearAdminSession, changeAdminPassword } from '../lib/adminAuth';
 import { downloadSchoolTemplate, normalizeSchoolRow, exportSchoolsToExcel } from '../lib/excel';
@@ -320,8 +322,38 @@ export default function Admin() {
     updatedCount: number;
     skippedCount: number;
     mode: string;
+    fileName?: string;
+    timestamp?: string;
   } | null>(null);
   const [cleaningDuplicates, setCleaningDuplicates] = useState(false);
+
+  // Excel Upload Progress & Completion State
+  const [isUploadingExcel, setIsUploadingExcel] = useState(false);
+  const [excelUploadState, setExcelUploadState] = useState<{
+    status: 'idle' | 'reading' | 'validating' | 'uploading' | 'completed' | 'error';
+    fileName: string;
+    stageText: string;
+    progressPercent: number;
+    processedRows?: number;
+    totalRows?: number;
+    currentBatch?: number;
+    totalBatches?: number;
+    errorMsg?: string;
+    stats?: {
+      totalInFile: number;
+      newCount: number;
+      updatedCount: number;
+      skippedCount: number;
+      mode: string;
+      fileName: string;
+      timestamp: string;
+    };
+  }>({
+    status: 'idle',
+    fileName: '',
+    stageText: '',
+    progressPercent: 0,
+  });
 
   const getFormattedDateTime = () => {
     const now = new Date();
@@ -947,7 +979,9 @@ export default function Admin() {
       tabParam === 'associations' ||
       tabParam === 'tickers' ||
       tabParam === 'audit_logs' ||
-      tabParam === 'admins'
+      tabParam === 'admins' ||
+      tabParam === 'levels' ||
+      tabParam === 'backup'
     ) {
       setActiveTab(tabParam as any);
     }
@@ -1664,9 +1698,40 @@ export default function Admin() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const inputElement = e.target;
+
+    setIsUploadingExcel(true);
+    setExcelUploadState({
+      status: 'reading',
+      fileName: file.name,
+      stageText: 'Excel ဖိုင်အား စနစ်ထဲသို့ စတင်ဖတ်ရှုနေပါသည်...',
+      progressPercent: 15,
+    });
+
     const reader = new FileReader();
+
+    reader.onerror = () => {
+      setIsUploadingExcel(false);
+      setExcelUploadState({
+        status: 'error',
+        fileName: file.name,
+        stageText: 'ဖိုင်ဖတ်ရှုရာတွင် ချို့ယွင်းချက် ဖြစ်ပေါ်ပါသည်',
+        progressPercent: 0,
+        errorMsg: 'ရွေးချယ်ထားသော Excel ဖိုင်အား ဖတ်ရှု၍ မရပါ။ ဖိုင်ပျက်စီးနေခြင်း သို့မဟုတ် အခြားပရိုဂရမ်တစ်ခုခုတွင် ဖွင့်ထားခြင်း ရှိမရှိ စစ်ဆေးပေးပါ။',
+      });
+      toast.error('Excel ဖိုင် ဖတ်ရှု၍ မရပါ');
+      inputElement.value = '';
+    };
+
     reader.onload = async (evt) => {
       try {
+        setExcelUploadState(prev => ({
+          ...prev,
+          status: 'validating',
+          stageText: 'Excel ဇယားကွက်များ စစ်ဆေးပြီး အချက်အလက် ခွဲခြမ်းနေပါသည်...',
+          progressPercent: 30,
+        }));
+
         const bstr = evt.target?.result as string;
         const wb = XLSX.read(bstr, { type: 'binary' });
         const wsname = wb.SheetNames[0];
@@ -1674,16 +1739,34 @@ export default function Admin() {
         const data = XLSX.utils.sheet_to_json<Record<string, any>>(ws);
 
         if (!data || data.length === 0) {
+          setIsUploadingExcel(false);
+          setExcelUploadState({
+            status: 'error',
+            fileName: file.name,
+            stageText: 'Excel ဖိုင်ထဲတွင် ဒေတာ မရှိပါ',
+            progressPercent: 0,
+            errorMsg: 'ရွေးချယ်ထားသော Excel ဖိုင်ထဲတွင် ကျောင်းစာရင်း ဒေတာတန်း (Rows) တစ်စုံတစ်ရာ မတွေ့ရှိပါ။ ကျေးဇူးပြု၍ Template အတိုင်း ပြန်လည်စစ်ဆေးပါ။',
+          });
           toast.error('Excel ဖိုင်ထဲတွင် ဒေတာ မရှိပါ');
+          inputElement.value = '';
           return;
         }
 
         const validSchools = data
           .map(normalizeSchoolRow)
-          .filter(s => s.name.length > 0);
+          .filter(s => s.name && s.name.trim().length > 0);
 
         if (validSchools.length === 0) {
+          setIsUploadingExcel(false);
+          setExcelUploadState({
+            status: 'error',
+            fileName: file.name,
+            stageText: 'အကျုံးဝင်သော ကျောင်းအမည် မတွေ့ရှိပါ',
+            progressPercent: 0,
+            errorMsg: 'Excel ဖိုင်တွင် "ကျောင်းအမည်" (School Name) ဖြည့်သွင်းထားသော ဒေတာ မတွေ့ရှိပါ။ ပေးထားသော Template ကော်လံ ခေါင်းစဉ်များအတိုင်း စစ်ဆေးပေးပါ။',
+          });
           toast.error('ထည့်သွင်းရန် အကျုံးဝင်သော ကျောင်းအမည် မတွေ့ရှိပါ');
+          inputElement.value = '';
           return;
         }
 
@@ -1714,7 +1797,12 @@ export default function Admin() {
         let updatedCount = 0;
         let skippedCount = 0;
 
-        const batch = writeBatch(db);
+        interface BatchOp {
+          docRef: any;
+          data: any;
+          isMerge: boolean;
+        }
+        const operations: BatchOp[] = [];
 
         fileUniqueSchools.forEach(schoolItem => {
           const key = schoolItem.name.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -1722,63 +1810,140 @@ export default function Admin() {
 
           if (existingSchool) {
             if (duplicateMode === 'update') {
-              // Merge/update into existing school document - NO duplicate created!
               const docRef = doc(db, 'schools', existingSchool.id);
-              batch.set(
+              operations.push({
                 docRef,
-                {
+                data: cleanFirestoreData({
                   ...schoolItem,
                   createdAt: existingSchool.createdAt || new Date().toISOString(),
                   updatedAt: new Date().toISOString(),
-                },
-                { merge: true }
-              );
+                }),
+                isMerge: true,
+              });
               updatedCount++;
             } else if (duplicateMode === 'skip') {
-              // Skip existing school - leave untouched
               skippedCount++;
             } else {
-              // 'add' - add as new document anyway
+              // 'add'
               const docRef = doc(collection(db, 'schools'));
-              batch.set(docRef, { ...schoolItem, createdAt: new Date().toISOString() });
+              operations.push({
+                docRef,
+                data: cleanFirestoreData({
+                  ...schoolItem,
+                  createdAt: new Date().toISOString(),
+                }),
+                isMerge: false,
+              });
               newCount++;
             }
           } else {
-            // Brand new school not currently in database
+            // Brand new school
             const docRef = doc(collection(db, 'schools'));
-            batch.set(docRef, { ...schoolItem, createdAt: new Date().toISOString() });
+            operations.push({
+              docRef,
+              data: cleanFirestoreData({
+                ...schoolItem,
+                createdAt: new Date().toISOString(),
+              }),
+              isMerge: false,
+            });
             newCount++;
           }
         });
 
-        await batch.commit();
+        // 3. Chunk into batches of up to 150 items (Firestore batch write safe limit)
+        const CHUNK_SIZE = 150;
+        const totalBatches = operations.length > 0 ? Math.ceil(operations.length / CHUNK_SIZE) : 1;
+
+        if (operations.length > 0) {
+          for (let bIdx = 0; bIdx < totalBatches; bIdx++) {
+            const startIdx = bIdx * CHUNK_SIZE;
+            const endIdx = Math.min(operations.length, startIdx + CHUNK_SIZE);
+            const batchChunk = operations.slice(startIdx, endIdx);
+
+            const pct = Math.min(
+              92,
+              Math.round(40 + ((bIdx + 1) / totalBatches) * 50)
+            );
+
+            setExcelUploadState(prev => ({
+              ...prev,
+              status: 'uploading',
+              stageText: `Database (Cloud Firestore) သို့ ရေးသွင်းနေပါသည်... (အသုတ် ${bIdx + 1}/${totalBatches} - ကျောင်းပေါင်း ${endIdx}/${operations.length})`,
+              progressPercent: pct,
+              currentBatch: bIdx + 1,
+              totalBatches,
+              processedRows: endIdx,
+              totalRows: operations.length,
+            }));
+
+            const batch = writeBatch(db);
+            batchChunk.forEach(op => {
+              if (op.isMerge) {
+                batch.set(op.docRef, op.data, { merge: true });
+              } else {
+                batch.set(op.docRef, op.data);
+              }
+            });
+            await batch.commit();
+          }
+        }
+
+        // 4. Finalizing & Audit Logging
+        setExcelUploadState(prev => ({
+          ...prev,
+          stageText: 'စနစ်မှတ်တမ်း (Audit Log) သိမ်းဆည်းပြီး ဒေတာများ ပြန်လည်စစ်ဆေးနေပါသည်...',
+          progressPercent: 96,
+        }));
 
         await recordAuditLog({
           action: 'create',
           entityType: 'school',
-          details: `Excel ဖိုင်မှ ကျောင်းစာရင်း တင်သွင်းခဲ့သည် (အသစ်: ${newCount}၊ ပြင်ဆင်: ${updatedCount}၊ ကျော်ခဲ့: ${skippedCount})`,
+          details: `Excel ဖိုင် (${file.name}) မှ ကျောင်းစာရင်း တင်သွင်းခဲ့သည် (အသစ်: ${newCount}၊ ပြင်ဆင်: ${updatedCount}၊ ကျော်ခဲ့: ${skippedCount})`,
         });
 
-        setImportStats({
+        const statsResult = {
           totalInFile: validSchools.length,
           newCount,
           updatedCount,
           skippedCount,
           mode: duplicateMode,
+          fileName: file.name,
+          timestamp: new Date().toLocaleTimeString('my-MM', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        };
+
+        setImportStats(statsResult);
+        setIsUploadingExcel(false);
+        setExcelUploadState({
+          status: 'completed',
+          fileName: file.name,
+          stageText: 'ကျောင်းစာရင်းများ အောင်မြင်စွာ တင်သွင်းပြီးပါပြီ!',
+          progressPercent: 100,
+          stats: statsResult,
         });
 
         toast.success(
           `Excel တင်သွင်းမှု အောင်မြင်ပါသည်: အသစ် (${newCount}) ခု၊ Update (${updatedCount}) ခု၊ ကျော်ခဲ့ (${skippedCount}) ခု`
         );
-        fetchSchools();
-        fetchAuditLogs();
-      } catch (err) {
-        console.error(err);
-        toast.error('Excel ဖတ်ရာတွင် အမှားဖြစ်ပွားပါသည်');
+
+        await fetchSchools();
+        await fetchAuditLogs();
+      } catch (err: any) {
+        console.error('Excel Import Error:', err);
+        setIsUploadingExcel(false);
+        setExcelUploadState({
+          status: 'error',
+          fileName: file.name,
+          stageText: 'Excel တင်သွင်းစဉ် အမှားဖြစ်ပွားပါသည်',
+          progressPercent: 0,
+          errorMsg: err?.message || 'Database သို့ ရေးသွင်းရာတွင် ချို့ယွင်းချက် ဖြစ်ပေါ်ပါသည်။ ကွန်ရက်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ပြန်လည်ကြိုးစားပေးပါ။',
+        });
+        toast.error('Excel တင်သွင်းစဉ် အမှားဖြစ်ပွားပါသည်: ' + (err?.message || 'Error'));
+      } finally {
+        inputElement.value = '';
       }
     };
     reader.readAsBinaryString(file);
-    e.target.value = '';
   };
 
   const downloadTemplate = () => {
@@ -2584,6 +2749,191 @@ export default function Admin() {
               </div>
             </div>
 
+            {/* Uploading Progress Indicator Card (လုပ်နေရင် လုပ်နေကြောင်း ပြသခြင်း) */}
+            {isUploadingExcel && (
+              <div className="bg-sky-50 border-2 border-sky-400 p-5 rounded-2xl shadow-md space-y-3.5 animate-in fade-in zoom-in-95">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-sky-600 text-white shadow-xs">
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-extrabold text-sky-950 text-sm sm:text-base">
+                          Excel ဖိုင် တင်သွင်းနေပါသည် (Uploading Excel...)
+                        </h4>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-200 text-sky-900 animate-pulse">
+                          လုပ်ဆောင်နေဆဲ
+                        </span>
+                      </div>
+                      <p className="text-xs text-sky-700 mt-0.5 flex items-center gap-1.5 font-medium">
+                        <FileSpreadsheet className="w-3.5 h-3.5 text-sky-600" />
+                        <span>ဖိုင်အမည်: <strong className="font-bold text-sky-900">{excelUploadState.fileName}</strong></span>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-2xl sm:text-3xl font-black text-sky-900">
+                      {excelUploadState.progressPercent}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Animated Progress Bar */}
+                <div className="space-y-1.5">
+                  <div className="w-full bg-sky-200/80 rounded-full h-3 overflow-hidden p-0.5">
+                    <div
+                      className="bg-gradient-to-r from-sky-500 via-sky-600 to-indigo-600 h-full rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${excelUploadState.progressPercent}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-sky-850 font-semibold">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-sky-600 animate-ping" />
+                      <span>{excelUploadState.stageText}</span>
+                    </span>
+                    {excelUploadState.totalRows ? (
+                      <span className="text-sky-900 font-bold">
+                        {excelUploadState.processedRows} / {excelUploadState.totalRows} ကျောင်း
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="bg-white/90 border border-sky-200 rounded-xl p-2.5 text-xs text-slate-700 flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-sky-600 shrink-0" />
+                  <span>ကျေးဇူးပြု၍ စောင့်ဆိုင်းပေးပါ။ ဒေတာဘေ့စ် (Firestore) သို့ တိုက်ရိုက် ရေးသွင်းနေသဖြင့် Browser စာမျက်နှာကို မပိတ်ပါနှင့်။</span>
+                </div>
+              </div>
+            )}
+
+            {/* Upload Completed Report Card (ပြီးရင် ပြီးကြောင်း အသေးစိတ် ပြသခြင်း) */}
+            {excelUploadState.status === 'completed' && excelUploadState.stats && (
+              <div className="bg-emerald-50/90 border-2 border-emerald-400 p-5 sm:p-6 rounded-2xl shadow-md space-y-4 animate-in fade-in zoom-in-95">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-3 rounded-2xl bg-emerald-600 text-white shadow-xs shrink-0">
+                      <CheckCircle2 className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="font-extrabold text-emerald-950 text-base sm:text-lg">
+                          Excel တင်သွင်းခြင်း အောင်မြင်စွာ ပြီးဆုံးပါပြီ!
+                        </h4>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-200 text-emerald-900 border border-emerald-300">
+                          <Check className="w-3.5 h-3.5" /> ၁၀၀% ပြီးစီး
+                        </span>
+                      </div>
+                      <p className="text-xs text-emerald-800 mt-1 flex items-center gap-2 flex-wrap">
+                        <span>ဖိုင်အမည်: <strong className="font-bold text-emerald-950">{excelUploadState.stats.fileName}</strong></span>
+                        <span>•</span>
+                        <span>ပြီးဆုံးချိန်: <strong className="font-bold text-emerald-950">{excelUploadState.stats.timestamp}</strong></span>
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setExcelUploadState(prev => ({ ...prev, status: 'idle' }))}
+                    type="button"
+                    className="text-emerald-700 hover:text-emerald-950 hover:bg-emerald-100 px-2 py-1 rounded-lg transition text-xs font-bold cursor-pointer"
+                    title="ပိတ်ရန်"
+                  >
+                    ✕ ပိတ်ရန်
+                  </button>
+                </div>
+
+                {/* Statistics 4-Cards Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 pt-1">
+                  <div className="bg-white p-3 rounded-xl border border-emerald-200 shadow-2xs">
+                    <p className="text-[11px] text-slate-500 font-medium">ဖိုင်ထဲရှိ စုစုပေါင်း</p>
+                    <p className="text-lg sm:text-xl font-black text-slate-800 mt-0.5">
+                      {excelUploadState.stats.totalInFile} <span className="text-xs font-normal text-slate-500">ကျောင်း</span>
+                    </p>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-emerald-200 shadow-2xs">
+                    <p className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
+                      <Plus className="w-3 h-3" /> ကျောင်းအသစ်
+                    </p>
+                    <p className="text-lg sm:text-xl font-black text-emerald-700 mt-0.5">
+                      +{excelUploadState.stats.newCount} <span className="text-xs font-normal text-emerald-600">ကျောင်း</span>
+                    </p>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-sky-200 shadow-2xs">
+                    <p className="text-[11px] text-sky-700 font-medium flex items-center gap-1">
+                      <RefreshCw className="w-3 h-3" /> Update ပြုလုပ်ပြီး
+                    </p>
+                    <p className="text-lg sm:text-xl font-black text-sky-700 mt-0.5">
+                      {excelUploadState.stats.updatedCount} <span className="text-xs font-normal text-sky-600">ကျောင်း</span>
+                    </p>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs">
+                    <p className="text-[11px] text-amber-700 font-medium flex items-center gap-1">
+                      <CopyCheck className="w-3 h-3" /> ကျော်ခဲ့သော Duplicate
+                    </p>
+                    <p className="text-lg sm:text-xl font-black text-amber-700 mt-0.5">
+                      {excelUploadState.stats.skippedCount} <span className="text-xs font-normal text-amber-600">ကျောင်း</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Status Notice & Action Buttons */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-emerald-200/80">
+                  <div className="flex items-center gap-2 text-xs text-emerald-900 font-medium">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span>ကျောင်းစာရင်း ဒေတာများအားလုံး Cloud Firestore သို့ အပြည့်အဝ ရောက်ရှိပြီးဖြစ်၍ လက်ရှိစနစ်တွင် ချက်ချင်း အသုံးပြုနိုင်ပါပြီ။</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                    <a
+                      href="#admin-schools-table"
+                      className="bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Users className="w-3.5 h-3.5" /> ကျောင်းစာရင်း ကြည့်ရှုမည်
+                    </a>
+                    <button
+                      onClick={() => setExcelUploadState(prev => ({ ...prev, status: 'idle' }))}
+                      type="button"
+                      className="bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer"
+                    >
+                      ပြီးပါပြီ (Done)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Upload Error Alert Card */}
+            {excelUploadState.status === 'error' && (
+              <div className="bg-rose-50 border-2 border-rose-300 p-5 rounded-2xl shadow-md space-y-3 animate-in fade-in">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2.5 rounded-xl bg-rose-600 text-white shrink-0">
+                      <AlertCircle className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-rose-950 text-sm sm:text-base">
+                        {excelUploadState.stageText || 'Excel တင်သွင်းရာတွင် အမှားဖြစ်ပွားပါသည်'}
+                      </h4>
+                      <p className="text-xs text-rose-800 mt-1">
+                        {excelUploadState.errorMsg || 'ဖိုင်အတွင်းရှိ အချက်အလက်များကို ဖတ်ရှု၍ မရပါ။'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setExcelUploadState(prev => ({ ...prev, status: 'idle' }))}
+                    type="button"
+                    className="text-rose-600 hover:text-rose-800 text-xs font-bold p-1 cursor-pointer"
+                  >
+                    ✕ ပိတ်ရန်
+                  </button>
+                </div>
+                <div className="flex items-center gap-2 pt-1 text-xs text-rose-700">
+                  <span>💡 အကြံပြုချက်: "Excel Template ဒေါင်းလုဒ်လုပ်ရန်" ခလုတ်မှ Template ဖိုင်ကို ရယူပြီး ကော်လံခေါင်းစဉ်များ အတိုင်း စစ်ဆေးတင်သွင်းပေးပါ။</span>
+                </div>
+              </div>
+            )}
+
             {/* Import & Export Buttons */}
             <div className="flex flex-wrap items-center gap-3">
               <button
@@ -2593,12 +2943,27 @@ export default function Admin() {
               >
                 <Download className="w-4 h-4 text-sky-600" /> Excel Template ဒေါင်းလုဒ်လုပ်ရန်
               </button>
-              <label className="bg-sky-900 text-white px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold hover:bg-sky-800 transition flex items-center gap-2 cursor-pointer shadow-xs">
-                <Upload className="w-4 h-4" /> Excel ဖိုင် ရွေးချယ်တင်သွင်းရန်
+              <label className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 shadow-xs ${
+                isUploadingExcel
+                  ? 'bg-sky-700 text-sky-100 cursor-not-allowed pointer-events-none ring-2 ring-sky-300'
+                  : 'bg-sky-900 text-white hover:bg-sky-800 cursor-pointer'
+              }`}>
+                {isUploadingExcel ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>ဖိုင် တင်သွင်းနေပါသည်...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    <span>Excel ဖိုင် ရွေးချယ်တင်သွင်းရန်</span>
+                  </>
+                )}
                 <input
                   type="file"
                   onChange={handleExcelImport}
                   accept=".xlsx, .xls"
+                  disabled={isUploadingExcel}
                   className="hidden"
                 />
               </label>
@@ -2613,31 +2978,6 @@ export default function Admin() {
                 <Download className="w-4 h-4" /> ကျောင်းစာရင်းအားလုံး Excel ထုတ်ယူမည် ({schools.length})
               </button>
             </div>
-
-            {/* Import Report Banner if just imported */}
-            {importStats && (
-              <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl text-xs space-y-1.5 text-emerald-950 animate-in fade-in">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold flex items-center gap-1.5 text-sm text-emerald-900">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    နောက်ဆုံး တင်သွင်းမှု မှတ်တမ်းအကျဉ်း:
-                  </span>
-                  <button
-                    onClick={() => setImportStats(null)}
-                    type="button"
-                    className="text-slate-400 hover:text-slate-600 text-[11px]"
-                  >
-                    ပိတ်ရန်
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 font-semibold">
-                  <div>ဖိုင်ထဲရှိ စုစုပေါင်း: <span className="font-bold text-slate-800">{importStats.totalInFile}</span></div>
-                  <div>ကျောင်းအသစ်: <span className="font-bold text-emerald-700">{importStats.newCount}</span></div>
-                  <div>Update ပြင်ဆင်ပြီး: <span className="font-bold text-sky-700">{importStats.updatedCount}</span></div>
-                  <div>ကျော်ခဲ့သော Duplicate: <span className="font-bold text-amber-700">{importStats.skippedCount}</span></div>
-                </div>
-              </div>
-            )}
           </section>
 
           {/* School Form (Add & Edit) */}
@@ -3178,7 +3518,7 @@ export default function Admin() {
           </form>
 
           {/* Existing Schools List & Deduplicate Utility */}
-          <div className="bg-white p-6 sm:p-7 rounded-2xl border border-slate-200 shadow-xs space-y-5">
+          <div id="admin-schools-table" className="bg-white p-6 sm:p-7 rounded-2xl border border-slate-200 shadow-xs space-y-5 scroll-mt-20">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
                 <h3 className="font-bold text-lg sm:text-xl text-slate-900 flex items-center gap-2">
@@ -5366,6 +5706,31 @@ export default function Admin() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Floating Global Upload Indicator while uploading (လုပ်နေရင် လုပ်နေကြောင်း အမြဲမြင်နိုင်ရန်) */}
+      {isUploadingExcel && (
+        <aside
+          role="status"
+          aria-live="polite"
+          aria-label="Excel upload in progress"
+          className="fixed bottom-5 right-5 z-50 bg-sky-950 text-white p-3.5 sm:p-4 rounded-2xl shadow-2xl border-2 border-sky-400 flex items-center gap-3 max-w-sm animate-in fade-in slide-in-from-bottom-4"
+        >
+          <div className="p-2 rounded-xl bg-sky-600 text-white shrink-0">
+            <Loader2 className="w-5 h-5 animate-spin" />
+          </div>
+          <div className="text-xs min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-sky-100">Excel တင်သွင်းနေပါသည်</span>
+              <span className="px-1.5 py-0.5 rounded-full bg-sky-800 text-[10px] font-bold text-amber-300 border border-sky-600">
+                {excelUploadState.progressPercent}%
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-300 truncate mt-0.5 font-medium">
+              {excelUploadState.stageText}
+            </p>
+          </div>
+        </aside>
       )}
     </div>
   );

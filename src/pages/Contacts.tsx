@@ -423,7 +423,7 @@ export default function Contacts() {
             <span>Excel Template ဒေါင်းလုဒ်</span>
           </button>
           <Link
-            to="/admin"
+            to="/admin?tab=schools"
             className="bg-sky-50 border border-sky-200 text-sky-800 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold hover:bg-sky-100 transition flex items-center gap-1.5 shadow-2xs"
           >
             <Upload className="w-4 h-4 text-sky-700" />

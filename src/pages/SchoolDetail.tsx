@@ -7,6 +7,7 @@ import { School } from '../types';
 import { useData } from '../context/DataContext';
 import { toast } from 'sonner';
 import { ArrowLeft, Phone, Send, School as SchoolIcon, CheckCircle2, XCircle, Edit2, Trash2 } from 'lucide-react';
+import { getAdminSession } from '../lib/adminAuth';
 
 export default function SchoolDetail() {
   const { id } = useParams<{ id: string }>();
@@ -16,6 +17,7 @@ export default function SchoolDetail() {
   const [school, setSchool] = useState<School | null>(cachedSchool || null);
   const [loading, setLoading] = useState(!cachedSchool);
   const [user] = useAuthState(auth);
+  const isAdmin = Boolean(user || getAdminSession().isLoggedIn);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -112,7 +114,7 @@ export default function SchoolDetail() {
       </Link>
 
       {/* Admin Quick Control Bar (if signed in) */}
-      {user && (
+      {isAdmin && (
         <div className="bg-sky-50 border border-sky-200 p-3.5 sm:p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs animate-in fade-in">
           <div className="flex items-center gap-2 text-xs font-bold text-sky-950">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
