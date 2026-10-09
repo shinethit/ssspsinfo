@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
-html, body, #root {
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
   overflow-x: hidden;
   max-width: 100%;
   width: 100%;
@@ -9,10 +13,19 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Prevent horizontal scrollbars globally */
-* {
-  box-sizing: border-box;
+body {
+  overflow-x: hidden;
   max-width: 100%;
+  width: 100%;
+  position: relative;
+  margin: 0;
+  padding: 0;
+}
+
+#root {
+  overflow-x: hidden;
+  max-width: 100%;
+  width: 100%;
 }
 
 /* Hide any accidental horizontal scrollbar */

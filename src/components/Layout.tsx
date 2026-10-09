@@ -310,7 +310,7 @@ export default function Layout() {
         </main>
 
         {/* Global Footer */}
-        <footer className="bg-slate-100 border-t border-slate-200 py-6 px-4 text-center text-slate-500 text-xs sm:text-sm mt-auto w-full">
+        <footer className="bg-slate-100 border-t border-slate-200 py-6 px-4 text-center text-slate-500 text-xs sm:text-sm mt-auto w-full overflow-x-hidden">
           <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-slate-600">
             <p className="font-medium text-slate-700">
               ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း — သတင်းနှင့် ပြန်ကြားရေးဌာန

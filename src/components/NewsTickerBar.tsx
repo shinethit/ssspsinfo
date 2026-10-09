@@ -80,7 +80,7 @@ export default function NewsTickerBar() {
 
   return (
     <div
-      className={`w-full border-b transition-colors relative z-30 shadow-2xs ${badgeConfig.bannerBg}`}
+      className={`w-full max-w-full overflow-hidden border-b transition-colors relative z-30 shadow-2xs ${badgeConfig.bannerBg}`}
       role="region"
       aria-label="အရေးကြီး စာတန်းပြေး အသိပေးချက်"
     >

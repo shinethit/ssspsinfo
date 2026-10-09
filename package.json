@@ -28,7 +28,7 @@
     "react-router-dom": "^7.18.4",
     "sonner": "^2.0.8",
     "vite": "^8.3.0",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz",
+    "xlsx": "^0.18.5",
     "zod": "^4.6.5"
   },
   "devDependencies": {
