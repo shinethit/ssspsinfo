@@ -22,7 +22,19 @@ export default function ProtectedRoute() {
       }
 
       try {
-        const snap = await getDoc(doc(db, 'admins', user.uid));
+        let snap = await getDoc(doc(db, 'admins', user.uid));
+        if (!snap.exists() && user.email) {
+          const emailSnap = await getDoc(doc(db, 'admins', user.email)).catch(() => null);
+          if (emailSnap && emailSnap.exists()) {
+            snap = emailSnap;
+          }
+        }
+        if (!snap.exists() && user.email) {
+          const lowerEmailSnap = await getDoc(doc(db, 'admins', user.email.toLowerCase())).catch(() => null);
+          if (lowerEmailSnap && lowerEmailSnap.exists()) {
+            snap = lowerEmailSnap;
+          }
+        }
         if (isMounted) {
           setIsAdmin(snap.exists());
           setCheckingAdmin(false);

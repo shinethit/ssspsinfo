@@ -35,7 +35,13 @@ if (typeof window !== 'undefined') {
 
     try {
       const adminDocRef = doc(db, 'admins', user.uid);
-      const snap = await getDoc(adminDocRef);
+      let snap = await getDoc(adminDocRef);
+      if (!snap.exists() && user.email) {
+        snap = await getDoc(doc(db, 'admins', user.email)).catch(() => snap);
+      }
+      if (!snap.exists() && user.email) {
+        snap = await getDoc(doc(db, 'admins', user.email.toLowerCase())).catch(() => snap);
+      }
       if (snap.exists()) {
         const data = snap.data();
         cachedSession = {
@@ -129,10 +135,24 @@ export async function verifyAdminCredentials(
     let adminSnap;
     try {
       adminSnap = await getDoc(adminDocRef);
+      if (!adminSnap.exists() && user.email) {
+        const emailSnap = await getDoc(doc(db, 'admins', user.email)).catch(() => null);
+        if (emailSnap && emailSnap.exists()) {
+          adminSnap = emailSnap;
+        }
+      }
+      if (!adminSnap.exists() && user.email) {
+        const lowerEmailSnap = await getDoc(doc(db, 'admins', user.email.toLowerCase())).catch(() => null);
+        if (lowerEmailSnap && lowerEmailSnap.exists()) {
+          adminSnap = lowerEmailSnap;
+        }
+      }
     } catch (docErr: any) {
       const code = docErr?.code || 'permission-denied';
       console.error('Firestore admins/{uid} verification error code (err.code):', code, docErr);
-      await firebaseSignOut(auth);
+      try {
+        await firebaseSignOut(auth);
+      } catch {}
       cachedSession = { isLoggedIn: false, email: '', role: 'admin' };
       window.dispatchEvent(new Event('sssps_admin_auth_changed'));
       return {
@@ -142,15 +162,24 @@ export async function verifyAdminCredentials(
       };
     }
 
-    if (!adminSnap.exists()) {
+    if (!adminSnap || !adminSnap.exists()) {
       // User is authenticated in Firebase Auth but NOT authorized as an admin
-      await firebaseSignOut(auth);
+      console.error('Firebase Auth error code (err.code): auth/not-an-admin', {
+        uid: user.uid,
+        email: user.email,
+        expectedFirestorePath: `admins/${user.uid}`,
+      });
+      try {
+        await firebaseSignOut(auth);
+      } catch {}
       cachedSession = { isLoggedIn: false, email: '', role: 'admin' };
       window.dispatchEvent(new Event('sssps_admin_auth_changed'));
       return {
         success: false,
         errorCode: 'auth/not-an-admin',
-        error: 'ဤအကောင့်သည် စနစ်တွင် အက်ဒမင် (Admin) အဖြစ် ခွင့်ပြုချက် ရရှိထားခြင်း မရှိသေးပါ',
+        uid: user.uid,
+        email: user.email || cleanEmail,
+        error: `ဤအကောင့် (${user.email || cleanEmail}) သည် စနစ်တွင် အက်ဒမင် (Admin) အဖြစ် ခွင့်ပြုချက် ရရှိထားခြင်း မရှိသေးပါ`,
       };
     }
 

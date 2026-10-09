@@ -888,15 +888,15 @@ export default function Contacts() {
                           </div>
 
                           {/* Right: Actions (Direct Call Button + View Detail Link) */}
-                          <div className="flex items-center justify-end sm:justify-start gap-1.5 sm:gap-2 pl-9 sm:pl-0 shrink-0">
+                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 pl-9 sm:pl-0 shrink-0 max-w-full">
                             {primaryPhone ? (
                               <a
                                 href={`tel:${primaryPhone.cleanDial}`}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs shadow-xs hover:shadow transition cursor-pointer"
+                                className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs shadow-xs hover:shadow transition cursor-pointer max-w-full"
                                 title={`တန်းပြီး ဖုန်းခေါ်မည် (${primaryPhone.number})`}
                               >
                                 <Phone className="w-3.5 h-3.5 shrink-0" />
-                                <span>{primaryPhone.number}</span>
+                                <span className="truncate max-w-[140px] sm:max-w-none">{primaryPhone.number}</span>
                               </a>
                             ) : (
                               <span className="text-[11px] text-slate-400 italic px-1">ဖုန်းမရှိပါ</span>
@@ -1015,15 +1015,15 @@ export default function Contacts() {
                 </div>
 
                 {/* Right: Actions (Direct Call Button + View Detail Link) */}
-                <div className="flex items-center justify-end sm:justify-start gap-1.5 sm:gap-2 pl-9 sm:pl-0 shrink-0">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 pl-9 sm:pl-0 shrink-0 max-w-full">
                   {primaryPhone ? (
                     <a
                       href={`tel:${primaryPhone.cleanDial}`}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs shadow-xs hover:shadow transition cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs shadow-xs hover:shadow transition cursor-pointer max-w-full"
                       title={`တန်းပြီး ဖုန်းခေါ်မည် (${primaryPhone.number})`}
                     >
                       <Phone className="w-3.5 h-3.5 shrink-0" />
-                      <span>{primaryPhone.number}</span>
+                      <span className="truncate max-w-[140px] sm:max-w-none">{primaryPhone.number}</span>
                     </a>
                   ) : (
                     <span className="text-[11px] text-slate-400 italic px-1">ဖုန်းမရှိပါ</span>

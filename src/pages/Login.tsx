@@ -23,6 +23,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [notAdminInfo, setNotAdminInfo] = useState<{ uid: string; email: string } | null>(null);
 
   // Password Reset Mode (Firebase Auth Send Password Reset Email)
   const [showPasswordSetup, setShowPasswordSetup] = useState(false);
@@ -36,6 +37,7 @@ export default function Login() {
   const handleFormLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
+    setNotAdminInfo(null);
 
     const cleanUser = username.trim();
     const cleanPass = password.trim();
@@ -57,6 +59,9 @@ export default function Login() {
         if (res.errorCode) {
           console.error('Firebase Auth error code (err.code):', res.errorCode);
         }
+        if (res.errorCode === 'auth/not-an-admin' && res.uid) {
+          setNotAdminInfo({ uid: res.uid, email: res.email || cleanUser });
+        }
         setLoginError(res.error || 'စကားဝှက် မှားယွင်းနေပါသည်');
         toast.error(res.error || 'စကားဝှက် မှားယွင်းနေပါသည်');
         return;
@@ -71,6 +76,8 @@ export default function Login() {
         errMsg = 'အီးမေးလ် သို့မဟုတ် စကားဝှက် မှားယွင်းနေပါသည်။ ပြန်လည်စစ်ဆေးပါ။';
       } else if (err?.code === 'permission-denied' || err?.code === 'auth/permission-denied' || err?.code?.includes('permission-denied')) {
         errMsg = 'အချက်အလက်များ ဖတ်ရှုခွင့် ခွင့်ပြုချက် မရှိပါ (Permission Denied)။ စနစ်စီမံခန့်ခွဲသူထံ ဆက်သွယ်ပါ။';
+      } else if (err?.code === 'auth/not-an-admin') {
+        errMsg = 'ဤအကောင့်သည် စနစ်တွင် အက်ဒမင် (Admin) အဖြစ် ခွင့်ပြုချက် မရှိသေးပါ';
       }
       setLoginError(errMsg);
       toast.error(errMsg);
@@ -143,10 +150,39 @@ export default function Login() {
             /* Standard Secure Login Form */
             <form onSubmit={handleFormLogin} className="space-y-4">
               {loginError && (
-                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2.5 text-xs text-rose-800 animate-in fade-in">
+                <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-2.5 text-xs text-rose-800 animate-in fade-in">
                   <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                  <div className="space-y-1">
+                  <div className="space-y-2 flex-1 min-w-0">
                     <p className="font-semibold">{loginError}</p>
+
+                    {notAdminInfo && notAdminInfo.uid && (
+                      <div className="p-3 bg-amber-50/90 border border-amber-300 rounded-xl text-amber-900 text-[11px] space-y-2 mt-2">
+                        <div className="font-bold flex items-center gap-1.5 text-amber-900">
+                          <HelpCircle className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                          <span>Firestore Admin ခွင့်ပြုချက် သတ်မှတ်နည်း</span>
+                        </div>
+                        <p className="text-amber-800 leading-relaxed">
+                          Firebase Console &gt; Firestore Database &gt; <code className="bg-amber-100 font-bold px-1 rounded">admins</code> collection ထဲတွင် Document ID အဖြစ် အောက်ပါ UID ဖြင့် Document အသစ် ဖန်တီးပေးပါ-
+                        </p>
+                        <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-amber-300 font-mono text-[10px] break-all select-all shadow-2xs">
+                          <span className="flex-1 font-bold text-slate-900">{notAdminInfo.uid}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(notAdminInfo.uid);
+                              toast.success('UID ကို ကူးယူပြီးပါပြီ');
+                            }}
+                            className="px-2.5 py-1 bg-amber-600 text-white rounded-md text-[10px] font-sans font-bold hover:bg-amber-700 shrink-0 cursor-pointer transition shadow-2xs"
+                          >
+                            Copy UID
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-amber-700 font-medium">
+                          Fields: <code className="bg-amber-100 px-1 py-0.5 rounded font-mono">role: "admin"</code> (သို့မဟုတ် <code className="bg-amber-100 px-1 py-0.5 rounded font-mono">"super_admin"</code>)
+                        </p>
+                      </div>
+                    )}
+
                     <p className="text-[11px] text-rose-600">
                       စကားဝှက် မေ့နေပါက အောက်ရှိ{' '}
                       <button
