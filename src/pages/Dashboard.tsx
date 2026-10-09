@@ -874,30 +874,44 @@ export default function Dashboard() {
               <Link
                 key={school.id}
                 to={`/schools/${school.id}`}
-                className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-50 px-3 rounded-xl transition group"
+                className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50 px-3 rounded-xl transition group"
               >
-                <div className="space-y-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-bold text-xs sm:text-sm text-sky-950 group-hover:text-sky-700">
-                      {school.name}
-                    </span>
-                    {school.level && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold border border-slate-200">
-                        {school.level}
+                <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+                  {school.logoUrl ? (
+                    <img
+                      src={school.logoUrl}
+                      alt={school.name}
+                      className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl object-cover border border-slate-200 bg-white p-0.5 shrink-0 group-hover:scale-105 transition"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-sky-900 text-white flex items-center justify-center shrink-0 group-hover:bg-sky-800 transition shadow-2xs">
+                      <SchoolIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                    </div>
+                  )}
+
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-bold text-xs sm:text-sm text-sky-950 group-hover:text-sky-700">
+                        {school.name}
                       </span>
-                    )}
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-50 text-sky-800 font-medium border border-sky-100">
-                      ကျောင်းသား: {school.studentRange || '1-100'} ဦး
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 flex flex-wrap gap-x-3">
-                    {school.founderName && <span>တည်ထောင်သူ: {school.founderName}</span>}
-                    {school.adminName && <span>စီမံအုပ်ချုပ်သူ: {school.adminName}</span>}
-                    {school.contactName && <span>တာဝန်ခံ (၁): {school.contactName}</span>}
-                    {school.contact2Name && <span>တာဝန်ခံ (၂): {school.contact2Name}</span>}
-                    {(school.schoolPhone || school.schoolPhone2) && (
-                      <span>ဖုန်း: {[school.schoolPhone, school.schoolPhone2].filter(Boolean).join(', ')}</span>
-                    )}
+                      {school.level && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold border border-slate-200">
+                          {school.level}
+                        </span>
+                      )}
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-50 text-sky-800 font-medium border border-sky-100">
+                        ကျောင်းသား: {school.studentRange || '1-100'} ဦး
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 flex flex-wrap gap-x-3">
+                      {school.founderName && <span>တည်ထောင်သူ: {school.founderName}</span>}
+                      {school.adminName && <span>စီမံအုပ်ချုပ်သူ: {school.adminName}</span>}
+                      {school.contactName && <span>တာဝန်ခံ (၁): {school.contactName}</span>}
+                      {school.contact2Name && <span>တာဝန်ခံ (၂): {school.contact2Name}</span>}
+                      {(school.schoolPhone || school.schoolPhone2) && (
+                        <span>ဖုန်း: {[school.schoolPhone, school.schoolPhone2].filter(Boolean).join(', ')}</span>
+                      )}
+                    </div>
                   </div>
                 </div>
 

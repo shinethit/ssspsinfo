@@ -6,7 +6,7 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { School } from '../types';
 import { useData } from '../context/DataContext';
 import { toast } from 'sonner';
-import { ArrowLeft, Phone, Send, School as SchoolIcon, CheckCircle2, XCircle, Edit2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Phone, Send, School as SchoolIcon, CheckCircle2, XCircle, Edit2, Trash2, MapPin } from 'lucide-react';
 import { getAdminSession } from '../lib/adminAuth';
 
 export default function SchoolDetail() {
@@ -316,6 +316,42 @@ export default function SchoolDetail() {
             </div>
           </div>
         </div>
+
+        {/* Location & Address Section (ကျောင်းလိပ်စာ၊ မြို့နယ်၊ မြို့၊ ဇုန်) */}
+        {(school.address || school.township || school.city || school.zone) && (
+          <div className="p-4 sm:p-5 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+            <div className="flex items-center gap-2 text-sm font-bold text-sky-950 border-b border-slate-100 pb-2">
+              <MapPin className="w-4 h-4 text-sky-600 shrink-0" />
+              <span>ကျောင်းတည်နေရာနှင့် လိပ်စာ အချက်အလက်များ</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+              {school.address && (
+                <div className="sm:col-span-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <span className="text-[11px] text-slate-500 font-medium block">ကျောင်းလိပ်စာ</span>
+                  <span className="font-bold text-slate-800 text-sm mt-0.5 block">{school.address}</span>
+                </div>
+              )}
+              {school.township && (
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <span className="text-[11px] text-slate-500 font-medium block">မြို့နယ်</span>
+                  <span className="font-bold text-slate-800 text-sm mt-0.5 block">{school.township}</span>
+                </div>
+              )}
+              {school.city && (
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <span className="text-[11px] text-slate-500 font-medium block">မြို့</span>
+                  <span className="font-bold text-slate-800 text-sm mt-0.5 block">{school.city}</span>
+                </div>
+              )}
+              {school.zone && (
+                <div className="bg-sky-50 p-3 rounded-xl border border-sky-100">
+                  <span className="text-[11px] text-sky-800 font-medium block">ဇုန် (Zone)</span>
+                  <span className="font-extrabold text-sky-950 text-sm mt-0.5 block">{school.zone}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Contact Roles Grid (Founder, Admin, Coordinator 1, Coordinator 2) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">

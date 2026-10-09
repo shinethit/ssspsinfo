@@ -56,6 +56,7 @@ import {
   FileJson,
   Check,
   ArrowDownToLine,
+  MapPin,
   Settings as SettingsIcon,
   Cloud,
   LogOut,
@@ -90,6 +91,10 @@ const schoolSchema = z.object({
   logoUrl: z.string().optional(),
   name: z.string().min(1, 'ကျောင်းအမည် လိုအပ်သည်'),
   level: z.string().min(1, 'ကျောင်းအဆင့် လိုအပ်သည်'),
+  address: z.string().optional(),
+  township: z.string().optional(),
+  city: z.string().optional(),
+  zone: z.string().optional(),
   studentRange: z.string().default('0-100').optional(),
   studentCount: z.union([z.number(), z.string()]).optional(),
   feeAmount: z.union([z.number(), z.string()]).optional(),
@@ -438,8 +443,12 @@ export default function Admin() {
     resolver: zodResolver(schoolSchema),
     defaultValues: {
       name: '',
-      level: 'အထက်တန်း',
-      studentRange: '1-100',
+      level: '၁။ အထက်တန်း',
+      address: '',
+      township: '',
+      city: '',
+      zone: '',
+      studentRange: '0-100',
       studentCount: '',
       feeAmount: 50000,
       feeAcademicYear: '၂၀၂၄-၂၀၂၅',
@@ -1351,6 +1360,10 @@ export default function Admin() {
     schoolForm.reset({
       name: school.name || '',
       level: school.level || '၁။ အထက်တန်း',
+      address: school.address || '',
+      township: school.township || '',
+      city: school.city || '',
+      zone: school.zone || '',
       studentRange: school.studentRange || '0-100',
       studentCount: school.studentCount !== undefined && school.studentCount !== null ? school.studentCount : '',
       feeAmount: school.feeAmount !== undefined && school.feeAmount !== null ? school.feeAmount : (rangeTier?.defaultFee ?? 200000),
@@ -1412,6 +1425,10 @@ export default function Admin() {
     schoolForm.reset({
       name: '',
       level: '၁။ အထက်တန်း',
+      address: '',
+      township: '',
+      city: '',
+      zone: '',
       studentRange: '0-100',
       studentCount: '',
       feeAmount: 200000,
@@ -1526,6 +1543,10 @@ export default function Admin() {
 
       const payload = {
         ...data,
+        address: data.address ? data.address.trim() : '',
+        township: data.township ? data.township.trim() : '',
+        city: data.city ? data.city.trim() : '',
+        zone: data.zone ? data.zone.trim() : '',
         schoolPhone: data.schoolPhone ? data.schoolPhone.trim() : '',
         schoolPhone2: data.schoolPhone2 ? data.schoolPhone2.trim() : '',
         schoolPhones: cleanSchoolPhones,
@@ -3085,6 +3106,56 @@ export default function Admin() {
                   <option value="under_review">🟡 စိစစ်ဆဲ / စစ်ဆေးဆဲ (Under Review)</option>
                   <option value="inactive">⚪ ယာယီရပ်နား / ရပ်ဆိုင်း (Inactive)</option>
                 </select>
+              </div>
+
+              {/* Location & Address Section (ကျောင်းလိပ်စာ၊ မြို့နယ်၊ မြို့၊ ဇုန်) */}
+              <div className="sm:col-span-2 p-3.5 sm:p-4 rounded-xl bg-slate-50 border border-slate-200/90 space-y-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-sky-950 border-b border-slate-200 pb-2">
+                  <MapPin className="w-4 h-4 text-sky-600" />
+                  <span>ကျောင်းတည်နေရာနှင့် လိပ်စာ အချက်အလက်များ (ကျောင်းလိပ်စာ၊ မြို့နယ်၊ မြို့၊ ဇုန်)</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="sm:col-span-2 lg:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      ကျောင်းလိပ်စာ (Address)
+                    </label>
+                    <input
+                      {...schoolForm.register('address')}
+                      placeholder="ဥပမာ - အမှတ် (၁၂)၊ ဗိုလ်ချုပ်လမ်း"
+                      className="w-full p-2.5 border rounded-lg text-sm bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      မြို့နယ် (Township)
+                    </label>
+                    <input
+                      {...schoolForm.register('township')}
+                      placeholder="ဥပမာ - တောင်ကြီး"
+                      className="w-full p-2.5 border rounded-lg text-sm bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      မြို့ (City)
+                    </label>
+                    <input
+                      {...schoolForm.register('city')}
+                      placeholder="ဥပမာ - တောင်ကြီး"
+                      className="w-full p-2.5 border rounded-lg text-sm bg-white"
+                    />
+                  </div>
+                  <div className="sm:col-span-2 lg:col-span-4">
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      ဇုန် (Zone)
+                    </label>
+                    <input
+                      {...schoolForm.register('zone')}
+                      placeholder="ဥပမာ - အရှေ့ဇုန် / အနောက်ဇုန် / ဇုန် (၁)"
+                      className="w-full p-2.5 border rounded-lg text-sm bg-white"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Annual Fee & Student Count Range Settings Block */}

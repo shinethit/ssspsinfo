@@ -186,6 +186,11 @@ export interface School {
   level: string;
   category?: string;
   status?: SchoolStatus;
+  // Location & Address Information (ကျောင်းလိပ်စာ၊ မြို့နယ်၊ မြို့၊ ဇုန်)
+  address?: string;
+  township?: string;
+  city?: string;
+  zone?: string;
   studentRange?: string; // e.g. '1-100', '101-300', '301-500', '501-1000', '1000+'
   studentCount?: number; // optional exact student count
   feeAmount?: number; // annual fee amount in MMK (e.g. 50000, 100000, 150000, 200000, 300000)

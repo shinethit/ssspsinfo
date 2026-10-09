@@ -6,6 +6,10 @@ export const downloadSchoolTemplate = () => {
     {
       'ကျောင်းအမည် *': 'ဥပမာ - ပညာရောင်ခြည် ကိုယ်ပိုင်အထက်တန်းကျောင်း',
       'ကျောင်းအဆင့် *': '၁။ အထက်တန်း',
+      'ကျောင်းလိပ်စာ': 'အမှတ် (၁၂)၊ ဗိုလ်ချုပ်လမ်း',
+      'မြို့နယ်': 'တောင်ကြီး',
+      'မြို့': 'တောင်ကြီး',
+      'ဇုန်': 'အရှေ့ဇုန်',
       'ကျောင်းသားဦးရေ Range': '၁၀၁ - ၁၅၀ ဦး',
       'တိကျသော ကျောင်းသားဦးရေ': '120',
       'နှစ်စဉ်ကြေး ပမာဏ (ကျပ်)': '250000',
@@ -134,6 +138,10 @@ export const normalizeSchoolRow = (row: Record<string, any>) => {
     return {
       name: cleanStr(row['name'] || row['ကျောင်းအမည် *'] || row['ကျောင်းအမည်'] || ''),
       level: cleanStr(row['level'] || row['ကျောင်းအဆင့် *'] || row['ကျောင်းအဆင့်'] || '၁။ အထက်တန်း'),
+      address: cleanStr(row['address'] || row['ကျောင်းလိပ်စာ'] || row['လိပ်စာ'] || ''),
+      township: cleanStr(row['township'] || row['မြို့နယ်'] || ''),
+      city: cleanStr(row['city'] || row['မြို့'] || ''),
+      zone: cleanStr(row['zone'] || row['ဇုန်'] || row['ဇုံ'] || ''),
       studentRange: stdRange,
       studentCount: parseNumber(row['studentCount'] ?? row['တိကျသော ကျောင်းသားဦးရေ'] ?? row['ကျောင်းသားဦးရေ']),
       feeAmount: explicitFee !== undefined ? explicitFee : (
@@ -211,6 +219,10 @@ export const exportSchoolsToExcel = (schools: School[], filename: string = 'Scho
     'စဉ်': idx + 1,
     'ကျောင်းအမည်': s.name,
     'ကျောင်းအဆင့်': s.level,
+    'ကျောင်းလိပ်စာ': s.address || '',
+    'မြို့နယ်': s.township || '',
+    'မြို့': s.city || '',
+    'ဇုန်': s.zone || '',
     'ကျောင်းသားဦးရေ Range': s.studentRange ? `${s.studentRange} ဦး` : '',
     'တိကျသော ကျောင်းသားဦးရေ': s.studentCount ?? '',
     'နှစ်စဉ်ကြေး ပမာဏ (ကျပ်)': s.feeAmount ?? '',

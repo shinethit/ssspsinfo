@@ -38,7 +38,7 @@ export default function Layout() {
 
   const utilityLinks = [
     { to: '/admin', label: 'အက်ဒမင် ဧရိယာ', labelEn: 'Admin Portal', icon: ShieldCheck, badge: 'Admin' },
-    { to: '/versions', label: 'ဗားရှင်းမှတ်တမ်း', labelEn: 'Version History', icon: History, badge: 'v2.5' },
+    { to: '/versions', label: 'ဗားရှင်းမှတ်တမ်း', labelEn: 'Version History', icon: History, badge: 'v2.6' },
   ];
 
   const closeSidebar = () => setSidebarOpen(false);
@@ -87,13 +87,13 @@ export default function Layout() {
               type="button"
               onClick={() => window.dispatchEvent(new CustomEvent('sssps_open_version_modal'))}
               className="bg-black hover:bg-neutral-800 text-white font-bold text-xs px-2 sm:px-3 py-1.5 rounded-xl border border-neutral-700 shadow-xs inline-flex items-center gap-1 sm:gap-1.5 transition cursor-pointer shrink-0"
-              title="Version Update v2.5 (အသစ်ပါဝင်မှုများ ကြည့်ရန်)"
+              title="Version Update v2.6 (အသစ်ပါဝင်မှုများ ကြည့်ရန်)"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
               <span className="hidden md:inline font-bold whitespace-nowrap">Version Update</span>
               <span className="md:hidden font-bold text-[11px]">Update</span>
               <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-neutral-800 text-amber-300 font-mono font-bold">
-                v2.5
+                v2.6
               </span>
             </button>
 
@@ -196,7 +196,7 @@ export default function Layout() {
                 <span className="truncate">Version Update (အမဲ)</span>
               </div>
               <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-neutral-800 text-amber-300 border border-neutral-700 shrink-0">
-                v2.5
+                v2.6
               </span>
             </button>
 
@@ -267,7 +267,7 @@ export default function Layout() {
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-sky-950">System Version</span>
               <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-black text-amber-300 border border-neutral-800">
-                v2.5 (Version Update အမဲ)
+                v2.6 (Version Update အမဲ)
               </span>
             </div>
             <p className="text-[11px] text-slate-500 leading-normal">
@@ -321,7 +321,7 @@ export default function Layout() {
                 onClick={() => window.dispatchEvent(new CustomEvent('sssps_open_version_modal'))}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black text-white text-xs font-mono font-bold border border-neutral-800 hover:bg-neutral-800 transition cursor-pointer"
               >
-                <Sparkles className="w-3 h-3 text-amber-400" /> Version Update v2.5
+                <Sparkles className="w-3 h-3 text-amber-400" /> Version Update v2.6
               </button>
               <span>•</span>
               <p>© 2026 All rights reserved</p>
