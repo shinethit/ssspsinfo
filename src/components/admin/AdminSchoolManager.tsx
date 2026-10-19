@@ -6,6 +6,7 @@ import {
 import { Link } from 'react-router-dom';
 import { School, SchoolLevelItem } from '../../types';
 import { getUnifiedSchoolLevels } from '../../lib/schoolLevels';
+import { DEFAULT_ZONES } from '../../data/zones';
 
 interface AdminSchoolManagerProps {
   schools: School[];
@@ -28,6 +29,7 @@ export default function AdminSchoolManager({
 }: AdminSchoolManagerProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'under_review' | 'inactive'>('all');
+  const [zoneFilter, setZoneFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'name_asc' | 'name_desc' | 'newest' | 'fee_paid' | 'fee_unpaid'>('name_asc');
   const [showExcelPanel, setShowExcelPanel] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
@@ -44,10 +46,11 @@ export default function AdminSchoolManager({
         (s.adminName && s.adminName.toLowerCase().includes(q));
       
       const matchStatus = statusFilter === 'all' || (s.status || 'active') === statusFilter;
+      const matchZone = zoneFilter === 'all' || s.zone === zoneFilter;
 
-      return matchSearch && matchStatus;
+      return matchSearch && matchStatus && matchZone;
     });
-  }, [schools, searchQuery, statusFilter]);
+  }, [schools, searchQuery, statusFilter, zoneFilter]);
 
   // 2. Sort
   const sortedSchools = useMemo(() => {
@@ -155,6 +158,12 @@ export default function AdminSchoolManager({
             className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-sky-500 outline-none"
           />
         </div>
+        <select value={zoneFilter} onChange={(e) => { setZoneFilter(e.target.value); setCurrentPage(1); }} className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium outline-none">
+          <option value="all">ဇုန် အားလုံး</option>
+          {DEFAULT_ZONES.map(z => (
+            <option key={z} value={z}>{z}</option>
+          ))}
+        </select>
         <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value as any); setCurrentPage(1); }} className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium outline-none">
           <option value="all">အခြေအနေအားလုံး</option>
           <option value="active">🟢 လည်ပတ်ဆဲ</option>

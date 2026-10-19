@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { MapPin, Edit2, Plus, Users, Phone, FileText } from 'lucide-react';
 import ImageUploadDropzone from '../ImageUploadDropzone';
 import { STUDENT_RANGE_TIERS, getStudentRangeTier } from '../../types';
+import { DEFAULT_ZONES } from '../../data/zones';
 
 const schoolSchema = z.object({
   logoUrl: z.string().optional(), name: z.string().min(1, 'ကျောင်းအမည် လိုအပ်သည်'),
@@ -130,7 +131,12 @@ export default function SchoolForm({ initialData, isEditing, onCancel, onSubmit,
                   <input {...schoolForm.register('address')} placeholder="ကျောင်းလိပ်စာ" className="w-full p-2.5 border rounded-lg text-sm bg-white" />
                   <input {...schoolForm.register('township')} placeholder="မြို့နယ်" className="w-full p-2.5 border rounded-lg text-sm bg-white" />
                   <input {...schoolForm.register('city')} placeholder="မြို့" className="w-full p-2.5 border rounded-lg text-sm bg-white" />
-                  <input {...schoolForm.register('zone')} placeholder="ဇုန်" className="w-full p-2.5 border rounded-lg text-sm bg-white" />
+                  <select {...schoolForm.register('zone')} className="w-full p-2.5 border rounded-lg text-sm bg-white">
+                    <option value="">- ဇုန် ရွေးပါ -</option>
+                    {DEFAULT_ZONES.map(z => (
+                      <option key={z} value={z}>{z}</option>
+                    ))}
+                  </select>
                </div>
             </div>
 
