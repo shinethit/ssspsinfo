@@ -4837,6 +4837,35 @@ export default function Admin() {
           </div>
         </aside>
       )}
+    
+      {/* School Form Modal (Add/Edit) */}
+      {isSchoolFormOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex justify-center p-4 sm:p-6 overflow-y-auto">
+          <div className="relative w-full max-w-5xl my-auto">
+            <div className="flex justify-end mb-2">
+              <button
+                type="button"
+                onClick={() => setIsSchoolFormOpen(false)}
+                className="bg-white hover:bg-slate-100 text-slate-800 px-4 py-2 rounded-xl font-bold shadow-md flex items-center gap-2 transition cursor-pointer"
+              >
+                <XCircle className="w-5 h-5 text-rose-500" /> ပိတ်မည် (Close)
+              </button>
+            </div>
+            <SchoolForm
+              initialData={editingSchoolId ? schools.find(s => s.id === editingSchoolId) : undefined}
+              isEditing={!!editingSchoolId}
+              onCancel={() => setIsSchoolFormOpen(false)}
+              onSubmit={async (data) => {
+                await onSchoolSubmit(data);
+                setIsSchoolFormOpen(false);
+              }}
+              schoolLevels={schoolLevels}
+              setActiveTab={setActiveTab}
+            />
+          </div>
+        </div>
+      )}
+    
     </div>
   );
 }
