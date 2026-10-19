@@ -138,7 +138,7 @@ export default function SchoolDetail() {
 
             {/* Edit School Button */}
             <Link
-              to={`/admin?tab=schools&editSchoolId=${school.id}`}
+              to={`/admin?tab=schools`}
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 transition shadow-2xs"
               title="ဤကျောင်းအချက်အလက်ကို ပြင်ဆင်ရန်"
             >

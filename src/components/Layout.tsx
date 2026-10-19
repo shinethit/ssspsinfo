@@ -16,6 +16,8 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import NewsTickerBar from './NewsTickerBar';
+import GlobalSearch from './GlobalSearch';
+import { CURRENT_VERSION } from '../constants';
 import { OfflineIndicator } from './OfflineIndicator';
 
 export default function Layout() {
@@ -97,6 +99,7 @@ export default function Layout() {
 
           {/* Right: Clean Admin Link */}
           <div className="flex items-center gap-2 shrink-0">
+            <GlobalSearch />
             <Link
               to="/admin"
               onClick={closeSidebar}
@@ -146,7 +149,7 @@ export default function Layout() {
                   onClick={closeSidebar}
                   className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold transition group ${
                     isActive
-                      ? 'bg-sky-900 text-white shadow-xs'
+                      ? 'bg-sky-50 text-sky-900 font-bold border-l-4 border-sky-600'
                       : 'text-slate-700 hover:bg-sky-50 hover:text-sky-950'
                   }`}
                 >
@@ -180,7 +183,7 @@ export default function Layout() {
                   onClick={closeSidebar}
                   className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold transition group ${
                     isActive
-                      ? 'bg-sky-900 text-white shadow-xs'
+                      ? 'bg-sky-50 text-sky-900 font-bold border-l-4 border-sky-600'
                       : 'text-slate-700 hover:bg-sky-50 hover:text-sky-950'
                   }`}
                 >
@@ -210,26 +213,31 @@ export default function Layout() {
         </div>
 
         {/* Sidebar Footer Card */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50/70 space-y-2">
+        
+        <div className="p-4 border-t border-slate-100 bg-slate-50/70 space-y-3">
+          <button
+            type="button"
+            onClick={() => {
+              // Dispatch the custom event to open the modal
+              window.dispatchEvent(new CustomEvent('sssps_open_version_modal'));
+              closeSidebar();
+            }}
+            className="w-full bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-2xs cursor-pointer"
+          >
+            <History className="w-4 h-4 text-sky-600" />
+            <span>Update စစ်ဆေးရန် (Force Update)</span>
+          </button>
+
           <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1 shadow-2xs">
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-sky-950">System Version</span>
               <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
-                v2.11
+                {CURRENT_VERSION}
               </span>
             </div>
             <p className="text-[11px] text-slate-500 leading-normal">
               ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း
             </p>
-            <div className="pt-1">
-              <Link
-                to="/versions"
-                onClick={closeSidebar}
-                className="text-[11px] text-sky-700 hover:underline font-semibold flex items-center gap-1"
-              >
-                ဗားရှင်းမှတ်တမ်း ကြည့်ရန် →
-              </Link>
-            </div>
           </div>
         </div>
       </aside>
@@ -256,7 +264,7 @@ export default function Layout() {
                 to="/versions"
                 className="text-slate-600 hover:text-sky-900 font-medium hover:underline"
               >
-                ဗားရှင်းမှတ်တမ်း (v2.11)
+                ဗားရှင်းမှတ်တမ်း ({CURRENT_VERSION})
               </Link>
               <span>•</span>
               <p>© 2026 All rights reserved</p>

@@ -18,11 +18,13 @@ import Chat from './pages/Chat';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
 import ProtectedRoute from './components/ProtectedRoute';
+import { VersionUpdateModal } from './components/VersionUpdateModal';
 
 export default function App() {
   return (
     <BrowserRouter>
       <DataProvider>
+        <VersionUpdateModal />
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<Home />} />

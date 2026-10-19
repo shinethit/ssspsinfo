@@ -340,7 +340,7 @@ export default function Dashboard() {
         {/* Paid Schools Count */}
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-2">
           <div className="flex items-center justify-between text-slate-500">
-            <span className="text-xs font-semibold">နှစ်စဉ်ကြေး ပေးပြီး</span>
+            <span className="text-xs font-semibold">နှစ်စဉ်ကြေး ပေးသွင်းပြီး</span>
             <span className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
               <CheckCircle2 className="w-4 h-4" />
             </span>
@@ -516,7 +516,7 @@ export default function Dashboard() {
 
                 <div className="space-y-1.5">
                   <div className="flex items-baseline justify-between text-xs">
-                    <span className="text-slate-600 font-medium">နှစ်စဉ်ကြေး ပေးပြီး:</span>
+                    <span className="text-slate-600 font-medium">နှစ်စဉ်ကြေး ပေးသွင်းပြီး:</span>
                     <span className="font-black text-emerald-700">
                       {item.paid} <span className="text-[10px] font-normal text-slate-400">({item.pct}%)</span>
                     </span>
@@ -768,7 +768,7 @@ export default function Dashboard() {
               </table>
             </div>
             <p className="text-[11px] text-slate-500 italic text-right">
-              * အကွက်တစ်ခုစီရှိ ဂဏန်းမှာ (နှစ်စဉ်ကြေး ပေးပြီး ကျောင်းအရေအတွက် / အဆင့်တူ အသင်းဝင် စုစုပေါင်း) ဖြစ်ပါသည်။
+              * အကွက်တစ်ခုစီရှိ ဂဏန်းမှာ (နှစ်စဉ်ကြေး ပေးသွင်းပြီး ကျောင်းအရေအတွက် / အဆင့်တူ အသင်းဝင် စုစုပေါင်း) ဖြစ်ပါသည်။
             </p>
           </div>
         )}
