@@ -45,6 +45,8 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
+          skipWaiting: true,
+          clientsClaim: true,
           maximumFileSizeToCacheInBytes: 6 * 1024 * 1024, // 6 MiB
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
           navigateFallback: '/index.html',

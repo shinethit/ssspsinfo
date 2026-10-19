@@ -23,9 +23,11 @@ import {
   CheckCircle2,
   GraduationCap,
   FileText,
+  MapPin,
 } from 'lucide-react';
 import { PWAInstallButton } from '../components/PWAInstallButton';
 import { getUnifiedSchoolLevels } from '../lib/schoolLevels';
+import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../constants';
 
 export default function Home() {
   const { schools, announcements, associations, schoolLevels, loading } = useData();
@@ -45,12 +47,18 @@ export default function Home() {
 
   // Dynamic School Levels Stats matching reference / database
   const filteredSchoolsByZone = useMemo(() => {
-    if (selectedZone === 'all') return schools;
-    if (selectedZone === 'အခြား') {
-      return schools.filter(s => !s.zone || !['တောင်ကြီးဇုန်', 'ကလောဇုန်', 'လွိုင်လင်/နမ့်စန်ဇုန်'].includes(s.zone));
-    }
-    return schools.filter(s => s.zone === selectedZone);
+    return schools.filter(s => isSchoolInZone(s.zone, selectedZone));
   }, [schools, selectedZone]);
+
+  const zoneCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: schools.length };
+    ZONE_FILTER_OPTIONS.forEach(opt => {
+      if (opt.value !== 'all') {
+        counts[opt.value] = schools.filter(s => isSchoolInZone(s.zone, opt.value)).length;
+      }
+    });
+    return counts;
+  }, [schools]);
 
   const levelStats = useMemo(() => {
     return getUnifiedSchoolLevels(schoolLevels, filteredSchoolsByZone).filter(l => l.total > 0);
@@ -61,8 +69,10 @@ export default function Home() {
     if (!quickSearch.trim()) return [];
     const q = quickSearch.trim().toLowerCase();
     return schools
+      .filter(s => isSchoolInZone(s.zone, selectedZone))
       .filter(s =>
         (s.name && s.name.toLowerCase().includes(q)) ||
+        (s.zone && s.zone.toLowerCase().includes(q)) ||
         (s.founderName && s.founderName.toLowerCase().includes(q)) ||
         (s.adminName && s.adminName.toLowerCase().includes(q)) ||
         (s.contactName && s.contactName.toLowerCase().includes(q)) ||
@@ -85,7 +95,7 @@ export default function Home() {
         (s.level && s.level.toLowerCase().includes(q))
       )
       .slice(0, 6);
-  }, [schools, quickSearch]);
+  }, [schools, quickSearch, selectedZone]);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-8">
@@ -107,7 +117,7 @@ export default function Home() {
                 type="text"
                 value={quickSearch}
                 onChange={(e) => setQuickSearch(e.target.value)}
-                placeholder="ကျောင်းအမည်၊ တာဝန်ခံ သို့မဟုတ် အဆင့်ဖြင့် ရှာဖွေပါ..."
+                placeholder="ကျောင်းအမည်၊ တာဝန်ခံ၊ ဇုန် သို့မဟုတ် အဆင့်ဖြင့် ရှာဖွေပါ..."
                 className="w-full pl-10 pr-3 py-2 bg-white text-slate-900 rounded-xl text-xs sm:text-sm shadow-md focus:outline-hidden focus:ring-2 focus:ring-amber-400"
               />
               {quickSearch && (
@@ -266,22 +276,53 @@ export default function Home() {
           </Link>
         </div>
 
-        {/* Zone Tabs */}
+        {/* Zone Tabs (with live counts) */}
         <div className="flex overflow-x-auto gap-1 pb-1">
-          {['all', 'တောင်ကြီးဇုန်', 'ကလောဇုန်', 'လွိုင်လင်/နမ့်စန်ဇုန်', 'အခြား'].map(zone => (
+          {ZONE_FILTER_OPTIONS.map(opt => (
             <button
-              key={zone}
-              onClick={() => setSelectedZone(zone)}
-              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap transition ${
-                selectedZone === zone
+              key={opt.value}
+              onClick={() => setSelectedZone(opt.value)}
+              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap transition flex items-center gap-1.5 ${
+                selectedZone === opt.value
                   ? 'bg-sky-900 text-white shadow-sm'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              {zone === 'all' ? 'အားလုံး' : zone}
+              <span>{opt.label}</span>
+              <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
+                selectedZone === opt.value
+                  ? 'bg-sky-700 text-sky-100'
+                  : 'bg-white text-slate-500 border border-slate-200'
+              }`}>
+                {zoneCounts[opt.value] ?? 0}
+              </span>
             </button>
           ))}
         </div>
+
+        {/* Selected Zone Summary */}
+        {selectedZone !== 'all' && (
+          <div className="bg-sky-50 border border-sky-200 rounded-lg p-2 flex items-center justify-between flex-wrap gap-2 text-[11px]">
+            <div className="flex items-center gap-1.5">
+              <MapPin className="w-3 h-3 text-sky-600" />
+              <span className="font-bold text-sky-900">{selectedZone}</span>
+              <span className="text-slate-400">|</span>
+              <span className="text-slate-700">စုစုပေါင်း <strong className="text-sky-900">{filteredSchoolsByZone.length}</strong> ကျောင်း</span>
+            </div>
+            <div className="flex items-center gap-2 text-[10px]">
+              <span className="text-emerald-700 font-bold">
+                ✓ Active: {filteredSchoolsByZone.filter(s => (s.status || 'active') === 'active').length}
+              </span>
+              <span className="text-slate-400">|</span>
+              <Link
+                to={`/contacts?zone=${encodeURIComponent(selectedZone)}`}
+                className="text-sky-700 font-bold hover:underline"
+              >
+                စာရင်းကြည့်ရန် &rarr;
+              </Link>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
           {levelStats.map((item) => (

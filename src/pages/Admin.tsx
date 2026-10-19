@@ -12,6 +12,7 @@ import { Association, NewsTicker, AuditLog, AdminUser, STUDENT_RANGE_TIERS, getS
 import { recordAuditLog } from '../lib/audit';
 import { useData, sortAnnouncementsByEventDate } from '../context/DataContext';
 import { isSchoolInLevel, getUnifiedSchoolLevels } from '../lib/schoolLevels';
+import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../constants';
 import {   FileText,   School as SchoolIcon,   Plus,   Trash2,   Calendar,   Download,   Upload,   Building2,   UserPlus,   Users,   Megaphone,   Clock,   AlertCircle,   Flame,   Edit2,   RefreshCw,   Sparkles,   Link as LinkIcon,   CheckCircle,   Eye,   EyeOff,   Lock,   CheckCircle2,   XCircle,   CopyCheck,   ShieldAlert,   Layers,   CheckSquare,   Square,   Search,   Shield,   Activity,   UserCheck,   History,   Crown,   Mail,   ShieldCheck,   HardDriveDownload,   Database,   Save,   ArrowLeft,   FileJson,   Check,   ArrowDownToLine,   MapPin,   Settings as SettingsIcon,   Cloud,   LogOut,   KeyRound,   Loader2,   FileSpreadsheet,   Trophy,   FolderOpen, Coins } from 'lucide-react';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { createSchoolAccount } from '../lib/schoolAuth';
@@ -354,6 +355,7 @@ export default function Admin() {
   const [adminSchoolSearch, setAdminSchoolSearch] = useState('');
   const [adminFeeFilter, setAdminFeeFilter] = useState<'all' | 'paid' | 'unpaid'>('all');
   const [adminStatusFilter, setAdminStatusFilter] = useState<'all' | 'active' | 'under_review' | 'inactive'>('all');
+  const [adminZoneFilter, setAdminZoneFilter] = useState<string>('all');
 
   // Dynamic extra phone numbers state for school form
   const [extraSchoolPhones, setExtraSchoolPhones] = useState<string[]>([]);
@@ -1043,12 +1045,18 @@ export default function Admin() {
   };
 
 
-  // Dashboard & School Summary Calculations
-  const totalSchoolsCount = schools.length;
-  const activeSchoolsCount = useMemo(() => schools.filter(s => (s.status || 'active') === 'active').length, [schools]);
-  const underReviewSchoolsCount = useMemo(() => schools.filter(s => s.status === 'under_review').length, [schools]);
-  const inactiveSchoolsCount = useMemo(() => schools.filter(s => s.status === 'inactive').length, [schools]);
-  const feePaidCount = useMemo(() => schools.filter(s => s.isAnnualFeePaid === true).length, [schools]);
+  // Zone-filtered schools (used for summary cards + AdminSchoolManager)
+  const schoolsForZone = useMemo(() => {
+    if (adminZoneFilter === 'all') return schools;
+    return schools.filter(s => isSchoolInZone(s.zone, adminZoneFilter));
+  }, [schools, adminZoneFilter]);
+
+  // Dashboard & School Summary Calculations (Zone-Aware)
+  const totalSchoolsCount = schoolsForZone.length;
+  const activeSchoolsCount = useMemo(() => schoolsForZone.filter(s => (s.status || 'active') === 'active').length, [schoolsForZone]);
+  const underReviewSchoolsCount = useMemo(() => schoolsForZone.filter(s => s.status === 'under_review').length, [schoolsForZone]);
+  const inactiveSchoolsCount = useMemo(() => schoolsForZone.filter(s => s.status === 'inactive').length, [schoolsForZone]);
+  const feePaidCount = useMemo(() => schoolsForZone.filter(s => s.isAnnualFeePaid === true).length, [schoolsForZone]);
   const feeUnpaidCount = totalSchoolsCount - feePaidCount;
 
   const filteredAuditLogs = useMemo(() => {
@@ -1745,7 +1753,7 @@ export default function Admin() {
 
   const filteredAdminSchools = useMemo(() => {
     const q = adminSchoolSearch.trim().toLowerCase();
-    return schools.filter(s => {
+    return schoolsForZone.filter(s => {
       const matchesSearch =
         !q ||
         (s.name && s.name.toLowerCase().includes(q)) ||
@@ -1768,7 +1776,7 @@ export default function Admin() {
 
       return matchesSearch && matchesFee && matchesStatus;
     });
-  }, [schools, adminSchoolSearch, adminFeeFilter, adminStatusFilter]);
+  }, [schoolsForZone, adminSchoolSearch, adminFeeFilter, adminStatusFilter]);
 
   const toggleSelectSchool = (id: string) => {
     setSelectedSchoolIds(prev =>
@@ -2374,6 +2382,58 @@ export default function Admin() {
           </button>)}
         </div>
 
+      {/* Zone Filter Bar (Global — affects summary cards + schools manager) */}
+      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-2.5">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-sky-50 text-sky-700 border border-sky-200">
+              <MapPin className="w-3.5 h-3.5" />
+            </div>
+            <div>
+              <h4 className="font-bold text-xs sm:text-sm text-sky-950">ဇုန်အလိုက် စစ်ထုတ်ခြင်း (Zone Filter)</h4>
+              <p className="text-[10px] text-slate-500">ရွေးချယ်ထားသော ဇုန်သည် ကျောင်းစာရင်း၊ စာရင်းအင်းနှင့် ငွေစာရင်းများတွင် သက်ရောက်ပါမည်</p>
+            </div>
+          </div>
+          {adminZoneFilter !== 'all' && (
+            <button
+              type="button"
+              onClick={() => setAdminZoneFilter('all')}
+              className="text-[10px] font-semibold text-sky-700 hover:underline cursor-pointer px-2 py-1 bg-sky-50 rounded-lg border border-sky-200"
+            >
+              ✕ ဖယ်ရှားမည် (Reset)
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {ZONE_FILTER_OPTIONS.map(opt => {
+            const count = opt.value === 'all'
+              ? schools.length
+              : schools.filter(s => isSchoolInZone(s.zone, opt.value)).length;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setAdminZoneFilter(opt.value)}
+                className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold transition flex items-center gap-1.5 border cursor-pointer ${
+                  adminZoneFilter === opt.value
+                    ? 'bg-sky-900 text-white border-sky-900 shadow-sm'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <span>{opt.label}</span>
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ${
+                  adminZoneFilter === opt.value
+                    ? 'bg-sky-700 text-sky-100'
+                    : 'bg-white text-slate-500 border border-slate-200'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Summary Stat Cards for Quick Overview */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Card 1: Total Schools */}
@@ -2974,7 +3034,7 @@ export default function Admin() {
       {/* Schools Tab */}
       {activeTab === 'schools' && (
         <AdminSchoolManager
-          schools={schools}
+          schools={schoolsForZone}
           schoolLevels={schoolLevels}
           onEdit={startEditSchool}
           onDelete={deleteSchool}
@@ -2982,7 +3042,7 @@ export default function Admin() {
           onUpdateStatus={updateSchoolStatus}
           onCreateAccount={handleCreateSchoolAccount}
           onOpenExcel={() => { cancelEditSchool(); setIsSchoolFormOpen(true); }}
-          onExportExcel={() => exportSchoolsToExcel(schools)}
+          onExportExcel={() => exportSchoolsToExcel(schoolsForZone)}
           onCleanDuplicates={cleanExistingDuplicates}
           onExcelUpload={handleExcelImport}
           isUploadingExcel={isUploadingExcel}
