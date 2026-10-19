@@ -20,6 +20,7 @@ import Events from './pages/Events';
 import Receipt from './pages/Receipt';
 import SchoolLogin from './pages/SchoolLogin';
 import SchoolPortal from './pages/SchoolPortal';
+import MedalTally from './pages/MedalTally';
 import Chat from './pages/Chat';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
@@ -37,6 +38,7 @@ export default function App() {
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="announcements" element={<Announcements />} />
             <Route path="sports" element={<Sports />} />
+            <Route path="medals" element={<MedalTally />} />
             <Route path="documents" element={<Documents />} />
             <Route path="events" element={<Events />} />
             <Route path="receipt/:id" element={<Receipt />} />

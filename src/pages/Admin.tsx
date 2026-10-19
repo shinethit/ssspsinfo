@@ -12,61 +12,7 @@ import { Association, NewsTicker, AuditLog, AdminUser, STUDENT_RANGE_TIERS, getS
 import { recordAuditLog } from '../lib/audit';
 import { useData, sortAnnouncementsByEventDate } from '../context/DataContext';
 import { isSchoolInLevel, getUnifiedSchoolLevels } from '../lib/schoolLevels';
-import {
-  FileText,
-  School as SchoolIcon,
-  Plus,
-  Trash2,
-  Calendar,
-  Download,
-  Upload,
-  Building2,
-  UserPlus,
-  Users,
-  Megaphone,
-  Clock,
-  AlertCircle,
-  Flame,
-  Edit2,
-  RefreshCw,
-  Sparkles,
-  Link as LinkIcon,
-  CheckCircle,
-  Eye,
-  EyeOff,
-  Lock,
-  CheckCircle2,
-  XCircle,
-  CopyCheck,
-  ShieldAlert,
-  Layers,
-  CheckSquare,
-  Square,
-  Search,
-  Shield,
-  Activity,
-  UserCheck,
-  History,
-  Crown,
-  Mail,
-  ShieldCheck,
-  HardDriveDownload,
-  Database,
-  Save,
-  ArrowLeft,
-  FileJson,
-  Check,
-  ArrowDownToLine,
-  MapPin,
-  Settings as SettingsIcon,
-  Cloud,
-  LogOut,
-  KeyRound,
-  Loader2,
-  FileSpreadsheet,
-  Trophy,
-  FolderOpen,
-} from 'lucide-react';
+import {   FileText,   School as SchoolIcon,   Plus,   Trash2,   Calendar,   Download,   Upload,   Building2,   UserPlus,   Users,   Megaphone,   Clock,   AlertCircle,   Flame,   Edit2,   RefreshCw,   Sparkles,   Link as LinkIcon,   CheckCircle,   Eye,   EyeOff,   Lock,   CheckCircle2,   XCircle,   CopyCheck,   ShieldAlert,   Layers,   CheckSquare,   Square,   Search,   Shield,   Activity,   UserCheck,   History,   Crown,   Mail,   ShieldCheck,   HardDriveDownload,   Database,   Save,   ArrowLeft,   FileJson,   Check,   ArrowDownToLine,   MapPin,   Settings as SettingsIcon,   Cloud,   LogOut,   KeyRound,   Loader2,   FileSpreadsheet,   Trophy,   FolderOpen, Coins } from 'lucide-react';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { createSchoolAccount } from '../lib/schoolAuth';
 import { getAuth, createUserWithEmailAndPassword, signOut as secondarySignOut } from 'firebase/auth';
@@ -84,6 +30,7 @@ import SortSelect from '../components/ui/SortSelect';
 import SchoolForm from '../components/admin/SchoolForm';
 import AdminSchoolManager from '../components/admin/AdminSchoolManager';
 import AdminEventManager from '../components/admin/AdminEventManager';
+import AdminFinanceManager from '../components/admin/AdminFinanceManager';
 import AdminSportsManager from '../components/admin/AdminSportsManager';
 import AdminDocumentManager from '../components/admin/AdminDocumentManager';
 import AdminRequestsManager from '../components/admin/AdminRequestsManager';
@@ -185,6 +132,14 @@ const associationSchema = z.object({
 });
 
 export default function Admin() {
+
+  // Session State (Moved to top to fix Scope Error)
+  const [adminSession, setAdminSessionState] = useState(getAdminSession());
+
+
+  
+  
+
   const {
     schools: globalSchools,
     announcements: globalAnnouncements,
@@ -201,7 +156,35 @@ export default function Admin() {
     deleteSchoolLevel,
     resetSchoolLevelsToDefault,
   } = useData();
-  const [activeTab, setActiveTab] = useState<'announcements' | 'associations' | 'schools' | 'tickers' | 'audit_logs' | 'admins' | 'levels' | 'backup' | 'events' | 'sports' | 'documents' | 'requests'>('announcements');
+  const [activeTab, setActiveTab] = useState<'announcements' | 'associations' | 'schools' | 'tickers' | 'audit_logs' | 'admins' | 'levels' | 'backup' | 'events' | 'sports' | 'documents' | 'finance' | 'requests'>('announcements');
+
+  // --- RBAC LOGIC (Correctly Placed) ---
+  const role = (adminSession?.role as string) || 'admin';
+  const isSuperOrAdmin = role === 'super_admin' || role === 'admin';
+  
+  const canAccess: Record<string, boolean> = {
+    announcements: isSuperOrAdmin || role === 'news_editor',
+    associations: isSuperOrAdmin,
+    schools: isSuperOrAdmin,
+    levels: isSuperOrAdmin,
+    tickers: isSuperOrAdmin || role === 'news_editor',
+    audit_logs: isSuperOrAdmin,
+    admins: role === 'super_admin',
+    backup: role === 'super_admin',
+    events: isSuperOrAdmin || role === 'sports_moderator',
+    sports: isSuperOrAdmin || role === 'sports_moderator',
+    documents: isSuperOrAdmin || role === 'news_editor',
+    finance: isSuperOrAdmin,
+  };
+
+  useEffect(() => {
+    if (canAccess[activeTab] === false) {
+      const firstAccessible = Object.keys(canAccess).find(key => canAccess[key]);
+      if (firstAccessible) setActiveTab(firstAccessible as any);
+    }
+  }, [activeTab, role]);
+  // ----------------------------------------
+
   const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
   const [editingAssociationId, setEditingAssociationId] = useState<string | null>(null);
 
@@ -291,7 +274,7 @@ export default function Admin() {
   // Router search params & navigation
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [adminSession, setAdminSessionState] = useState(getAdminSession());
+  
 
   const handleLogout = () => {
     clearAdminSession();
@@ -2242,7 +2225,7 @@ export default function Admin() {
           >
             <FileText className="w-4 h-4 shrink-0" /> ကြေညာချက်များ
           </button>
-          <button
+          {canAccess.associations && (<button
             onClick={() => setActiveTab('associations')}
             type="button"
             className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer ${
@@ -2252,8 +2235,8 @@ export default function Admin() {
             }`}
           >
             <Building2 className="w-4 h-4 shrink-0" /> အသင်းများနှင့် အမှုဆောင်
-          </button>
-          <button
+          </button>)}
+          {canAccess.schools && (<button
             onClick={() => setActiveTab('schools')}
             type="button"
             className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer ${
@@ -2263,8 +2246,8 @@ export default function Admin() {
             }`}
           >
             <SchoolIcon className="w-4 h-4 shrink-0" /> အသင်းဝင်ကျောင်းများ
-          </button>
-          <button
+          </button>)}
+          {canAccess.levels && (<button
             onClick={() => setActiveTab('levels')}
             type="button"
             className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer ${
@@ -2278,8 +2261,8 @@ export default function Admin() {
             <span className="text-[10px] font-bold px-1.5 py-0.2 bg-emerald-100 text-emerald-900 rounded-full">
               {schoolLevels.length}
             </span>
-          </button>
-          <button
+          </button>)}
+          {canAccess.tickers && (<button
             onClick={() => setActiveTab('tickers')}
             type="button"
             className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer ${
@@ -2289,8 +2272,8 @@ export default function Admin() {
             }`}
           >
             <Megaphone className="w-4 h-4 shrink-0 text-rose-600" /> စာတန်းပြေး (Ticker)
-          </button>
-          <button
+          </button>)}
+          {canAccess.events && (<button
             onClick={() => setActiveTab('events')}
             type="button"
             className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer ${
@@ -2300,8 +2283,8 @@ export default function Admin() {
             }`}
           >
             <Calendar className="w-4 h-4 shrink-0 text-indigo-600" /> ပွဲစဉ်များ (Events)
-          </button>
-          <button
+          </button>)}
+          {canAccess.sports && (<button
             onClick={() => setActiveTab('sports')}
             type="button"
             className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer ${
@@ -2311,8 +2294,8 @@ export default function Admin() {
             }`}
           >
             <Trophy className="w-4 h-4 shrink-0 text-emerald-600" /> အားကစား (Sports)
-          </button>
-          <button
+          </button>)}
+          {canAccess.documents && (<button
             onClick={() => setActiveTab('documents')}
             type="button"
             className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer ${
@@ -2322,7 +2305,18 @@ export default function Admin() {
             }`}
           >
             <FolderOpen className="w-4 h-4 shrink-0 text-amber-600" /> စာရွက်စာတမ်း (Docs)
-          </button>
+          </button>)}
+          {canAccess.finance && (<button
+            onClick={() => setActiveTab('finance')}
+            type="button"
+            className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+              activeTab === 'finance'
+                ? 'bg-white text-emerald-900 shadow-xs ring-1 ring-emerald-200'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Coins className="w-4 h-4 shrink-0 text-emerald-600" /> ငွေစာရင်း (Finance)
+          </button>)}
           <button
             onClick={() => setActiveTab('requests')}
             type="button"
@@ -2334,7 +2328,7 @@ export default function Admin() {
           >
             <FileText className="w-4 h-4 shrink-0 text-rose-600" /> တောင်းဆိုမှုများ
           </button>
-          <button
+          {canAccess.audit_logs && (<button
             onClick={() => setActiveTab('audit_logs')}
             type="button"
             className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer ${
@@ -2350,8 +2344,8 @@ export default function Admin() {
                 {auditLogs.length}
               </span>
             )}
-          </button>
-          <button
+          </button>)}
+          {canAccess.admins && (<button
             onClick={() => setActiveTab('admins')}
             type="button"
             className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer col-span-2 sm:col-span-1 ${
@@ -2365,8 +2359,8 @@ export default function Admin() {
             <span className="text-[10px] font-bold px-1.5 py-0.2 bg-amber-100 text-amber-900 rounded-full">
               {admins.length}
             </span>
-          </button>
-          <button
+          </button>)}
+          {canAccess.backup && (<button
             onClick={() => setActiveTab('backup')}
             type="button"
             className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer col-span-2 sm:col-span-1 ${
@@ -2377,7 +2371,7 @@ export default function Admin() {
           >
             <HardDriveDownload className="w-4 h-4 shrink-0 text-emerald-600" />
             <span>အရန်သိမ်း/ပြန်ယူ (Backup)</span>
-          </button>
+          </button>)}
         </div>
 
       {/* Summary Stat Cards for Quick Overview */}
@@ -3001,11 +2995,15 @@ export default function Admin() {
       )}
 
       {activeTab === 'sports' && (
-        <AdminSportsManager />
+        <AdminSportsManager schools={schools} />
       )}
 
       {activeTab === 'documents' && (
         <AdminDocumentManager />
+      )}
+
+      {activeTab === 'finance' && (
+        <AdminFinanceManager schools={schools} />
       )}
 
       {activeTab === 'requests' && (
@@ -3836,9 +3834,11 @@ export default function Admin() {
                     onChange={(e) => setNewAdminRole(e.target.value as any)}
                     className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-amber-500 outline-hidden cursor-pointer"
                   >
-                    <option value="admin">🛡️ Admin (ကျောင်း၊ ကြေညာချက်၊ စာတန်းပြေး အပြည့်အဝ စီမံခွင့်)</option>
-                    <option value="editor">✏️ Editor (ကြေညာချက်နှင့် အချက်အလက် တည်းဖြတ်ခွင့်)</option>
-                    <option value="super_admin">👑 Super Admin (အက်ဒမင်များ ခန့်အပ်ခြင်း အပါအဝင် အဆင့်မြင့် စီမံခွင့်)</option>
+                    <option value="admin">🛡️ Admin (အပြည့်အဝ စီမံခွင့်)</option>
+                    <option value="sports_moderator">🏆 Sports Moderator (အားကစား သီးသန့်)</option>
+                    <option value="news_editor">📝 News Editor (ကြေညာချက်/သတင်း သီးသန့်)</option>
+                    <option value="editor">✏️ Editor (အထွေထွေ တည်းဖြတ်ခွင့်)</option>
+                    <option value="super_admin">👑 Super Admin (အမြင့်ဆုံး စီမံခွင့်)</option>
                   </select>
                 </div>
 

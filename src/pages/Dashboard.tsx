@@ -1,7 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { School, STUDENT_RANGE_TIERS, getStudentRangeTier } from '../types';
 import { useData, getAnnouncementTimestamp } from '../context/DataContext';
+import { db } from '../lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
+import { Athlete, SportsEvent, TransactionRecord, EventItem } from '../types';
 import { getCategoryBadge } from './Announcements';
 import { getUnifiedSchoolLevels, isSchoolInLevel } from '../lib/schoolLevels';
 import {
@@ -27,11 +30,44 @@ import {
   Layers,
   Table,
   ArrowLeft,
+  UserCheck,
+  Trophy,
+  Receipt,
+  Ticket,
 } from 'lucide-react';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  
   const { schools, announcements, schoolLevels, loading } = useData();
+
+  // --- UNIFIED STATS STATE ---
+  const [sportsStats, setSportsStats] = useState({ athletes: 0, events: 0 });
+  const [financeStats, setFinanceStats] = useState({ totalCollected: 0 });
+  const [eventStats, setEventStats] = useState(0);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const [athletesSnap, sportsSnap, transSnap, eventsSnap] = await Promise.all([
+          getDocs(collection(db, 'athletes')).catch(() => ({ size: 0 })),
+          getDocs(collection(db, 'sports_events')).catch(() => ({ size: 0 })),
+          getDocs(collection(db, 'transactions')).catch(() => ({ docs: [] })),
+          getDocs(collection(db, 'events')).catch(() => ({ size: 0 }))
+        ]);
+        
+        setSportsStats({ athletes: athletesSnap.size, events: sportsSnap.size });
+        const total = transSnap.docs.reduce((sum: number, d: any) => sum + (Number(d.data().amount) || 0), 0);
+        setFinanceStats({ totalCollected: total });
+        setEventStats(eventsSnap.size);
+      } catch (err) {
+        console.error("Stats fetch error:", err);
+      }
+    };
+    fetchStats();
+  }, []);
+  // ---------------------------
+
 
   // Annual Fee Breakdown Tab: 'level' | 'student_range' | 'amount' | 'matrix'
   const [feeBreakdownTab, setFeeBreakdownTab] = useState<'level' | 'student_range' | 'amount' | 'matrix'>('level');
@@ -332,6 +368,41 @@ export default function Dashboard() {
             >
               <BookOpen className="w-4 h-4" /> <span>ကြေညာချက်များ</span>
             </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* NEW: UNIFIED OVERVIEW STATS */}
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 animate-in fade-in slide-in-from-bottom-2">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
+          <div className="p-3 bg-sky-50 text-sky-600 rounded-xl shrink-0"><UserCheck className="w-5 h-5" /></div>
+          <div>
+            <p className="text-[11px] text-slate-500 font-semibold">အားကစားသမား စုစုပေါင်း</p>
+            <p className="text-xl font-black text-sky-950">{sportsStats.athletes} <span className="text-xs font-normal text-slate-500">ဦး</span></p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
+          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0"><Trophy className="w-5 h-5" /></div>
+          <div>
+            <p className="text-[11px] text-slate-500 font-semibold">အားကစားပွဲစဉ်</p>
+            <p className="text-xl font-black text-emerald-950">{sportsStats.events} <span className="text-xs font-normal text-slate-500">ခု</span></p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
+          <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0"><Receipt className="w-5 h-5" /></div>
+          <div>
+            <p className="text-[11px] text-slate-500 font-semibold">အခြားရရှိငွေ (အားကစားကြေး စသဖြင့်)</p>
+            <p className="text-xl font-black text-amber-950 truncate">{formatMMK(financeStats.totalCollected)} <span className="text-xs font-normal text-slate-500">ကျပ်</span></p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
+          <div className="p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0"><Ticket className="w-5 h-5" /></div>
+          <div>
+            <p className="text-[11px] text-slate-500 font-semibold">စာရင်းသွင်းနိုင်သော ပွဲစဉ်များ</p>
+            <p className="text-xl font-black text-purple-950">{eventStats} <span className="text-xs font-normal text-slate-500">ခု</span></p>
           </div>
         </div>
       </section>

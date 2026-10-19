@@ -1,25 +1,53 @@
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useData } from '../context/DataContext';
-import { Printer, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { TransactionRecord } from '../types';
+import { Printer, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
 
 export default function Receipt() {
   const { id } = useParams<{ id: string }>();
-  const { getSchoolById } = useData();
-  const school = id ? getSchoolById(id) : null;
+  const [transaction, setTransaction] = useState<TransactionRecord | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  if (!school) return <div className="p-10 text-center">ကျောင်းအချက်အလက် ရှာမတွေ့ပါ</div>;
+  useEffect(() => {
+    const fetchTransaction = async () => {
+      if (!id) return;
+      try {
+        const docRef = doc(db, 'transactions', id);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setTransaction({ id: docSnap.id, ...docSnap.data() } as TransactionRecord);
+        }
+      } catch (err) {
+        console.error('Error fetching transaction:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTransaction();
+  }, [id]);
 
   const handlePrint = () => {
     window.print();
   };
 
-  const currentDate = new Date().toLocaleDateString('my-MM', { year: 'numeric', month: 'long', day: 'numeric' });
+  if (loading) return <div className="p-10 text-center flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-sky-600" /></div>;
+  
+  if (!transaction) {
+    return (
+      <div className="p-10 text-center space-y-4">
+        <p className="text-slate-500">ငွေလက်ခံဖြတ်ပိုင်း အချက်အလက် ရှာမတွေ့ပါ။</p>
+        <Link to="/admin?tab=finance" className="text-sky-700 font-bold hover:underline">← နောက်သို့</Link>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto p-4 sm:p-8 space-y-6 bg-slate-50 min-h-screen">
       {/* Non-printable controls */}
       <div className="flex items-center justify-between print:hidden">
-        <Link to="/admin?tab=schools" className="inline-flex items-center gap-2 text-sm font-bold text-sky-800 hover:text-sky-950">
+        <Link to="/admin?tab=finance" className="inline-flex items-center gap-2 text-sm font-bold text-sky-800 hover:text-sky-950">
           <ArrowLeft className="w-4 h-4" /> နောက်သို့
         </Link>
         <button onClick={handlePrint} className="bg-sky-900 hover:bg-sky-800 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition flex items-center gap-2">
@@ -30,34 +58,31 @@ export default function Receipt() {
       {/* Printable Area */}
       <div className="bg-white p-8 sm:p-12 rounded-3xl shadow-sm border border-slate-200 relative overflow-hidden print:shadow-none print:border-none print:p-0">
         
-        {/* Watermark */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-5 pointer-events-none">
           <CheckCircle2 className="w-96 h-96 text-emerald-600" />
         </div>
 
-        {/* Header */}
         <div className="text-center border-b-2 border-slate-800 pb-6 mb-8 relative z-10">
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 leading-snug">
             ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း
           </h1>
           <p className="text-sm font-semibold text-slate-500 mt-1">သတင်းနှင့် ပြန်ကြားရေးဌာန</p>
           <div className="mt-4 inline-block bg-slate-900 text-white px-6 py-1.5 rounded-full font-bold text-sm tracking-widest">
-            နှစ်စဉ်ကြေး ငွေလက်ခံဖြတ်ပိုင်း
+            ငွေလက်ခံဖြတ်ပိုင်း
           </div>
         </div>
 
-        {/* Body */}
         <div className="space-y-6 relative z-10">
           <div className="flex justify-between text-sm">
             <div>
               <span className="text-slate-500 font-semibold block mb-1">ဖြတ်ပိုင်းအမှတ် (Receipt No):</span>
               <span className="font-mono font-bold text-slate-900 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">
-                INV-{new Date().getFullYear()}-{school.id.substring(0, 5).toUpperCase()}
+                RCPT-{transaction.id.substring(0, 6).toUpperCase()}
               </span>
             </div>
             <div className="text-right">
               <span className="text-slate-500 font-semibold block mb-1">ရက်စွဲ (Date):</span>
-              <span className="font-bold text-slate-900">{currentDate}</span>
+              <span className="font-bold text-slate-900">{new Date(transaction.paidDate).toLocaleDateString('my-MM', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
             </div>
           </div>
 
@@ -65,24 +90,15 @@ export default function Receipt() {
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-slate-500 font-semibold block mb-1">ကျောင်းအမည်:</span>
-                <span className="font-bold text-slate-900 text-base">{school.name}</span>
+                <span className="font-bold text-slate-900 text-base">{transaction.schoolName}</span>
               </div>
               <div>
-                <span className="text-slate-500 font-semibold block mb-1">ကျောင်းအဆင့်:</span>
-                <span className="font-bold text-slate-900">{school.level}</span>
-              </div>
-              <div>
-                <span className="text-slate-500 font-semibold block mb-1">မြို့နယ် / မြို့:</span>
-                <span className="font-bold text-slate-900">{school.township || school.city || 'မသတ်မှတ်ထားပါ'}</span>
-              </div>
-              <div>
-                <span className="text-slate-500 font-semibold block mb-1">ပညာသင်နှစ်:</span>
-                <span className="font-bold text-slate-900">{school.feeAcademicYear || '၂၀၂၄-၂၀၂၅'}</span>
+                <span className="text-slate-500 font-semibold block mb-1">မှတ်တမ်းတင်သူ:</span>
+                <span className="font-bold text-slate-900">{transaction.recordedBy || 'Admin'}</span>
               </div>
             </div>
           </div>
 
-          {/* Table */}
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-100 text-slate-700">
@@ -93,29 +109,27 @@ export default function Receipt() {
             <tbody>
               <tr>
                 <td className="py-4 px-4 border-b border-slate-100">
-                  အသင်းဝင် နှစ်စဉ်ကြေး (Annual Membership Fee)
-                  {school.studentRange && <span className="block text-xs text-slate-500 mt-1">(ကျောင်းသားဦးရေ: {school.studentRange} ဦး)</span>}
+                  {transaction.feeType}
+                  {transaction.note && <span className="block text-xs text-slate-500 mt-1">({transaction.note})</span>}
                 </td>
                 <td className="py-4 px-4 text-right border-b border-slate-100 font-mono font-bold">
-                  {Number(school.feeAmount || 50000).toLocaleString('my-MM')} ကျပ်
+                  {transaction.amount.toLocaleString('my-MM')} ကျပ်
                 </td>
               </tr>
               <tr>
                 <td className="py-4 px-4 text-right font-bold text-slate-800">စုစုပေါင်း (Total):</td>
                 <td className="py-4 px-4 text-right font-mono font-black text-lg text-sky-900 bg-sky-50 rounded-br-lg">
-                  {Number(school.feeAmount || 50000).toLocaleString('my-MM')} ကျပ်
+                  {transaction.amount.toLocaleString('my-MM')} ကျပ်
                 </td>
               </tr>
             </tbody>
           </table>
 
           <div className="pt-4 text-sm text-slate-600">
-            <p>ဤဖြတ်ပိုင်းသည် နှစ်စဉ်ကြေး ပေးသွင်းပြီးကြောင်း သက်သေအဖြစ် အသုံးပြုနိုင်ပါသည်။</p>
-            {school.feePaidDate && <p className="mt-1 font-semibold text-emerald-700">ပေးသွင်းသည့်ရက်: {new Date(school.feePaidDate).toLocaleDateString('my-MM')}</p>}
+            <p>ဤဖြတ်ပိုင်းသည် ငွေပေးသွင်းမှု အတည်ပြုချက် သက်သေအဖြစ် အသုံးပြုနိုင်ပါသည်။</p>
           </div>
         </div>
 
-        {/* Footer / Signature */}
         <div className="mt-16 pt-8 flex justify-between items-end relative z-10">
           <div className="text-center">
             <div className="w-32 border-b border-slate-400 mb-2"></div>

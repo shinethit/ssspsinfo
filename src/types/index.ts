@@ -179,6 +179,14 @@ export interface SchoolLevelItem {
   createdAt?: string;
 }
 
+export interface PaymentRecord {
+  id: string;
+  feeType: string; // ဥပမာ - 'အားကစားကြေး', 'အခြားကြေး'
+  amount: number;
+  paidDate: string;
+  note?: string;
+}
+
 export interface School {
   authUid?: string; // Linked Firebase Auth User ID
   accountEmail?: string;
@@ -255,7 +263,7 @@ export interface School {
   schoolNote: string;
   note: string;
   isAnnualFeePaid?: boolean;
-  createdAt: string;
+    createdAt: string;
 }
 
 export interface Contact {
@@ -393,7 +401,7 @@ export interface AdminUser {
   id: string;
   email: string;
   name?: string;
-  role: 'super_admin' | 'admin' | 'editor';
+  role: 'super_admin' | 'admin' | 'editor' | 'sports_moderator' | 'news_editor';
   phone?: string;
   phone2?: string;
   phones?: string[]; // Multiple contact numbers for administrator
@@ -422,11 +430,14 @@ export interface AdminUser {
 
 export interface SportsMatchResult {
   id: string;
-  teamA: string;
-  scoreA: number;
+  teamA: string; // ကျောင်းအမည် (သို့) အသင်းအမည်
+  playerA?: string; // အားကစားသမား အမည် (တစ်ဦးချင်းအတွက်)
+  scoreA: string | number;
   teamB: string;
-  scoreB: number;
-  winner?: string;
+  playerB?: string;
+  scoreB: string | number;
+  winner?: string; // အနိုင်ရသူ
+  medal?: 'gold' | 'silver' | 'bronze'; // ရရှိသည့် ဆုတံဆိပ်
 }
 
 export interface SportsEvent {
@@ -494,4 +505,47 @@ export interface SchoolUpdateRequest {
   }[];
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
+}
+
+
+export interface TransactionRecord {
+  id: string;
+  schoolId: string;
+  schoolName: string;
+  feeType: string;
+  amount: number;
+  paidDate: string;
+  note?: string;
+  recordedBy?: string;
+  createdAt: string;
+}
+
+
+export interface SportOfficial {
+  id: string;
+  name: string;
+  role: string; // ဒိုင်, ကော်မတီဝင်
+  phone?: string;
+}
+
+export interface Athlete {
+  id: string;
+  name: string;
+  fatherName: string;
+  dob: string;
+  age: string;
+  grade: string;
+  rollNo: string;
+  school: string;
+  gender: string;
+  sports: string[]; // အားကစားအမျိုးအစားများ (Array)
+  photoUrl?: string;
+}
+
+export interface SportInfo {
+  sportType: string;
+  rules: string;
+  info: string;
+  officials: SportOfficial[];
+    updatedAt?: string;
 }

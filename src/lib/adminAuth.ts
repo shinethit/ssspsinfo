@@ -12,7 +12,7 @@ import { db, auth } from './firebase';
 export interface AdminSession {
   isLoggedIn: boolean;
   email: string;
-  role: 'super_admin' | 'admin' | 'editor';
+  role: 'super_admin' | 'admin' | 'editor' | 'sports_moderator' | 'news_editor';
   uid?: string;
   name?: string;
 }
@@ -47,7 +47,7 @@ if (typeof window !== 'undefined') {
         cachedSession = {
           isLoggedIn: true,
           email: user.email || data.email || '',
-          role: (data.role as 'super_admin' | 'admin' | 'editor') || 'admin',
+          role: (data.role as any) || 'admin',
           uid: user.uid,
           name: data.name || '',
         };

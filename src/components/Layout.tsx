@@ -16,6 +16,7 @@ import {
   ArrowLeft,
   Trophy,
   FolderOpen,
+  Award,
   Ticket,
 } from 'lucide-react';
 import NewsTickerBar from './NewsTickerBar';
@@ -34,6 +35,7 @@ export default function Layout() {
     { to: '/announcements', label: 'ကြေညာချက်များ', labelEn: 'Announcements', icon: BookOpen },
     { to: '/events', label: 'ပွဲစဉ်များ (Events)', labelEn: 'Events', icon: Ticket },
     { to: '/sports', label: 'အားကစားရလဒ်များ', labelEn: 'Sports Results', icon: Trophy },
+    { to: '/medals', label: 'ဆုတံဆိပ်ဇယား', labelEn: 'Medal Tally', icon: Award },
     { to: '/documents', label: 'စာရွက်စာတမ်းများ', labelEn: 'Documents', icon: FolderOpen },
     { to: '/associations', label: 'အသင်းများ', labelEn: 'Associations', icon: Building2 },
     { to: '/contacts', label: 'အသင်းဝင်ကျောင်းများ', labelEn: 'Member Schools', icon: Users },
