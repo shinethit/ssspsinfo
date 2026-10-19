@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { ANNOUNCEMENT_CATEGORIES, getCategoryBadge } from './Announcements';
-import { Association, NewsTicker, AuditLog, AdminUser, STUDENT_RANGE_TIERS, getStudentRangeTier, SchoolLevelItem } from '../types';
+import { Association, NewsTicker, AuditLog, AdminUser, STUDENT_RANGE_TIERS, getStudentRangeTier, SchoolLevelItem, School } from '../types';
 import { recordAuditLog } from '../lib/audit';
 import { useData, sortAnnouncementsByEventDate } from '../context/DataContext';
 import { isSchoolInLevel, getUnifiedSchoolLevels } from '../lib/schoolLevels';
@@ -64,8 +64,11 @@ import {
   KeyRound,
   Loader2,
   FileSpreadsheet,
+  Trophy,
+  FolderOpen,
 } from 'lucide-react';
 import { initializeApp, deleteApp } from 'firebase/app';
+import { createSchoolAccount } from '../lib/schoolAuth';
 import { getAuth, createUserWithEmailAndPassword, signOut as secondarySignOut } from 'firebase/auth';
 import { firebaseConfig } from '../lib/firebase';
 import {
@@ -77,8 +80,13 @@ import {
 } from '../lib/adminAuth';
 import { downloadSchoolTemplate, normalizeSchoolRow, exportSchoolsToExcel } from '../lib/excel';
 import ImageUploadDropzone from '../components/ImageUploadDropzone';
+import SortSelect from '../components/ui/SortSelect';
 import SchoolForm from '../components/admin/SchoolForm';
 import AdminSchoolManager from '../components/admin/AdminSchoolManager';
+import AdminEventManager from '../components/admin/AdminEventManager';
+import AdminSportsManager from '../components/admin/AdminSportsManager';
+import AdminDocumentManager from '../components/admin/AdminDocumentManager';
+import AdminRequestsManager from '../components/admin/AdminRequestsManager';
 import { getCloudinaryConfig, saveCloudinaryConfig, isCloudinaryConfigured } from '../lib/cloudinary';
 import { findRecoverableCache, restoreRecoveredCacheToFirestore, RecoverableCacheData } from '../lib/cacheRecovery';
 
@@ -193,7 +201,7 @@ export default function Admin() {
     deleteSchoolLevel,
     resetSchoolLevelsToDefault,
   } = useData();
-  const [activeTab, setActiveTab] = useState<'announcements' | 'associations' | 'schools' | 'tickers' | 'audit_logs' | 'admins' | 'levels' | 'backup'>('announcements');
+  const [activeTab, setActiveTab] = useState<'announcements' | 'associations' | 'schools' | 'tickers' | 'audit_logs' | 'admins' | 'levels' | 'backup' | 'events' | 'sports' | 'documents' | 'requests'>('announcements');
   const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
   const [editingAssociationId, setEditingAssociationId] = useState<string | null>(null);
 
@@ -268,6 +276,7 @@ export default function Admin() {
   // Audit Log search & filter state
   const [auditSearch, setAuditSearch] = useState('');
   const [auditActionFilter, setAuditActionFilter] = useState<'all' | 'create' | 'update' | 'delete' | 'bulk_delete'>('all');
+  const [auditSortBy, setAuditSortBy] = useState<'newest' | 'oldest'>('newest');
 
   // Ticker form state
   const [tickerText, setTickerText] = useState('');
@@ -1074,8 +1083,12 @@ export default function Admin() {
         auditActionFilter === 'all' ? true : log.action === auditActionFilter;
 
       return matchesSearch && matchesAction;
+    }).sort((a, b) => {
+      const timeA = new Date(a.createdAt).getTime();
+      const timeB = new Date(b.createdAt).getTime();
+      return auditSortBy === 'newest' ? timeB - timeA : timeA - timeB;
     });
-  }, [auditLogs, auditSearch, auditActionFilter]);
+  }, [auditLogs, auditSearch, auditActionFilter, auditSortBy]);
 
   useEffect(() => {
     fetchAnnouncements();
@@ -1586,6 +1599,29 @@ export default function Admin() {
     }
   };
 
+  const handleCreateSchoolAccount = async (school: School) => {
+    if (school.authUid) {
+      toast.info('ဤကျောင်းအတွက် အကောင့် ဖန်တီးပြီးသား ဖြစ်ပါသည်။');
+      return;
+    }
+    const email = prompt("ကျောင်းအတွက် အသုံးပြုမည့် Email ကို ရိုက်ထည့်ပါ (ဥပမာ - school@gmail.com):");
+    if (!email) return;
+    const password = prompt("စကားဝှက် (အနည်းဆုံး ၆ လုံး) သတ်မှတ်ပါ:");
+    if (!password || password.length < 6) {
+      toast.error('စကားဝှက်သည် အနည်းဆုံး ၆ လုံး ရှိရပါမည်');
+      return;
+    }
+
+    try {
+      toast.loading('အကောင့် ဖန်တီးနေပါသည်...', { id: 'acc-create' });
+      const uid = await createSchoolAccount(email, password, school.id);
+      toast.success('ကျောင်းအကောင့် အောင်မြင်စွာ ဖန်တီးပြီးပါပြီ', { id: 'acc-create' });
+      fetchSchools();
+    } catch (err: any) {
+      toast.error(err.message || 'အကောင့်ဖန်တီး၍ မရပါ', { id: 'acc-create' });
+    }
+  };
+
   const onSchoolSubmit = async (data: any) => {
     try {
       const rawCount = (data.studentCount !== undefined && data.studentCount !== '' && data.studentCount !== null)
@@ -1608,54 +1644,62 @@ export default function Admin() {
 
       const payload = {
         ...data,
-        address: data.address ? data.address.trim() : '',
-        township: data.township ? data.township.trim() : '',
-        city: data.city ? data.city.trim() : '',
-        zone: data.zone ? data.zone.trim() : '',
-        schoolPhone: data.schoolPhone ? data.schoolPhone.trim() : '',
-        schoolPhone2: data.schoolPhone2 ? data.schoolPhone2.trim() : '',
-        schoolPhones: cleanSchoolPhones,
-        founderName: data.founderName ? data.founderName.trim() : '',
-        founderPhone: data.founderPhone ? data.founderPhone.trim() : '',
-        founderPhone2: data.founderPhone2 ? data.founderPhone2.trim() : '',
-        founderPhones: cleanFounderPhones,
-        founderViber: data.founderViber ? data.founderViber.trim() : '',
-        founderTelegram: data.founderTelegram ? data.founderTelegram.trim() : '',
-        adminName: data.adminName ? data.adminName.trim() : '',
-        adminPhone: data.adminPhone ? data.adminPhone.trim() : '',
-        adminPhone2: data.adminPhone2 ? data.adminPhone2.trim() : '',
-        adminPhones: cleanAdminPhones,
-        adminViber: data.adminViber ? data.adminViber.trim() : '',
-        adminTelegram: data.adminTelegram ? data.adminTelegram.trim() : '',
-        contactName: data.contactName ? data.contactName.trim() : (data.responsiblePerson1Name ? data.responsiblePerson1Name.trim() : ''),
-        contactRole: data.contactRole ? data.contactRole.trim() : (data.responsiblePerson1Role ? data.responsiblePerson1Role.trim() : ''),
-        contactPhone: data.contactPhone ? data.contactPhone.trim() : (data.responsiblePerson1Phone ? data.responsiblePerson1Phone.trim() : ''),
-        contactPhone2: data.contactPhone2 ? data.contactPhone2.trim() : (data.responsiblePerson1Phone2 ? data.responsiblePerson1Phone2.trim() : ''),
-        contactPhones: cleanCoord1Phones,
-        responsiblePerson1Name: data.contactName ? data.contactName.trim() : (data.responsiblePerson1Name ? data.responsiblePerson1Name.trim() : ''),
-        responsiblePerson1Role: data.contactRole ? data.contactRole.trim() : (data.responsiblePerson1Role ? data.responsiblePerson1Role.trim() : ''),
-        responsiblePerson1Phone: data.contactPhone ? data.contactPhone.trim() : (data.responsiblePerson1Phone ? data.responsiblePerson1Phone.trim() : ''),
-        responsiblePerson1Phone2: data.contactPhone2 ? data.contactPhone2.trim() : (data.responsiblePerson1Phone2 ? data.responsiblePerson1Phone2.trim() : ''),
-        responsiblePerson1Phones: cleanCoord1Phones,
-        contactViber: data.contactViber ? data.contactViber.trim() : (data.responsiblePerson1Viber ? data.responsiblePerson1Viber.trim() : ''),
-        contactTelegram: data.contactTelegram ? data.contactTelegram.trim() : (data.responsiblePerson1Telegram ? data.responsiblePerson1Telegram.trim() : ''),
-        responsiblePerson1Viber: data.contactViber ? data.contactViber.trim() : (data.responsiblePerson1Viber ? data.responsiblePerson1Viber.trim() : ''),
-        responsiblePerson1Telegram: data.contactTelegram ? data.contactTelegram.trim() : (data.responsiblePerson1Telegram ? data.responsiblePerson1Telegram.trim() : ''),
+        address: data.address?.trim() || '',
+        township: data.township?.trim() || '',
+        city: data.city?.trim() || '',
+        zone: data.zone?.trim() || '',
+        schoolPhone: data.schoolPhone?.trim() || '',
+        schoolPhone2: data.schoolPhone2?.trim() || '',
+        schoolPhones: extraSchoolPhones.map(p => p.trim()).filter(Boolean),
+        
+        founderName: data.founderName?.trim() || '',
+        founderPhone: data.founderPhone?.trim() || '',
+        founderPhone2: data.founderPhone2?.trim() || '',
+        founderPhones: extraFounderPhones.map(p => p.trim()).filter(Boolean),
+        founderViber: data.founderViber?.trim() || '',
+        founderTelegram: data.founderTelegram?.trim() || '',
 
-        contact2Name: data.contact2Name ? data.contact2Name.trim() : (data.responsiblePerson2Name ? data.responsiblePerson2Name.trim() : ''),
-        contact2Role: data.contact2Role ? data.contact2Role.trim() : (data.responsiblePerson2Role ? data.responsiblePerson2Role.trim() : ''),
-        contact2Phone: data.contact2Phone ? data.contact2Phone.trim() : (data.responsiblePerson2Phone ? data.responsiblePerson2Phone.trim() : ''),
-        contact2Phone2: data.contact2Phone2 ? data.contact2Phone2.trim() : (data.responsiblePerson2Phone2 ? data.responsiblePerson2Phone2.trim() : ''),
-        contact2Phones: cleanCoord2Phones,
-        responsiblePerson2Name: data.contact2Name ? data.contact2Name.trim() : (data.responsiblePerson2Name ? data.responsiblePerson2Name.trim() : ''),
-        responsiblePerson2Role: data.contact2Role ? data.contact2Role.trim() : (data.responsiblePerson2Role ? data.responsiblePerson2Role.trim() : ''),
-        responsiblePerson2Phone: data.contact2Phone ? data.contact2Phone.trim() : (data.responsiblePerson2Phone ? data.responsiblePerson2Phone.trim() : ''),
-        responsiblePerson2Phone2: data.contact2Phone2 ? data.contact2Phone2.trim() : (data.responsiblePerson2Phone2 ? data.responsiblePerson2Phone2.trim() : ''),
-        responsiblePerson2Phones: cleanCoord2Phones,
-        contact2Viber: data.contact2Viber ? data.contact2Viber.trim() : (data.responsiblePerson2Viber ? data.responsiblePerson2Viber.trim() : ''),
-        contact2Telegram: data.contact2Telegram ? data.contact2Telegram.trim() : (data.responsiblePerson2Telegram ? data.responsiblePerson2Telegram.trim() : ''),
-        responsiblePerson2Viber: data.contact2Viber ? data.contact2Viber.trim() : (data.responsiblePerson2Viber ? data.responsiblePerson2Viber.trim() : ''),
-        responsiblePerson2Telegram: data.contact2Telegram ? data.contact2Telegram.trim() : (data.responsiblePerson2Telegram ? data.responsiblePerson2Telegram.trim() : ''),
+        adminName: data.adminName?.trim() || '',
+        adminPhone: data.adminPhone?.trim() || '',
+        adminPhone2: data.adminPhone2?.trim() || '',
+        adminPhones: extraAdminPhones.map(p => p.trim()).filter(Boolean),
+        adminViber: data.adminViber?.trim() || '',
+        adminTelegram: data.adminTelegram?.trim() || '',
+
+        // Clean mapping for Responsible Person 1
+        responsiblePerson1Name: data.contactName?.trim() || '',
+        responsiblePerson1Role: data.contactRole?.trim() || '',
+        responsiblePerson1Phone: data.contactPhone?.trim() || '',
+        responsiblePerson1Phone2: data.contactPhone2?.trim() || '',
+        responsiblePerson1Phones: extraCoord1Phones.map(p => p.trim()).filter(Boolean),
+        responsiblePerson1Viber: data.contactViber?.trim() || '',
+        responsiblePerson1Telegram: data.contactTelegram?.trim() || '',
+        // Keep old fields for backward compatibility
+        contactName: data.contactName?.trim() || '',
+        contactRole: data.contactRole?.trim() || '',
+        contactPhone: data.contactPhone?.trim() || '',
+        contactPhone2: data.contactPhone2?.trim() || '',
+        contactPhones: extraCoord1Phones.map(p => p.trim()).filter(Boolean),
+        contactViber: data.contactViber?.trim() || '',
+        contactTelegram: data.contactTelegram?.trim() || '',
+
+        // Clean mapping for Responsible Person 2
+        responsiblePerson2Name: data.contact2Name?.trim() || '',
+        responsiblePerson2Role: data.contact2Role?.trim() || '',
+        responsiblePerson2Phone: data.contact2Phone?.trim() || '',
+        responsiblePerson2Phone2: data.contact2Phone2?.trim() || '',
+        responsiblePerson2Phones: extraCoord2Phones.map(p => p.trim()).filter(Boolean),
+        responsiblePerson2Viber: data.contact2Viber?.trim() || '',
+        responsiblePerson2Telegram: data.contact2Telegram?.trim() || '',
+        // Keep old fields for backward compatibility
+        contact2Name: data.contact2Name?.trim() || '',
+        contact2Role: data.contact2Role?.trim() || '',
+        contact2Phone: data.contact2Phone?.trim() || '',
+        contact2Phone2: data.contact2Phone2?.trim() || '',
+        contact2Phones: extraCoord2Phones.map(p => p.trim()).filter(Boolean),
+        contact2Viber: data.contact2Viber?.trim() || '',
+        contact2Telegram: data.contact2Telegram?.trim() || '',
+
         studentRange: data.studentRange || '0-100',
         studentCount: cleanStudentCount,
         feeAmount: cleanFeeAmount,
@@ -2245,6 +2289,50 @@ export default function Admin() {
             }`}
           >
             <Megaphone className="w-4 h-4 shrink-0 text-rose-600" /> စာတန်းပြေး (Ticker)
+          </button>
+          <button
+            onClick={() => setActiveTab('events')}
+            type="button"
+            className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+              activeTab === 'events'
+                ? 'bg-white text-indigo-900 shadow-xs ring-1 ring-indigo-200'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Calendar className="w-4 h-4 shrink-0 text-indigo-600" /> ပွဲစဉ်များ (Events)
+          </button>
+          <button
+            onClick={() => setActiveTab('sports')}
+            type="button"
+            className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+              activeTab === 'sports'
+                ? 'bg-white text-emerald-900 shadow-xs ring-1 ring-emerald-200'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Trophy className="w-4 h-4 shrink-0 text-emerald-600" /> အားကစား (Sports)
+          </button>
+          <button
+            onClick={() => setActiveTab('documents')}
+            type="button"
+            className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+              activeTab === 'documents'
+                ? 'bg-white text-amber-900 shadow-xs ring-1 ring-amber-200'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <FolderOpen className="w-4 h-4 shrink-0 text-amber-600" /> စာရွက်စာတမ်း (Docs)
+          </button>
+          <button
+            onClick={() => setActiveTab('requests')}
+            type="button"
+            className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+              activeTab === 'requests'
+                ? 'bg-white text-rose-900 shadow-xs ring-1 ring-rose-200'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <FileText className="w-4 h-4 shrink-0 text-rose-600" /> တောင်းဆိုမှုများ
           </button>
           <button
             onClick={() => setActiveTab('audit_logs')}
@@ -2898,12 +2986,30 @@ export default function Admin() {
           onDelete={deleteSchool}
           onToggleFee={toggleSchoolFeeStatus}
           onUpdateStatus={updateSchoolStatus}
+          onCreateAccount={handleCreateSchoolAccount}
           onOpenExcel={() => { cancelEditSchool(); setIsSchoolFormOpen(true); }}
           onExportExcel={() => exportSchoolsToExcel(schools)}
           onCleanDuplicates={cleanExistingDuplicates}
+          onExcelUpload={handleExcelImport}
           isUploadingExcel={isUploadingExcel}
           excelUploadState={excelUploadState}
         />
+      )}
+
+      {activeTab === 'events' && (
+        <AdminEventManager />
+      )}
+
+      {activeTab === 'sports' && (
+        <AdminSportsManager />
+      )}
+
+      {activeTab === 'documents' && (
+        <AdminDocumentManager />
+      )}
+
+      {activeTab === 'requests' && (
+        <AdminRequestsManager />
       )}
 
       {activeTab === 'tickers' && (
@@ -3462,6 +3568,17 @@ export default function Admin() {
                   <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
                   <span>အများအပြားဖျက် ({auditLogs.filter(l => l.action === 'bulk_delete').length})</span>
                 </button>
+              </div>
+              <div className="ml-auto w-full sm:w-auto mt-2 sm:mt-0">
+                <SortSelect
+                  value={auditSortBy}
+                  onChange={(val) => setAuditSortBy(val as any)}
+                  options={[
+                    { value: 'newest', label: 'အသစ်ဆုံး အရင်ပြ' },
+                    { value: 'oldest', label: 'အဟောင်းဆုံး အရင်ပြ' }
+                  ]}
+                  className="min-w-[160px]"
+                />
               </div>
             </div>
 

@@ -35,6 +35,7 @@ export default function Dashboard() {
 
   // Annual Fee Breakdown Tab: 'level' | 'student_range' | 'amount' | 'matrix'
   const [feeBreakdownTab, setFeeBreakdownTab] = useState<'level' | 'student_range' | 'amount' | 'matrix'>('level');
+  const [showDetailedBreakdown, setShowDetailedBreakdown] = useState(false);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -426,7 +427,20 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* 3. CORE ANNUAL FEE BREAKDOWN SECTION (ကျောင်းအဆင့် / ကျောင်းသားဦးရေ / ထည့်ဝင်ထားသော ပမာဏ အလိုက်) */}
+      {/* Toggle Button for Detailed Breakdown */}
+      <div className="flex justify-center py-4">
+        <button
+          onClick={() => setShowDetailedBreakdown(!showDetailedBreakdown)}
+          className="px-6 py-2.5 bg-white border border-slate-200 text-slate-700 font-bold text-sm rounded-xl hover:bg-slate-50 transition shadow-sm flex items-center gap-2"
+        >
+          {showDetailedBreakdown ? 'အသေးစိတ် ဇယားများကို ပိတ်မည် ▲' : 'အသေးစိတ် ကိန်းဂဏန်းဇယားများ ကြည့်ရန် ▼'}
+        </button>
+      </div>
+
+      {/* The original breakdown section, conditionally rendered */}
+      {showDetailedBreakdown && (
+        <div className="animate-in fade-in slide-in-from-top-4 duration-300">
+          {/* 3. CORE ANNUAL FEE BREAKDOWN SECTION (ကျောင်းအဆင့် / ကျောင်းသားဦးရေ / ထည့်ဝင်ထားသော ပမာဏ အလိုက်) */}
       <section className="bg-white rounded-3xl border border-slate-200 shadow-sm p-4 sm:p-6 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
           <div>
@@ -773,6 +787,10 @@ export default function Dashboard() {
           </div>
         )}
       </section>
+
+      
+        </div>
+      )}
 
       {/* 4. LATEST ANNOUNCEMENTS */}
       <section className="space-y-3">

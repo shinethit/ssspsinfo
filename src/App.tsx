@@ -14,6 +14,12 @@ import SchoolDetail from './pages/SchoolDetail';
 import Associations from './pages/Associations';
 import Dashboard from './pages/Dashboard';
 import VersionHistory from './pages/VersionHistory';
+import Sports from './pages/Sports';
+import Documents from './pages/Documents';
+import Events from './pages/Events';
+import Receipt from './pages/Receipt';
+import SchoolLogin from './pages/SchoolLogin';
+import SchoolPortal from './pages/SchoolPortal';
 import Chat from './pages/Chat';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
@@ -30,6 +36,12 @@ export default function App() {
             <Route index element={<Home />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="announcements" element={<Announcements />} />
+            <Route path="sports" element={<Sports />} />
+            <Route path="documents" element={<Documents />} />
+            <Route path="events" element={<Events />} />
+            <Route path="receipt/:id" element={<Receipt />} />
+            <Route path="school-login" element={<SchoolLogin />} />
+            <Route path="school-portal" element={<SchoolPortal />} />
             <Route path="announcements/:id" element={<AnnouncementDetail />} />
             <Route path="associations" element={<Associations />} />
             <Route path="contacts" element={<Contacts />} />

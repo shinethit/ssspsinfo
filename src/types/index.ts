@@ -180,6 +180,8 @@ export interface SchoolLevelItem {
 }
 
 export interface School {
+  authUid?: string; // Linked Firebase Auth User ID
+  accountEmail?: string;
   id: string;
   logoUrl: string;
   name: string;
@@ -414,3 +416,82 @@ export interface AdminUser {
 }
 
 
+
+
+// --- NEW WAVE 1 TYPES ---
+
+export interface SportsMatchResult {
+  id: string;
+  teamA: string;
+  scoreA: number;
+  teamB: string;
+  scoreB: number;
+  winner?: string;
+}
+
+export interface SportsEvent {
+  id: string;
+  title: string;
+  sportType: string; // 'ဘောလုံး', 'ဘော်လီဘော', စသဖြင့်
+  status: 'upcoming' | 'ongoing' | 'finished';
+  startDate: string;
+  location: string;
+  results: SportsMatchResult[];
+  createdAt: string;
+}
+
+export interface DocumentItem {
+  id: string;
+  title: string;
+  category: string; // 'စည်းမျဉ်း', 'ဖောင်ပုံစံ', 'အစီရင်ခံစာ'
+  fileUrl: string;
+  fileType: string;
+  fileSize: string;
+  uploadedAt: string;
+}
+
+export interface EventRegistration {
+  id: string;
+  eventId: string;
+  schoolId: string;
+  schoolName: string;
+  contactPhone: string;
+  attendeesCount: number;
+  registeredAt: string;
+}
+
+
+export interface EventItem {
+  id: string;
+  title: string;
+  description: string;
+  date: string;
+  location: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface EventRegistration {
+  id: string;
+  eventId: string;
+  schoolName: string;
+  contactPhone: string;
+  attendeesCount: number;
+  registeredAt: string;
+}
+
+
+export interface SchoolUpdateRequest {
+  id: string;
+  schoolId: string;
+  schoolName: string;
+  requestedBy: string; // Email or Name of the person requesting
+  contactPhone: string;
+  changes: {
+    field: string;
+    oldValue: string;
+    newValue: string;
+  }[];
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}

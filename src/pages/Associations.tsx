@@ -3,12 +3,14 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Association, CommitteeMember } from '../types';
 import { useData } from '../context/DataContext';
 import { Building2, Users, Phone, MapPin, Search, Mail, Send, Award, School as SchoolIcon, ArrowLeft } from 'lucide-react';
+import SortSelect from '../components/ui/SortSelect';
 
 export default function Associations() {
   const navigate = useNavigate();
   const { associations, loading } = useData();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTownship, setSelectedTownship] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'name_asc' | 'name_desc'>('name_asc');
 
   // Extract unique townships for filtering
   const townships = useMemo(() => {
@@ -32,8 +34,12 @@ export default function Associations() {
         (a.members && a.members.some(m => m.name.toLowerCase().includes(q) || m.role.toLowerCase().includes(q)));
 
       return matchTownship && matchSearch;
+    }).sort((a, b) => {
+      if (sortBy === 'name_asc') return (a.name || '').localeCompare(b.name || '', 'my');
+      if (sortBy === 'name_desc') return (b.name || '').localeCompare(a.name || '', 'my');
+      return 0;
     });
-  }, [associations, selectedTownship, searchQuery]);
+  }, [associations, selectedTownship, searchQuery, sortBy]);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -84,6 +90,16 @@ export default function Associations() {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="အသင်းအမည်၊ မြို့နယ် (သို့) အမှုဆောင်အဖွဲ့ဝင် အမည်ဖြင့် ရှာရန်..."
             className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-100 outline-hidden text-sm sm:text-base"
+          />
+        </div>
+        <div className="mt-3">
+          <SortSelect
+            value={sortBy}
+            onChange={(val) => setSortBy(val as any)}
+            options={[
+              { value: 'name_asc', label: 'အသင်းအမည် (က မှ အ)' },
+              { value: 'name_desc', label: 'အသင်းအမည် (အ မှ က)' }
+            ]}
           />
         </div>
 

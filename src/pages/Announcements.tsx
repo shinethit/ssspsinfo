@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Announcement } from '../types';
 import { useData, getAnnouncementTimestamp } from '../context/DataContext';
 import { Tag, Calendar, ChevronLeft, ChevronRight, Search, FileText, ArrowLeft } from 'lucide-react';
+import SortSelect from '../components/ui/SortSelect';
 
 export const ANNOUNCEMENT_CATEGORIES = [
   { id: 'all', label: 'အားလုံး', labelEn: 'All', color: 'bg-slate-100 text-slate-700 border-slate-200' },
@@ -34,7 +35,7 @@ export default function Announcements() {
   const { announcements, loading } = useData();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'title_asc' | 'title_desc'>('date_desc');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
@@ -60,16 +61,18 @@ export default function Announcements() {
 
     // Sort strictly by Admin Set Date (eventDate), fallback to publishedAt
     return list.sort((a, b) => {
+      if (sortBy === 'title_asc') return (a.title || '').localeCompare(b.title || '', 'my');
+      if (sortBy === 'title_desc') return (b.title || '').localeCompare(a.title || '', 'my');
       const timeA = getAnnouncementTimestamp(a);
       const timeB = getAnnouncementTimestamp(b);
-      return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+      return sortBy === 'date_desc' ? timeB - timeA : timeA - timeB;
     });
-  }, [announcements, selectedCategory, searchQuery, sortOrder]);
+  }, [announcements, selectedCategory, searchQuery, sortBy]);
 
   // Reset page when category or search changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedCategory, searchQuery, sortOrder]);
+  }, [selectedCategory, searchQuery, sortBy]);
 
   const totalPages = Math.ceil(filteredAnnouncements.length / itemsPerPage);
   const currentItems = useMemo(() => {
@@ -159,15 +162,16 @@ export default function Announcements() {
         {/* Sort & Stats Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 text-xs">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-500">စီစဉ်မှု (Sort by Date):</span>
-            <select
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value as 'desc' | 'asc')}
-              className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 font-bold text-slate-800 outline-hidden cursor-pointer"
-            >
-              <option value="desc">ရက်စွဲ (အသစ်ဆုံး မှ အဟောင်း - Newest Event First)</option>
-              <option value="asc">ရက်စွဲ (အဟောင်း မှ အသစ် - Oldest Event First)</option>
-            </select>
+            <SortSelect
+              value={sortBy}
+              onChange={(val) => setSortBy(val as any)}
+              options={[
+                { value: 'date_desc', label: 'ရက်စွဲ (အသစ်ဆုံး မှ အဟောင်း)' },
+                { value: 'date_asc', label: 'ရက်စွဲ (အဟောင်း မှ အသစ်)' },
+                { value: 'title_asc', label: 'ခေါင်းစဉ် (က မှ အ)' },
+                { value: 'title_desc', label: 'ခေါင်းစဉ် (အ မှ က)' }
+              ]}
+            />
           </div>
           <span className="text-slate-500">
             ရှာဖွေတွေ့ရှိသည့် ကြေညာချက်: <strong>{filteredAnnouncements.length}</strong> ခု
