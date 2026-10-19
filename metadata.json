@@ -1,0 +1,6 @@
+{
+  "name": "ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း — သတင်းနှင့် ပြန်ကြားရေးဌာန",
+  "description": "အသင်း၏ အတွင်းပိုင်း သတင်းအချက်အလက် မျှဝေရေး ပလပ်ဖောင်း။",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
