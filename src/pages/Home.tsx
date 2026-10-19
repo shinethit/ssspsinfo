@@ -30,6 +30,7 @@ import { getUnifiedSchoolLevels } from '../lib/schoolLevels';
 export default function Home() {
   const { schools, announcements, associations, schoolLevels, loading } = useData();
   const [quickSearch, setQuickSearch] = useState('');
+  const [selectedZone, setSelectedZone] = useState<string>('all');
 
   const latestAnnouncements = useMemo(() => {
     return [...announcements]
@@ -43,9 +44,17 @@ export default function Home() {
   const underReviewSchools = useMemo(() => schools.filter(s => s.status === 'under_review').length, [schools]);
 
   // Dynamic School Levels Stats matching reference / database
+  const filteredSchoolsByZone = useMemo(() => {
+    if (selectedZone === 'all') return schools;
+    if (selectedZone === 'အခြား') {
+      return schools.filter(s => !s.zone || !['တောင်ကြီးဇုန်', 'ကလောဇုန်', 'လွိုင်လင်/နမ့်စန်ဇုန်'].includes(s.zone));
+    }
+    return schools.filter(s => s.zone === selectedZone);
+  }, [schools, selectedZone]);
+
   const levelStats = useMemo(() => {
-    return getUnifiedSchoolLevels(schoolLevels, schools).filter(l => l.total > 0);
-  }, [schools, schoolLevels]);
+    return getUnifiedSchoolLevels(schoolLevels, filteredSchoolsByZone).filter(l => l.total > 0);
+  }, [filteredSchoolsByZone, schoolLevels]);
 
   // Quick searched schools preview
   const filteredQuickSchools = useMemo(() => {
@@ -246,22 +255,39 @@ export default function Home() {
       </section>
 
       {/* 3. SCHOOL EDUCATION LEVELS BREAKDOWN (Matching Reference & Database) */}
-      <section className="bg-white p-3 rounded-xl border border-slate-100 shadow-none space-y-2">
+      <section className="bg-white p-3 rounded-xl border border-slate-100 shadow-none space-y-3">
         <div className="flex items-center justify-between border-b border-slate-50 pb-1">
           <h3 className="font-bold text-xs text-sky-950 flex items-center gap-1.5">
             <GraduationCap className="w-3.5 h-3.5 text-sky-600" />
-            <span>ကျောင်းအဆင့် ခွဲခြမ်းမှု (အဆင့်အလိုက် စာရင်းအင်း)</span>
+            <span>ကျောင်းအဆင့် ခွဲခြမ်းမှု (ဇုန်အလိုက်)</span>
           </h3>
           <Link to="/contacts" className="text-[10px] font-bold text-sky-700 hover:underline">
-            အသေးစိတ် &rarr;
+            List အားလုံးကြည့်ရန် &rarr;
           </Link>
+        </div>
+
+        {/* Zone Tabs */}
+        <div className="flex overflow-x-auto gap-1 pb-1">
+          {['all', 'တောင်ကြီးဇုန်', 'ကလောဇုန်', 'လွိုင်လင်/နမ့်စန်ဇုန်', 'အခြား'].map(zone => (
+            <button
+              key={zone}
+              onClick={() => setSelectedZone(zone)}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap transition ${
+                selectedZone === zone
+                  ? 'bg-sky-900 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {zone === 'all' ? 'အားလုံး' : zone}
+            </button>
+          ))}
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
           {levelStats.map((item) => (
             <Link
               key={item.id}
-              to={`/contacts?level=${encodeURIComponent(item.name)}`}
+              to={`/contacts?level=${encodeURIComponent(item.name)}&zone=${encodeURIComponent(selectedZone)}`}
               className={`p-2.5 rounded-lg ${item.color.bg} border ${item.color.border} space-y-1 hover:brightness-95 transition group block`}
             >
               <div className="flex items-center justify-between text-[10px] font-bold">
