@@ -12,7 +12,7 @@ import { Association, NewsTicker, AuditLog, AdminUser, STUDENT_RANGE_TIERS, getS
 import { recordAuditLog } from '../lib/audit';
 import { useData, sortAnnouncementsByEventDate } from '../context/DataContext';
 import { isSchoolInLevel, getUnifiedSchoolLevels } from '../lib/schoolLevels';
-import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../constants';
+import { ZONE_FILTER_OPTIONS, isSchoolInZone, STANDARD_ZONES } from '../constants';
 import {   FileText,   School as SchoolIcon,   Plus,   Trash2,   Calendar,   Download,   Upload,   Building2,   UserPlus,   Users,   Megaphone,   Clock,   AlertCircle,   Flame,   Edit2,   RefreshCw,   Sparkles,   Link as LinkIcon,   CheckCircle,   Eye,   EyeOff,   Lock,   CheckCircle2,   XCircle,   CopyCheck,   ShieldAlert,   Layers,   CheckSquare,   Square,   Search,   Shield,   Activity,   UserCheck,   History,   Crown,   Mail,   ShieldCheck,   HardDriveDownload,   Database,   Save,   ArrowLeft,   FileJson,   Check,   ArrowDownToLine,   MapPin,   Settings as SettingsIcon,   Cloud,   LogOut,   KeyRound,   Loader2,   FileSpreadsheet,   Trophy,   FolderOpen, Coins } from 'lucide-react';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { createSchoolAccount } from '../lib/schoolAuth';
@@ -44,6 +44,7 @@ const announcementSchema = z.object({
   category: z.string().min(1, 'ကဏ္ဍ ရွေးချယ်ပါ'),
   eventDate: z.string().min(1, 'ကြေညာချက်ရက်စွဲ (Admin Set Date) ထည့်သွင်းပေးပါ'),
   attachmentUrl: z.string().optional(),
+  zone: z.string().optional(),
 });
 
 const schoolSchema = z.object({
@@ -431,6 +432,7 @@ export default function Admin() {
       category: 'general',
       eventDate: new Date().toISOString().split('T')[0],
       attachmentUrl: '',
+      zone: '',
     },
   });
 
@@ -1246,6 +1248,7 @@ export default function Admin() {
       category: a.category || 'general',
       eventDate: dateVal,
       attachmentUrl: a.attachments && a.attachments.length > 0 ? a.attachments[0] : '',
+      zone: a.zone || '',
     });
     setTimeout(() => {
       const elem = document.getElementById('announcement-form-section');
@@ -1261,6 +1264,7 @@ export default function Admin() {
       category: 'general',
       eventDate: new Date().toISOString().split('T')[0],
       attachmentUrl: '',
+      zone: '',
     });
   };
 
@@ -1268,10 +1272,11 @@ export default function Admin() {
     try {
       const selectedDate = data.eventDate || new Date().toISOString().split('T')[0];
       const isoPublishedAt = new Date(`${selectedDate}T12:00:00Z`).toISOString();
-      const payload = {
+      const payload: any = {
         title: data.title,
         body: data.body,
         category: data.category,
+        zone: data.zone || '',
         eventDate: selectedDate, // Admin Set Date (Event Date)
         publishedAt: isoPublishedAt, // Synchronized with Admin Set Date
         attachments: data.attachmentUrl ? [data.attachmentUrl] : [],
@@ -2626,6 +2631,25 @@ export default function Admin() {
               </div>
 
               <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1">
+                  <MapPin className="w-3.5 h-3.5 text-indigo-600" />
+                  ဇုန် (Zone — စိတ်ကြိုက် / Optional)
+                </label>
+                <select
+                  {...announcementForm.register('zone')}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 bg-white text-slate-800 text-sm focus:border-sky-500 outline-hidden"
+                >
+                  <option value="">- ဇုန် မသတ်မှတ် (Association-wide / အားလုံးအတွက်) -</option>
+                  {STANDARD_ZONES.map(z => (
+                    <option key={z} value={z}>{z}</option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  (ဇုန် မသတ်မှတ်ပါက ဤကြေညာချက်သည် အားလုံးအတွက် ဖြစ်ပါမည်)
+                </p>
+              </div>
+
+              <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">
                   ကြေညာချက် ခေါင်းစဉ် (Title) *
                 </label>
@@ -2718,6 +2742,11 @@ export default function Admin() {
                           <span className={`text-[11px] px-2 py-0.5 rounded-md border font-medium ${badge.className}`}>
                             {badge.label}
                           </span>
+                          {(a as any).zone && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-800 border border-indigo-200 font-semibold inline-flex items-center gap-0.5">
+                              <MapPin className="w-2.5 h-2.5" />{(a as any).zone}
+                            </span>
+                          )}
                           <span className="font-bold text-sm text-slate-900">{a.title}</span>
                           {editingAnnouncementId === a.id && (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white animate-pulse">

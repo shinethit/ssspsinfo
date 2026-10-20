@@ -2,8 +2,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Announcement } from '../types';
 import { useData, getAnnouncementTimestamp } from '../context/DataContext';
-import { Tag, Calendar, ChevronLeft, ChevronRight, Search, FileText, ArrowLeft } from 'lucide-react';
+import { Tag, Calendar, ChevronLeft, ChevronRight, Search, FileText, ArrowLeft, MapPin } from 'lucide-react';
 import SortSelect from '../components/ui/SortSelect';
+import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../constants';
 
 export const ANNOUNCEMENT_CATEGORIES = [
   { id: 'all', label: 'အားလုံး', labelEn: 'All', color: 'bg-slate-100 text-slate-700 border-slate-200' },
@@ -34,6 +35,7 @@ export default function Announcements() {
   const navigate = useNavigate();
   const { announcements, loading } = useData();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedZone, setSelectedZone] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'title_asc' | 'title_desc'>('date_desc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -54,9 +56,11 @@ export default function Announcements() {
       const matchSearch =
         !q ||
         (a.title && a.title.toLowerCase().includes(q)) ||
-        (a.body && a.body.toLowerCase().includes(q));
+        (a.body && a.body.toLowerCase().includes(q)) ||
+        ((a as any).zone && (a as any).zone.toLowerCase().includes(q));
 
-      return matchCategory && matchSearch;
+      const matchZone = selectedZone === 'all' ? true : isSchoolInZone((a as any).zone, selectedZone);
+      return matchCategory && matchSearch && matchZone;
     });
 
     // Sort strictly by Admin Set Date (eventDate), fallback to publishedAt
@@ -67,12 +71,12 @@ export default function Announcements() {
       const timeB = getAnnouncementTimestamp(b);
       return sortBy === 'date_desc' ? timeB - timeA : timeA - timeB;
     });
-  }, [announcements, selectedCategory, searchQuery, sortBy]);
+  }, [announcements, selectedCategory, searchQuery, sortBy, selectedZone]);
 
   // Reset page when category or search changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedCategory, searchQuery, sortBy]);
+  }, [selectedCategory, searchQuery, sortBy, selectedZone]);
 
   const totalPages = Math.ceil(filteredAnnouncements.length / itemsPerPage);
   const currentItems = useMemo(() => {
@@ -159,6 +163,31 @@ export default function Announcements() {
           </div>
         </div>
 
+        {/* Zone Filter */}
+        <div>
+          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <MapPin className="w-3.5 h-3.5" /> ဇုန်အလိုက် စစ်ထုတ်ရန် (Filter by Zone)
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {ZONE_FILTER_OPTIONS.map(opt => {
+              const isSelected = selectedZone === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => setSelectedZone(opt.value)}
+                  type="button"
+                  className={`px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-medium transition cursor-pointer border ` +
+                    (isSelected
+                      ? 'bg-indigo-700 text-white border-indigo-700 shadow-xs ring-2 ring-indigo-200'
+                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-800')}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Sort & Stats Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 text-xs">
           <div className="flex items-center gap-2">
@@ -221,9 +250,16 @@ export default function Announcements() {
                 className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs hover:border-sky-300 hover:shadow-md transition space-y-3"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold border ${badge.className}`}>
-                    {badge.label}
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold border ${badge.className}`}>
+                      {badge.label}
+                    </span>
+                    {(a as any).zone && (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold bg-indigo-50 text-indigo-800 px-2 py-0.5 rounded-md border border-indigo-200">
+                        <MapPin className="w-3 h-3" />{(a as any).zone}
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1.5 text-xs text-sky-800 font-semibold bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-100">
                     <Calendar className="w-3.5 h-3.5 text-sky-600" />
                     <span>ရက်စွဲ: {dateStr || rawDate || 'မဖော်ပြထားပါ'}</span>
