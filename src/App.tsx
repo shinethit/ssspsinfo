@@ -17,6 +17,7 @@ import VersionHistory from './pages/VersionHistory';
 import Sports from './pages/Sports';
 import Documents from './pages/Documents';
 import Events from './pages/Events';
+import CalendarPage from './pages/CalendarPage';
 import Receipt from './pages/Receipt';
 import SchoolLogin from './pages/SchoolLogin';
 import SchoolPortal from './pages/SchoolPortal';
@@ -41,6 +42,7 @@ export default function App() {
             <Route path="medals" element={<MedalTally />} />
             <Route path="documents" element={<Documents />} />
             <Route path="events" element={<Events />} />
+            <Route path="calendar" element={<CalendarPage />} />
             <Route path="receipt/:id" element={<Receipt />} />
             <Route path="school-login" element={<SchoolLogin />} />
             <Route path="school-portal" element={<SchoolPortal />} />

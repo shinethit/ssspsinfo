@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { PWAInstallButton } from '../components/PWAInstallButton';
 import { getUnifiedSchoolLevels } from '../lib/schoolLevels';
+import ShareButton from '../components/ShareButton';
 import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../constants';
 
 export default function Home() {
@@ -105,9 +106,17 @@ export default function Home() {
         <div className="absolute bottom-0 left-0 w-52 h-52 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none -ml-10 -mb-10" />
 
         <div className="relative z-10 text-center space-y-3 max-w-2xl mx-auto">
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight leading-snug">
-            သတင်းနှင့် ပြန်ကြားရေးဌာန
-          </h1>
+          <div className="flex flex-col items-center gap-2">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight leading-snug">
+              သတင်းနှင့် ပြန်ကြားရေးဌာန
+            </h1>
+            <ShareButton
+              title="ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း"
+              text="သတင်းနှင့် ပြန်ကြားရေးဌာန — အသင်းဝင်ကျောင်းများ၏ သတင်းအချက်အလက်များ"
+              variant="primary"
+              label="App ကို မျှဝေရန်"
+            />
+          </div>
 
           {/* Quick Search on Hero Banner */}
           <div className="max-w-md mx-auto">

@@ -18,6 +18,7 @@ import {
   FolderOpen,
   Award,
   Ticket,
+  Calendar,
 } from 'lucide-react';
 import NewsTickerBar from './NewsTickerBar';
 import GlobalSearch from './GlobalSearch';
@@ -33,8 +34,9 @@ export default function Layout() {
     { to: '/', label: 'ပင်မစာမျက်နှာ', labelEn: 'Home', icon: Home, exact: true },
     { to: '/dashboard', label: 'ဒက်ရှ်ဘုတ် (စာရင်းအင်း)', labelEn: 'Dashboard', icon: BarChart3 },
     { to: '/announcements', label: 'ကြေညာချက်များ', labelEn: 'Announcements', icon: BookOpen },
-    { to: '/events', label: 'ပွဲစဉ်များ (Events)', labelEn: 'Events', icon: Ticket },
-    { to: '/sports', label: 'အားကစားရလဒ်များ', labelEn: 'Sports Results', icon: Trophy },
+    { to: '/events', label: 'ပွဲတော်များ', labelEn: 'Events', icon: Ticket },
+    { to: '/calendar', label: 'ပြက္ခဒိန်', labelEn: 'Calendar', icon: Calendar },
+    { to: '/sports', label: 'အားကစား', labelEn: 'Sports', icon: Trophy },
     { to: '/medals', label: 'ဆုတံဆိပ်ဇယား', labelEn: 'Medal Tally', icon: Award },
     { to: '/documents', label: 'စာရွက်စာတမ်းများ', labelEn: 'Documents', icon: FolderOpen },
     { to: '/associations', label: 'အသင်းများ', labelEn: 'Associations', icon: Building2 },

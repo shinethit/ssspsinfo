@@ -481,6 +481,12 @@ export interface EventItem {
   location: string;
   isActive: boolean;
   createdAt: string;
+  time?: string;
+  schoolId?: string;
+  schoolName?: string;
+  zone?: string;
+  eventType?: 'festival' | 'sport' | 'school_activity' | 'general';
+  imageUrl?: string;
 }
 
 export interface EventRegistration {

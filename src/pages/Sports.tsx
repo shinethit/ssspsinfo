@@ -4,7 +4,6 @@ import { collection, onSnapshot, doc, getDoc, getDocs } from 'firebase/firestore
 import { db } from '../lib/firebase';
 import { SportsEvent, SportInfo, Athlete } from '../types';
 import { Trophy, Calendar, MapPin, ArrowLeft, Loader2, UserCheck, Shield, Info, Clock } from 'lucide-react';
-import ShareButton from '../components/ShareButton';
 import { DEFAULT_SPORTS_TYPES } from '../data/sports';
 
 export default function Sports() {
@@ -64,15 +63,6 @@ export default function Sports() {
         <p className="text-emerald-100 text-sm">အားကစားအမျိုးအစားအလိုက် ရလဒ်များ၊ စည်းမျဉ်းများနှင့် အားကစားသမားများ</p>
       </div>
 
-      <div className="flex items-center justify-end gap-2">
-        <ShareButton
-          title="အားကစားပြိုင်ပွဲများ"
-          text="အားကစားပြိုင်ပွဲများ — ရလဒ်များ၊ စည်းမျဉ်းများနှင့် အားကစားသမား စာရင်း"
-          variant="secondary"
-          label="မျှဝေရန်"
-        />
-      </div>
-
       <div className="flex overflow-x-auto bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm gap-1 snap-x">
         {DEFAULT_SPORTS_TYPES.map(sport => (
           <button
@@ -117,15 +107,7 @@ export default function Sports() {
         </div>
       ) : viewTab === 'athletes' ? (
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 animate-in fade-in">
-          <div className="flex items-center justify-between border-b pb-2 gap-2 flex-wrap">
-            <h3 className="font-bold text-lg text-sky-950 flex items-center gap-2"><UserCheck className="w-5 h-5 text-sky-600"/> အားကစားသမား စာရင်း</h3>
-            <ShareButton
-              title={`${activeSport} — အားကစားသမား စာရင်း`}
-              text={`${activeSport} အားကစားသမားများ — အမည်၊ အတန်း၊ အသက်၊ ကိုယ်စားပြုကျောင်း`}
-              variant="secondary"
-              label="မျှဝေရန်"
-            />
-          </div>
+          <h3 className="font-bold text-lg text-sky-950 border-b pb-2 flex items-center gap-2"><UserCheck className="w-5 h-5 text-sky-600"/> အားကစားသမား စာရင်း</h3>
           {athletes.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">

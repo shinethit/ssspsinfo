@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { auth, db } from '../lib/firebase';
-import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
-import { School, Athlete } from '../types';
+import { collection, query, where, getDocs, updateDoc, doc, addDoc } from 'firebase/firestore';
+import { School, Athlete, EventItem } from '../types';
 import { toast } from 'sonner';
-import { LogOut, Save, School as SchoolIcon, Phone, MapPin, Users, Eye, ShieldCheck, UserCheck } from 'lucide-react';
+import { LogOut, Save, School as SchoolIcon, Phone, MapPin, Users, Eye, ShieldCheck, UserCheck, Calendar, Clock } from 'lucide-react';
 import { STANDARD_ZONES } from '../constants';
+import ImageUploadDropzone from '../components/ImageUploadDropzone';
 
 export default function SchoolPortal() {
   const [school, setSchool] = useState<School | null>(null);
@@ -20,6 +21,15 @@ export default function SchoolPortal() {
   const [township, setTownship] = useState('');
   const [zone, setZone] = useState('');
   const [studentCount, setStudentCount] = useState('');
+
+  const [activities, setActivities] = useState<EventItem[]>([]);
+  const [actTitle, setActTitle] = useState('');
+  const [actDate, setActDate] = useState('');
+  const [actTime, setActTime] = useState('');
+  const [actLocation, setActLocation] = useState('');
+  const [actDesc, setActDesc] = useState('');
+  const [actImage, setActImage] = useState('');
+  const [isSubmittingAct, setIsSubmittingAct] = useState(false);
 
   useEffect(() => {
     const fetchSchoolData = async () => {
@@ -43,6 +53,10 @@ export default function SchoolPortal() {
           const athleteQuery = query(collection(db, 'athletes'), where('school', '==', data.name));
           const athleteSnap = await getDocs(athleteQuery);
           setAthletes(athleteSnap.docs.map(d => ({ id: d.id, ...d.data() } as Athlete)));
+
+          const actQuery = query(collection(db, 'events'), where('schoolId', '==', data.id));
+          const actSnap = await getDocs(actQuery);
+          setActivities(actSnap.docs.map(d => ({ id: d.id, ...d.data() } as EventItem)));
         } else {
           toast.error('ကျောင်းအချက်အလက် ရှာမတွေ့ပါ');
         }
@@ -73,6 +87,36 @@ export default function SchoolPortal() {
       toast.error('သိမ်းဆည်းရာတွင် အမှားဖြစ်ပွားပါသည်');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAddActivity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!school) return;
+    setIsSubmittingAct(true);
+    try {
+      const payload = {
+        title: actTitle,
+        date: actDate,
+        time: actTime,
+        location: actLocation,
+        description: actDesc,
+        imageUrl: actImage,
+        zone: school.zone || '',
+        schoolId: school.id,
+        schoolName: school.name,
+        eventType: 'school_activity' as const,
+        isActive: true,
+        createdAt: new Date().toISOString()
+      };
+      const docRef = await addDoc(collection(db, 'events'), payload);
+      setActivities([...activities, { id: docRef.id, ...payload }]);
+      toast.success('လှုပ်ရှားမှု တင်ပြီးပါပြီ');
+      setActTitle(''); setActDate(''); setActTime(''); setActLocation(''); setActDesc(''); setActImage('');
+    } catch (err) {
+      toast.error('တင်၍ မရပါ');
+    } finally {
+      setIsSubmittingAct(false);
     }
   };
 
@@ -190,6 +234,53 @@ export default function SchoolPortal() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Activity Management */}
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+          <div className="flex items-center justify-between border-b pb-3">
+            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-indigo-600" /> ကျောင်း၏ လှုပ်ရှားမှုများ (Activities)
+            </h2>
+          </div>
+          <div className="grid md:grid-cols-2 gap-6">
+            <form onSubmit={handleAddActivity} className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <h3 className="font-bold text-sm text-slate-800">လှုပ်ရှားမှုအသစ် တင်ရန်</h3>
+              <input required placeholder="ခေါင်းစဉ် *" value={actTitle} onChange={e => setActTitle(e.target.value)} className="w-full p-2.5 border rounded-xl text-sm bg-white" />
+              <div className="grid grid-cols-2 gap-2">
+                <input required type="date" value={actDate} onChange={e => setActDate(e.target.value)} className="w-full p-2.5 border rounded-xl text-sm bg-white" />
+                <input placeholder="အချိန် (Optional)" value={actTime} onChange={e => setActTime(e.target.value)} className="w-full p-2.5 border rounded-xl text-sm bg-white" />
+              </div>
+              <input placeholder="နေရာ (Optional)" value={actLocation} onChange={e => setActLocation(e.target.value)} className="w-full p-2.5 border rounded-xl text-sm bg-white" />
+              <textarea placeholder="အသေးစိတ် (Optional)" value={actDesc} onChange={e => setActDesc(e.target.value)} rows={2} className="w-full p-2.5 border rounded-xl text-sm bg-white" />
+              <ImageUploadDropzone
+                value={actImage}
+                onChange={setActImage}
+                label="ဓာတ်ပုံ (Optional)"
+                folder="school-activities"
+              />
+              <button type="submit" disabled={isSubmittingAct} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-sm font-bold shadow-sm disabled:opacity-50 cursor-pointer">
+                {isSubmittingAct ? 'တင်နေပါသည်...' : '+ လှုပ်ရှားမှု တင်မည်'}
+              </button>
+            </form>
+            <div className="space-y-3">
+              <h3 className="font-bold text-sm text-slate-800">တင်ထားသော လှုပ်ရှားမှုများ ({activities.length})</h3>
+              {activities.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">လှုပ်ရှားမှု မရှိသေးပါ</p>
+              ) : (
+                [...activities].sort((a,b) => b.date.localeCompare(a.date)).map(act => (
+                  <div key={act.id} className="p-3 bg-white border border-slate-200 rounded-xl flex gap-3 shadow-2xs">
+                    {act.imageUrl && <img src={act.imageUrl} alt={act.title} className="w-14 h-14 rounded-lg object-cover border shrink-0" />}
+                    <div>
+                      <p className="font-bold text-sm text-slate-900">{act.title}</p>
+                      <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5"><Calendar className="w-3 h-3"/> {act.date} {act.time && `• ${act.time}`}</p>
+                      {act.location && <p className="text-[10px] text-slate-400 mt-1"><MapPin className="w-2.5 h-2.5 inline"/> {act.location}</p>}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       </div>

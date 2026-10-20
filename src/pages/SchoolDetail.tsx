@@ -9,7 +9,6 @@ import { toast } from 'sonner';
 import { ArrowLeft, Phone, Send, School as SchoolIcon, CheckCircle2, XCircle, Edit2, Trash2, MapPin } from 'lucide-react';
 import { getAdminSession } from '../lib/adminAuth';
 import { getCategorizedSchoolPhones } from '../lib/phoneUtils';
-import ShareButton from '../components/ShareButton';
 
 export default function SchoolDetail() {
   const { id } = useParams<{ id: string }>();
@@ -108,20 +107,12 @@ export default function SchoolDetail() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 w-full">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <Link
-          to="/contacts"
-          className="inline-flex items-center gap-2 text-sm font-medium text-sky-800 hover:text-sky-950 transition"
-        >
-          <ArrowLeft className="w-4 h-4" /> အသင်းဝင်ကျောင်းများသို့ ပြန်သွားရန်
-        </Link>
-        <ShareButton
-          title={school.name}
-          text={`${school.name} — ကျောင်း အသေးစိတ် အချက်အလက်`}
-          variant="secondary"
-          label="မျှဝေရန်"
-        />
-      </div>
+      <Link
+        to="/contacts"
+        className="inline-flex items-center gap-2 text-sm font-medium text-sky-800 hover:text-sky-950 transition"
+      >
+        <ArrowLeft className="w-4 h-4" /> အသင်းဝင်ကျောင်းများသို့ ပြန်သွားရန်
+      </Link>
 
       {/* Admin Quick Control Bar (if signed in) */}
       {isAdmin && (
