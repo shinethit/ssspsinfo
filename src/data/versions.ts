@@ -8,9 +8,20 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v14.9',
+    version: 'v15.0',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'Cloudflare Rate Limit ပြဿနာ ဖြေရှင်းခြင်း (Connection Reset Fix)',
+    changes: [
+      { type: 'fix', text: 'Service Worker ကို ၃၀ စက္ကန့်တိုင်း လှမ်းမေးနေသည့် စနစ်ကို ဖယ်ရှားပြီး Cloudflare မှ IP ပိတ်ခံရခြင်းကို ရပ်တန့်စေခြင်း' },
+      { type: 'fix', text: 'မလိုအပ်တော့သည့် _headers ဖိုင်ကို ဖယ်ရှားပြီး Edge Connection ပြန်လည်ကောင်းမွန်စေခြင်း' },
+      { type: 'improve', text: 'Page စတင်ဖွင့်ချိန်တွင်သာ Update စစ်ဆေးမည်ဖြစ်ပြီး လိုအပ်မှသာ Manual Force Update နှိပ်နိုင်စေခြင်း' },
+    ],
+  },
+  {
+    version: 'v14.9',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'PWA Auto-Update အပြည့်အစုံ ပြင်ဆင်ခြင်း (Cloudflare Cache Bypass)',
     changes: [
       { type: 'fix', text: 'Cloudflare Pages တွင် sw.js နှင့် index.html ကို Cache မ လုပ်စေရန် _headers ဖိုင် ထည့်သွင်းခြင်း' },
