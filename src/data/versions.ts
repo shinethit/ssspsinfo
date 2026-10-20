@@ -8,9 +8,19 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v19.3',
+    version: 'v19.4',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'iOS Cache Bypass & Normal PWA Restore',
+    changes: [
+      { type: 'fix', text: 'iOS Safari တွင် sw.js ကို Cache မလုပ်စေရန် _headers ဖိုင်အား ဘေးကင်းစွာ ပြန်လည်ထည့်သွင်းခြင်း' },
+      { type: 'improve', text: 'PWA စနစ်အား Force Update (skipWaiting + clientsClaim) ဖြင့် ပုံမှန်အတိုင်း ပြန်လည်ထူထောင်ခြင်း' }
+    ],
+  },
+  {
+    version: 'v19.3',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'Zombie Service Worker Killer (Force Reset)',
     changes: [
       { type: 'fix', text: 'iOS နှင့် Windows တွင် ပိတ်မိနေသော Service Worker များကို ကိုယ်တိုင် ဖျက်ဆီးပစ်သည့် Self-Destructing SW စနစ် ထည့်သွင်းခြင်း' }
