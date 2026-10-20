@@ -5,6 +5,7 @@ import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/fire
 import { School, Athlete } from '../types';
 import { toast } from 'sonner';
 import { LogOut, Save, School as SchoolIcon, Phone, MapPin, Users, Eye, ShieldCheck, UserCheck } from 'lucide-react';
+import { STANDARD_ZONES } from '../constants';
 
 export default function SchoolPortal() {
   const [school, setSchool] = useState<School | null>(null);
@@ -17,6 +18,7 @@ export default function SchoolPortal() {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [township, setTownship] = useState('');
+  const [zone, setZone] = useState('');
   const [studentCount, setStudentCount] = useState('');
 
   useEffect(() => {
@@ -34,6 +36,7 @@ export default function SchoolPortal() {
           setPhone(data.schoolPhone || '');
           setAddress(data.address || '');
           setTownship(data.township || '');
+          setZone(data.zone || '');
           setStudentCount(data.studentCount?.toString() || '');
 
           // Fetch athletes for this school
@@ -61,6 +64,7 @@ export default function SchoolPortal() {
         schoolPhone: phone,
         address,
         township,
+        zone,
         studentCount: studentCount ? Number(studentCount) : null,
         updatedAt: new Date().toISOString()
       });
@@ -132,6 +136,15 @@ export default function SchoolPortal() {
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">မြို့နယ်</label>
                 <input type="text" value={township} onChange={e => setTownship(e.target.value)} className="w-full p-2.5 border rounded-xl text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1"><MapPin className="w-3 h-3 text-indigo-600"/> ဇုန် (Zone)</label>
+                <select value={zone} onChange={e => setZone(e.target.value)} className="w-full p-2.5 border rounded-xl text-sm bg-white">
+                  <option value="">- ဇုန် မသတ်မှတ်ရသေး -</option>
+                  {STANDARD_ZONES.map(z => (
+                    <option key={z} value={z}>{z}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="pt-4 border-t border-slate-100">

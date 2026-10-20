@@ -3,14 +3,16 @@ import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, getDoc } from '
 import { db } from '../../lib/firebase';
 import { SportsEvent, SportsMatchResult, School, Athlete } from '../../types';
 import { toast } from 'sonner';
-import { Plus, Trash2, PlusCircle, Upload, Download, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, PlusCircle, Upload, Download, AlertCircle, MapPin } from 'lucide-react';
 import { DEFAULT_SPORTS_TYPES } from '../../data/sports';
 import AdminSportInfoManager from './AdminSportInfoManager';
 import AdminAthleteManager from './AdminAthleteManager';
 import { downloadSportsTemplate, parseSportsExcel } from '../../lib/sportsExcel';
+import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../../constants';
 
 export default function AdminSportsManager({ schools }: { schools: School[] }) {
   const [activeSport, setActiveSport] = useState(DEFAULT_SPORTS_TYPES[0]);
+  const [zoneFilter, setZoneFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'results' | 'info' | 'athletes'>('results');
   const [events, setEvents] = useState<SportsEvent[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -103,6 +105,30 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
 
   return (
     <div className="space-y-6">
+      <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200"><MapPin className="w-3.5 h-3.5" /></div>
+          <div>
+            <h4 className="font-bold text-xs sm:text-sm text-slate-900">ဇုန်အလိုက် ကျောင်း စစ်ထုတ်ခြင်း (Zone Filter)</h4>
+            <p className="text-[10px] text-slate-500">ပြိုင်ပွဲအတွက် ကျောင်း ရွေးချယ်ရာတွင် ဤဇုန်ကို စစ်ထုတ်ပါမည်</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {ZONE_FILTER_OPTIONS.map(opt => {
+            const count = opt.value === 'all' ? schools.length : schools.filter(s => isSchoolInZone(s.zone, opt.value)).length;
+            return (
+              <button key={opt.value} type="button" onClick={() => setZoneFilter(opt.value)}
+                className={`px-2.5 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold transition flex items-center gap-1.5 border cursor-pointer ` +
+                  (zoneFilter === opt.value ? 'bg-indigo-700 text-white border-indigo-700 shadow-sm' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100')}>
+                <span>{opt.label}</span>
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ` +
+                  (zoneFilter === opt.value ? 'bg-indigo-500 text-white' : 'bg-white text-slate-500 border border-slate-200')}>{count}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="flex overflow-x-auto bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm gap-1 snap-x mb-2">
         {DEFAULT_SPORTS_TYPES.map(sport => (
           <button key={sport} onClick={() => { setActiveSport(sport); setSelectedEventId(null); }} className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-lg whitespace-nowrap transition shrink-0 snap-start ${activeSport === sport ? 'bg-sky-900 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'}`}>
@@ -173,9 +199,10 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
                       <div>
                         <select required value={teamA} onChange={e => setTeamA(e.target.value)} className="w-full p-2 border rounded-lg text-xs mb-1">
                           <option value="">- ကျောင်းရွေးပါ -</option>
-                          {schools.map(s => {
+                          {schools.filter(s => isSchoolInZone(s.zone, zoneFilter)).map(s => {
                           const paid = hasPaidSportsFee(s.name);
-                          return <option key={s.id} value={s.name}>{s.name} {!paid ? '(⚠️ကြေးမရှင်း)' : ''}</option>
+                          const zoneTag = s.zone ? '[' + s.zone + '] ' : '';
+                          return <option key={s.id} value={s.name}>{zoneTag}{s.name} {!paid ? '(⚠️ကြေးမရှင်း)' : ''}</option>
                         })}
                         </select>
                         {isIndividual && (
@@ -189,9 +216,10 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
                       <div>
                         <select required value={teamB} onChange={e => setTeamB(e.target.value)} className="w-full p-2 border rounded-lg text-xs mb-1">
                           <option value="">- ကျောင်းရွေးပါ -</option>
-                          {schools.map(s => {
+                          {schools.filter(s => isSchoolInZone(s.zone, zoneFilter)).map(s => {
                           const paid = hasPaidSportsFee(s.name);
-                          return <option key={s.id} value={s.name}>{s.name} {!paid ? '(⚠️ကြေးမရှင်း)' : ''}</option>
+                          const zoneTag = s.zone ? '[' + s.zone + '] ' : '';
+                          return <option key={s.id} value={s.name}>{zoneTag}{s.name} {!paid ? '(⚠️ကြေးမရှင်း)' : ''}</option>
                         })}
                         </select>
                         {isIndividual && (
