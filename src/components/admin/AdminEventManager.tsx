@@ -44,7 +44,7 @@ export default function AdminEventManager() {
       await addDoc(collection(db, 'events'), {
         title, description, date, location, zone: zone || '', isActive: true, createdAt: new Date().toISOString()
       });
-      toast.success('ပွဲစဉ်အသစ် တင်ပြီးပါပြီ');
+      toast.success('ပွဲ/အခမ်းအနား အသစ် တင်ပြီးပါပြီ');
       setTitle(''); setDescription(''); setDate(''); setLocation(''); setZone('');
       fetchData();
     } catch (err) {
@@ -70,10 +70,10 @@ export default function AdminEventManager() {
       {/* Create Event Form */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
         <h3 className="font-bold text-lg text-slate-900 flex items-center gap-2">
-          <Plus className="w-5 h-5 text-sky-600" /> ပွဲစဉ်အသစ် တင်ရန်
+          <Plus className="w-5 h-5 text-sky-600" /> ပွဲ/အခမ်းအနား အသစ် တင်ရန်
         </h3>
         <form onSubmit={handleCreate} className="grid sm:grid-cols-2 gap-4">
-          <input required value={title} onChange={e => setTitle(e.target.value)} placeholder="ပွဲစဉ် ခေါင်းစဉ်" className="p-2.5 border rounded-xl text-sm" />
+          <input required value={title} onChange={e => setTitle(e.target.value)} placeholder="ပွဲ/အခမ်းအနား ခေါင်းစဉ်" className="p-2.5 border rounded-xl text-sm" />
           <input required type="date" value={date} onChange={e => setDate(e.target.value)} className="p-2.5 border rounded-xl text-sm" />
           <input required value={location} onChange={e => setLocation(e.target.value)} placeholder="နေရာ (ဥပမာ - တောင်ကြီးမြို့)" className="p-2.5 border rounded-xl text-sm sm:col-span-2" />
           <select value={zone} onChange={e => setZone(e.target.value)} className="p-2.5 border rounded-xl text-sm sm:col-span-2 bg-white">
@@ -82,7 +82,7 @@ export default function AdminEventManager() {
           </select>
           <textarea required value={description} onChange={e => setDescription(e.target.value)} placeholder="အသေးစိတ် အကြောင်းအရာ" rows={2} className="p-2.5 border rounded-xl text-sm sm:col-span-2" />
           <button type="submit" disabled={isSubmitting} className="bg-sky-900 text-white px-6 py-2.5 rounded-xl font-bold text-sm sm:col-span-2 justify-self-start">
-            {isSubmitting ? 'တင်နေပါသည်...' : 'ပွဲစဉ် တင်မည်'}
+            {isSubmitting ? 'တင်နေပါသည်...' : 'ပွဲ/အခမ်းအနား တင်မည်'}
           </button>
         </form>
       </div>
@@ -93,7 +93,7 @@ export default function AdminEventManager() {
           <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200"><MapPin className="w-3.5 h-3.5" /></div>
           <div>
             <h4 className="font-bold text-xs sm:text-sm text-slate-900">ဇုန်အလိုက် စစ်ထုတ်ခြင်း (Zone Filter)</h4>
-            <p className="text-[10px] text-slate-500">ပွဲစဉ် များကို ဇုန်အလိုက် စစ်ထုတ်နိုင်ပါသည်</p>
+            <p className="text-[10px] text-slate-500">ပွဲ/အခမ်းအနားများကို ဇုန်အလိုက် စစ်ထုတ်နိုင်ပါသည်</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -115,7 +115,7 @@ export default function AdminEventManager() {
       {/* Events List */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 border-b bg-slate-50">
-          <h3 className="font-bold text-slate-800">တင်ထားသော ပွဲစဉ်များ ({zoneFilter === 'all' ? events.length : events.filter(e => isSchoolInZone((e as any).zone, zoneFilter)).length})</h3>
+          <h3 className="font-bold text-slate-800">တင်ထားသော ပွဲ/အခမ်းအနားများ ({zoneFilter === 'all' ? events.length : events.filter(e => isSchoolInZone((e as any).zone, zoneFilter)).length})</h3>
         </div>
         <div className="divide-y divide-slate-100">
           {(zoneFilter === 'all' ? events : events.filter(e => isSchoolInZone((e as any).zone, zoneFilter))).map(ev => {

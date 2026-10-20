@@ -52,7 +52,7 @@ export default function Events() {
         attendeesCount: Number(attendeesCount),
         registeredAt: new Date().toISOString()
       });
-      toast.success('ပွဲစဉ်အတွက် စာရင်းသွင်းမှု အောင်မြင်ပါသည်!');
+      toast.success('ပွဲ/အခမ်းအနားအတွက် စာရင်းသွင်းမှု အောင်မြင်ပါသည်!');
       setSelectedEvent(null);
       setSchoolName('');
       setContactPhone('');
@@ -76,7 +76,7 @@ export default function Events() {
       <div className="bg-gradient-to-r from-sky-900 to-indigo-900 text-white rounded-3xl p-6 sm:p-8 shadow-lg">
         <div className="flex items-center gap-3 mb-2">
           <Ticket className="w-8 h-8 text-amber-400" />
-          <h1 className="text-2xl sm:text-3xl font-black">ပွဲစဉ်များနှင့် သင်တန်းများ</h1>
+          <h1 className="text-2xl sm:text-3xl font-black">ပွဲနှင့် အခမ်းအနားများ</h1>
         </div>
         <p className="text-sky-100 text-sm max-w-2xl">လာမည့် အစည်းအဝေးများ၊ သင်တန်းများနှင့် အားကစားပွဲစဉ်များအတွက် စာရင်းသွင်းနိုင်ပါသည်</p>
       </div>
@@ -85,7 +85,7 @@ export default function Events() {
         <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-sky-600" /></div>
       ) : events.length === 0 ? (
         <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 text-slate-500">
-          လက်ရှိတွင် ပွဲစဉ်အသစ်များ မရှိသေးပါ။
+          လက်ရှိတွင် ပွဲ/အခမ်းအနားအသစ်များ မရှိသေးပါ။
         </div>
       ) : (
         <div className="grid gap-4">

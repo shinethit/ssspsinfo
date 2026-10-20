@@ -73,7 +73,7 @@ export default function CalendarPage() {
     <div className="space-y-6 max-w-5xl mx-auto pb-10">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200 gap-2">
         <h2 className="text-xl font-extrabold text-sky-950 flex items-center gap-2">
-          <CalendarIcon className="w-6 h-6 text-sky-600" /> ပွဲတော်နှင့် လှုပ်ရှားမှု ပြက္ခဒိန်
+          <CalendarIcon className="w-6 h-6 text-sky-600" /> ပွဲနှင့် အခမ်းအနား ပြက္ခဒိန်
         </h2>
         <Link to="/" className="text-xs font-semibold text-slate-600 hover:text-sky-800">ပင်မစာမျက်နှာ ➔</Link>
       </div>
@@ -82,7 +82,7 @@ export default function CalendarPage() {
         <div className="flex flex-wrap items-center gap-2">
           <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none">
             <option value="all">အမျိုးအစား အားလုံး</option>
-            <option value="festival">ပွဲတော်</option>
+            <option value="festival">ပွဲ/အခမ်းအနား</option>
             <option value="school_activity">ကျောင်း Activity</option>
             <option value="general">အထွေထွေ</option>
           </select>
@@ -150,14 +150,14 @@ export default function CalendarPage() {
             {!selectedDate ? (
               <p className="text-xs text-slate-400">ကြည့်ရှုရန် ပြက္ခဒိန်မှ ရက်တစ်ရက်ကို နှိပ်ပါ</p>
             ) : selectedEvents.length === 0 ? (
-              <p className="text-xs text-slate-400 italic">ဤရက်တွင် ပွဲတော်/လှုပ်ရှားမှု မရှိပါ</p>
+              <p className="text-xs text-slate-400 italic">ဤရက်တွင် ပွဲ/အခမ်းအနား မရှိပါ</p>
             ) : (
               <div className="space-y-3">
                 {selectedEvents.map(ev => (
                   <div key={ev.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${ev.eventType === 'school_activity' ? 'bg-amber-50 text-amber-800 border-amber-200' : ev.eventType === 'festival' ? 'bg-rose-50 text-rose-800 border-rose-200' : 'bg-sky-50 text-sky-800 border-sky-200'}`}>
-                        {ev.eventType === 'school_activity' ? 'ကျောင်း' : ev.eventType === 'festival' ? 'ပွဲတော်' : 'အထွေထွေ'}
+                        {ev.eventType === 'school_activity' ? 'ကျောင်း' : ev.eventType === 'festival' ? 'ပွဲ/အခမ်းအနား' : 'အထွေထွေ'}
                       </span>
                       {ev.time && <span className="text-[10px] text-slate-500 font-bold flex items-center gap-1"><Clock className="w-3 h-3"/>{ev.time}</span>}
                     </div>
@@ -186,7 +186,7 @@ export default function CalendarPage() {
           {!startDate || !endDate ? (
             <p className="text-xs text-slate-400 italic text-center py-6">ရက်အပိုင်းအခြား ရွေးချယ်ပါ</p>
           ) : rangeEvents.length === 0 ? (
-            <p className="text-xs text-slate-400 italic text-center py-6">ဤကာလအတွင်း ပွဲတော်/လှုပ်ရှားမှု မရှိပါ</p>
+            <p className="text-xs text-slate-400 italic text-center py-6">ဤကာလအတွင်း ပွဲ/အခမ်းအနား မရှိပါ</p>
           ) : (
             <div className="space-y-3">
               {rangeEvents.map(ev => (
@@ -195,7 +195,7 @@ export default function CalendarPage() {
                   <div className="space-y-1.5 flex-1">
                     <div className="flex items-center justify-between">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${ev.eventType === 'school_activity' ? 'bg-amber-50 text-amber-800 border-amber-200' : ev.eventType === 'festival' ? 'bg-rose-50 text-rose-800 border-rose-200' : 'bg-sky-50 text-sky-800 border-sky-200'}`}>
-                        {ev.eventType === 'school_activity' ? 'ကျောင်း' : ev.eventType === 'festival' ? 'ပွဲတော်' : 'အထွေထွေ'}
+                        {ev.eventType === 'school_activity' ? 'ကျောင်း' : ev.eventType === 'festival' ? 'ပွဲ/အခမ်းအနား' : 'အထွေထွေ'}
                       </span>
                       <span className="text-xs font-bold text-sky-900">{ev.date} {ev.time && `• ${ev.time}`}</span>
                     </div>

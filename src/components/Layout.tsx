@@ -34,7 +34,7 @@ export default function Layout() {
     { to: '/', label: 'ပင်မစာမျက်နှာ', labelEn: 'Home', icon: Home, exact: true },
     { to: '/dashboard', label: 'ဒက်ရှ်ဘုတ် (စာရင်းအင်း)', labelEn: 'Dashboard', icon: BarChart3 },
     { to: '/announcements', label: 'ကြေညာချက်များ', labelEn: 'Announcements', icon: BookOpen },
-    { to: '/events', label: 'ပွဲတော်များ', labelEn: 'Events', icon: Ticket },
+    { to: '/events', label: 'ပွဲနှင့် အခမ်းအနားများ', labelEn: 'Events', icon: Ticket },
     { to: '/calendar', label: 'ပြက္ခဒိန်', labelEn: 'Calendar', icon: Calendar },
     { to: '/sports', label: 'အားကစား', labelEn: 'Sports', icon: Trophy },
     { to: '/medals', label: 'ဆုတံဆိပ်ဇယား', labelEn: 'Medal Tally', icon: Award },

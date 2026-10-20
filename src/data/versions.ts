@@ -8,9 +8,18 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v15.3',
+    version: 'v15.4',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'ပွဲစဉ်များ၏ အမည်ကို ပြောင်းလဲခြင်း (Rename Events)',
+    changes: [
+      { type: 'improve', text: 'Sidebar နှင့် စာမျက်နှာအတွင်းရှိ "ပွဲတော်များ" နှင့် "ပွဲစဉ်များ" ဆိုသော စာသားများကို "ပွဲနှင့် အခမ်းအနားများ" ဟု ပြောင်းလဲခြင်း' },
+    ],
+  },
+  {
+    version: 'v15.3',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'ဆိုက်အား ပုံမှန်အခြေအနေသို့ ပြန်လည်ရောက်ရှိစေခြင်း (Final Cleanup)',
     changes: [
       { type: 'fix', text: 'Cloudflare Rate Limit ဖြစ်စေသော ပိုလျှံနေသည့် Service Worker Loop ကုဒ်များအား လုံးဝ ဖယ်ရှားခြင်း' },
