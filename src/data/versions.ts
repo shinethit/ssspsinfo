@@ -8,9 +8,19 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v15.4',
+    version: 'v15.5',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'PWA Auto Update စနစ် အပြည့်အစုံ ပြန်လည်ထည့်သွင်းခြင်း',
+    changes: [
+      { type: 'fix', text: 'PWA စနစ် (App ကဲ့သို့ သွင်းယူနိုင်ခြင်း) ပြန်လည်အလုပ်လုပ်နိုင်ရန် Service Worker အား မှန်ကန်စွာ ပြန်လည်မှတ်ပုံတင်ခြင်း' },
+      { type: 'feat', text: 'App ဖွင့်ဖွင့်ချင်း Cloud နှင့် Local Version ကို အလိုအလျောက် တိုက်စစ်ပြီး Version အသစ်ရှိပါက ချက်ချင်း Update ဖြစ်စေခြင်း' },
+    ],
+  },
+  {
+    version: 'v15.4',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'ပွဲစဉ်များ၏ အမည်ကို ပြောင်းလဲခြင်း (Rename Events)',
     changes: [
       { type: 'improve', text: 'Sidebar နှင့် စာမျက်နှာအတွင်းရှိ "ပွဲတော်များ" နှင့် "ပွဲစဉ်များ" ဆိုသော စာသားများကို "ပွဲနှင့် အခမ်းအနားများ" ဟု ပြောင်းလဲခြင်း' },
