@@ -8,9 +8,19 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v15.6',
+    version: 'v16.3',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'PWA Auto-Update တည်ငြိမ်စေရန် နှင့် Cloudflare Block ပြဿနာ ဖြေရှင်းခြင်း',
+    changes: [
+      { type: 'fix', text: 'Cloudflare Rate Limit ဖြစ်စေသော ပိုလျှံနေသည့် visibilitychange ကုဒ်များအား ဖယ်ရှားခြင်း' },
+      { type: 'improve', text: 'Vite PWA ၏ မူလ Auto-Update စနစ်အတိုင်း ပြန်လည်ထားရှိခြင်း' },
+    ],
+  },
+  {
+    version: 'v15.6',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'ဖုန်း (Mobile) များတွင် PWA Auto-Update အပြည့်အစုံ အလုပ်လုပ်နိုင်စေရန် ပြင်ဆင်ခြင်း',
     changes: [
       { type: 'fix', text: 'App ဖွင့်တိုင်း နှင့် ဖုန်း Screen ပြန်ဖွင့်တိုင်း Cloud နှင့် Local Version ကို အလိုအလျောက် တိုက်စစ်ပြီး အသစ်ရှိပါက ချက်ချင်း Update ဖြစ်စေခြင်း' },
