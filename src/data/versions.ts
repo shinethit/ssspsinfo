@@ -8,9 +8,81 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v13.0',
+    version: 'v14.7',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'PWA Update စနစ် အပြည့်အစုံ ပြင်ဆင်ခြင်း (Real Force Update)',
+    changes: [
+      { type: 'fix', text: 'Force Update ခလုတ်သည် Service Worker Update ကို တကယ်လုပ်ဆောင်ပေးပြီး Cloudflare Cache ကို ကျော်ဖြတ်နိုင်သည်' },
+      { type: 'feat', text: 'VersionUpdateModal တွင် "Update Now" နှင့် "Force Reload (Hard Reset)" ခလုတ်များ ထည့်သွင်းခြင်း' },
+      { type: 'fix', text: 'Cloudflare Pages တွင် sw.js ကို Cache မလုပ်စေရန် _headers ဖိုင် ထည့်သွင်းခြင်း' },
+      { type: 'improve', text: 'Service Worker တွင် cleanupOutdatedCaches ဖွင့်ခြင်းဖြင့် version ဟောင်း Cache များ အလိုအလျောက် ရှင်းလင်းခြင်း' },
+    ],
+  },
+  {
+    version: 'v14.6',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
+    title: 'Share/QR စနစ်နှင့် ပွဲချိန် (Match Time) Optional ထည့်သွင်းခြင်း',
+    changes: [
+      { type: 'feat', text: 'Share Button (Native Share + Copy Link + QR Code) ကို ကျောင်းအသေးစိတ်၊ အားကစားပြိုင်ပွဲနှင့် အားကစားသမားစာရင်းတွင် ထည့်သွင်းခြင်း' },
+      { type: 'feat', text: 'အားကစားပွဲစဉ်များတွင် ပွဲချိန် (Match Time) ကို Optional ထည့်သွင်းနိုင်ခြင်း' },
+      { type: 'improve', text: 'အားကစားသမား စာရင်းကို Public (အမည်၊ အတန်း၊ အသက်၊ ကိုယ်စားပြုကျောင်း) သာ ပြသနိုင်စေရန် ပြင်ဆင်ခြင်း' },
+    ],
+  },
+  {
+    version: 'v14.5',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
+    title: 'ကြေညာချက်နှင့် ပွဲစဉ်များတွင် ဇုန် (Optional) ထည့်သွင်းခြင်း',
+    changes: [
+      { type: 'feat', text: 'Announcements နှင့် Events တွင် ဇုန် (Optional) သတ်မှတ်နိုင်ခြင်း' },
+      { type: 'feat', text: 'ဇုန် မသတ်မှတ်ပါက Association-wide အနေဖြင့် အားလုံးအတွက် ပြသခြင်း' },
+    ],
+  },
+  {
+    version: 'v14.4',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
+    title: 'အားကစား၊ တောင်းဆိုမှုနှင့် ကျောင်း Portal တွင် ဇုန်စနစ်',
+    changes: [
+      { type: 'feat', text: 'AdminSportsManager — ဇုန်အလိုက် ကျောင်းစစ်ထုတ်မှု' },
+      { type: 'feat', text: 'AdminRequestsManager — ဇုန်အလိုက် တောင်းဆိုမှုစစ်ထုတ်မှု' },
+      { type: 'feat', text: 'SchoolPortal — ကျောင်း ကိုယ်တိုင် ဇုန်ရွေးနိုင်ခြင်း' },
+    ],
+  },
+  {
+    version: 'v14.3',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
+    title: 'Contacts Page တွင် ဇုန်စစ်ထုတ်မှု',
+    changes: [
+      { type: 'feat', text: 'Contacts တွင် ဇုန်စစ်ထုတ်မှု + URL sync' },
+    ],
+  },
+  {
+    version: 'v14.2',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
+    title: 'Dashboard နှင့် Admin Managers တွင် ဇုန်စနစ်',
+    changes: [
+      { type: 'feat', text: 'Dashboard, AdminSchoolManager, AdminFinanceManager, SchoolForm တွင် ဇုန်စနစ်' },
+    ],
+  },
+  {
+    version: 'v14.1',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
+    title: 'Global Zone Filters + PWA Auto-Update Hardening',
+    changes: [
+      { type: 'feat', text: 'Home နှင့် Admin တွင် ဇုန် Filter' },
+      { type: 'fix', text: 'PWA autoUpdate hardening (skipWaiting + clientsClaim)' },
+    ],
+  },
+  {
+    version: 'v13.0',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'ဇုန်ဒေတာများ အပြည့်အစုံ ချိတ်ဆက်ခြင်း (Zone Data Flow)',
     changes: [
       { type: 'feat', text: 'ကျောင်းအချက်အလက် ထည့်သွင်းရာတွင် ဇုန်ကို စာသားရိုက်ထည့်ခြင်းမှ Dropdown ဖြင့် ရွေးချယ်နိုင်စေရန် ပြင်ဆင်ခြင်း' },

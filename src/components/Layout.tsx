@@ -225,8 +225,15 @@ export default function Layout() {
         <div className="p-4 border-t border-slate-100 bg-slate-50/70 space-y-3">
           <button
             type="button"
-            onClick={() => {
-              // Dispatch the custom event to open the modal
+            onClick={async () => {
+              // Real SW update check, then open modal
+              const reg = (window as any).__swReg as ServiceWorkerRegistration | undefined;
+              if (reg) {
+                try {
+                  await reg.update();
+                } catch {}
+              }
+              // Always open modal — modal shows current state + buttons
               window.dispatchEvent(new CustomEvent('sssps_open_version_modal'));
               closeSidebar();
             }}
