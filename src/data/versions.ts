@@ -8,9 +8,22 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v14.7',
+    version: 'v14.8',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'Event Smart Calendar နှင့် ကျောင်း Activity တင်ခြင်းစနစ်',
+    changes: [
+      { type: 'feat', text: 'Home Page တွင်သာ Share နှင့် QR စနစ်ကို ထည့်သွင်းပြီး အခြားစာမျက်နှာများမှ ဖယ်ရှားခြင်း' },
+      { type: 'feat', text: 'ပွဲတော်နှင့် လှုပ်ရှားမှုများကို ကြည့်ရှုနိုင်သည့် ပြက္ခဒိန် (/calendar) စနစ်သစ် ထည့်သွင်းခြင်း' },
+      { type: 'feat', text: 'ပြက္ခဒိန်တွင် လအလိုက် (Month View) နှင့် ရက်အပိုင်းအခြား (Date Range) အလိုက် စစ်ထုတ်ကြည့်ရှုနိုင်ခြင်း' },
+      { type: 'feat', text: 'အသင်းဝင်ကျောင်းများကိုယ်တိုင် ၎င်းတို့၏ Activity များကို ဓာတ်ပုံများနှင့်တကွ တင်နိုင်သည့် စနစ် (SchoolPortal)' },
+      { type: 'improve', text: 'Sidebar ရှိ "အားကစားရလဒ်များ" ကို "အားကစား" နှင့် "ပွဲစဉ်များ" ကို "ပွဲတော်များ" အဖြစ် ပြောင်းလဲခြင်း' },
+    ],
+  },
+  {
+    version: 'v14.7',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'PWA Update စနစ် အပြည့်အစုံ ပြင်ဆင်ခြင်း (Real Force Update)',
     changes: [
       { type: 'fix', text: 'Force Update ခလုတ်သည် Service Worker Update ကို တကယ်လုပ်ဆောင်ပေးပြီး Cloudflare Cache ကို ကျော်ဖြတ်နိုင်သည်' },
