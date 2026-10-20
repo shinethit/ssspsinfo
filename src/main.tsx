@@ -1,10 +1,9 @@
-/// <reference types="vite-plugin-pwa/client" />
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 
-// Vite PWA Auto Update
+// မူလ Vite PWA AutoUpdate စနစ်အတိုင်း ပြန်ထားပြီးသား
 const updateSW = registerSW({
   onNeedRefresh() {
     console.log('[PWA] Update found. Applying automatically...');
