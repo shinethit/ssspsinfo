@@ -8,9 +8,19 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v15.1',
+    version: 'v15.2',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'PWA စနစ် မူလအတိုင်း ပြန်လည်ထူထောင်ခြင်း (Restore)',
+    changes: [
+      { type: 'fix', text: 'မူလက အလုပ်လုပ်နေသော Vite PWA autoUpdate စနစ်အား မူလအတိုင်း ပြန်လည်ထည့်သွင်းခြင်း' },
+      { type: 'improve', text: 'Cloudflare Rate Limit ဖြစ်စေသော ပိုလျှံနေသည့် Manual Polling ကုဒ်များအား လုံးဝ ဖယ်ရှားခြင်း' },
+    ],
+  },
+  {
+    version: 'v15.1',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'PWA Auto-Update ပိတ်သိမ်းခြင်း (Emergency Fix)',
     changes: [
       { type: 'fix', text: 'PWA Service Worker ကြောင့် ဖြစ်ပေါ်နေသော Cloudflare ERR_CONNECTION_RESET ပြဿနာကို ရပ်တန့်ရန် PWA စနစ်အား ယာယီပိတ်သိမ်းခြင်း' },
