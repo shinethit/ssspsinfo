@@ -7,6 +7,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import { Athlete, SportsEvent, TransactionRecord, EventItem } from '../types';
 import { getCategoryBadge } from './Announcements';
 import { getUnifiedSchoolLevels, isSchoolInLevel } from '../lib/schoolLevels';
+import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../constants';
 import {
   School as SchoolIcon,
   Activity,
@@ -34,12 +35,18 @@ import {
   Trophy,
   Receipt,
   Ticket,
+  MapPin,
 } from 'lucide-react';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   
-  const { schools, announcements, schoolLevels, loading } = useData();
+  const { schools: allSchools, announcements, schoolLevels, loading } = useData();
+  const [selectedZone, setSelectedZone] = useState<string>('all');
+  const schools = useMemo(() => {
+    if (selectedZone === 'all') return allSchools;
+    return allSchools.filter(s => isSchoolInZone(s.zone, selectedZone));
+  }, [allSchools, selectedZone]);
 
   // --- UNIFIED STATS STATE ---
   const [sportsStats, setSportsStats] = useState({ athletes: 0, events: 0 });
@@ -286,7 +293,8 @@ export default function Dashboard() {
           (school.responsiblePerson2Phone && school.responsiblePerson2Phone.toLowerCase().includes(q)) ||
           (Array.isArray(school.contact2Phones) && school.contact2Phones.some(p => p.toLowerCase().includes(q))) ||
           (Array.isArray(school.responsiblePerson2Phones) && school.responsiblePerson2Phones.some(p => p.toLowerCase().includes(q))) ||
-          (school.level && school.level.toLowerCase().includes(q));
+          (school.level && school.level.toLowerCase().includes(q)) ||
+          (school.zone && school.zone.toLowerCase().includes(q));
 
         const matchStatus = selectedStatus === 'all' || (school.status || 'active') === selectedStatus;
 
@@ -369,6 +377,36 @@ export default function Dashboard() {
               <BookOpen className="w-4 h-4" /> <span>ကြေညာချက်များ</span>
             </Link>
           </div>
+        </div>
+      </section>
+
+      {/* ZONE FILTER BAR */}
+      <section className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-2.5">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200"><MapPin className="w-3.5 h-3.5" /></div>
+            <div>
+              <h4 className="font-bold text-xs sm:text-sm text-slate-900">ဇုန်အလိုက် စစ်ထုတ်ခြင်း (Zone Filter)</h4>
+              <p className="text-[10px] text-slate-500">ဤစာမျက်နှာရှိ ကျောင်းစာရင်းနှင့် စာရင်းအင်းများတွင် သက်ရောက်ပါမည်</p>
+            </div>
+          </div>
+          {selectedZone !== 'all' && (
+            <button type="button" onClick={() => setSelectedZone('all')} className="text-[10px] font-semibold text-sky-700 hover:underline cursor-pointer px-2 py-1 bg-sky-50 rounded-lg border border-sky-200">✕ ဖယ်ရှားမည်</button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {ZONE_FILTER_OPTIONS.map(opt => {
+            const count = opt.value === 'all' ? allSchools.length : allSchools.filter(s => isSchoolInZone(s.zone, opt.value)).length;
+            return (
+              <button key={opt.value} type="button" onClick={() => setSelectedZone(opt.value)}
+                className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold transition flex items-center gap-1.5 border cursor-pointer ` +
+                  (selectedZone === opt.value ? 'bg-indigo-700 text-white border-indigo-700 shadow-sm' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100')}>
+                <span>{opt.label}</span>
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ` +
+                  (selectedZone === opt.value ? 'bg-indigo-500 text-white' : 'bg-white text-slate-500 border border-slate-200')}>{count}</span>
+              </button>
+            );
+          })}
         </div>
       </section>
 
@@ -1017,6 +1055,11 @@ export default function Dashboard() {
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-50 text-sky-800 font-medium border border-sky-100">
                         ကျောင်းသား: {school.studentRange || '1-100'} ဦး
                       </span>
+                      {school.zone && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-800 font-semibold border border-indigo-200 inline-flex items-center gap-1 ml-1">
+                          <MapPin className="w-2.5 h-2.5" />{school.zone}
+                        </span>
+                      )}
                     </div>
                     <div className="text-[11px] text-slate-500 flex flex-wrap gap-x-3">
                       {school.founderName && <span>တည်ထောင်သူ: {school.founderName}</span>}

@@ -3,11 +3,13 @@ import { collection, getDocs, addDoc, query, orderBy, deleteDoc, doc, updateDoc 
 import { db, auth } from '../../lib/firebase';
 import { School, TransactionRecord, PaymentRecord } from '../../types';
 import { toast } from 'sonner';
-import { Coins, Plus, Search, Printer, Trash2, ArrowRightLeft, History } from 'lucide-react';
+import { Coins, Plus, Search, Printer, Trash2, ArrowRightLeft, History, MapPin } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../../constants';
 
 export default function AdminFinanceManager({ schools }: { schools: School[] }) {
   const [search, setSearch] = useState('');
+  const [zoneFilter, setZoneFilter] = useState<string>('all');
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -122,7 +124,11 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
     }
   };
 
-  const filteredSchools = schools.filter(s => s.name.includes(search));
+  const filteredSchools = schools.filter(s => {
+    const matchSearch = s.name.includes(search);
+    const matchZone = isSchoolInZone(s.zone, zoneFilter);
+    return matchSearch && matchZone;
+  });
   const schoolTransactions = selectedSchool 
     ? transactions.filter(t => t.schoolId === selectedSchool.id)
     : [];
@@ -166,14 +172,36 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
               />
             </div>
             
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                <MapPin className="w-3 h-3 text-indigo-600" /> ဇုန် အလိုက် စစ်ထုတ်ရန်:
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {ZONE_FILTER_OPTIONS.map(opt => {
+                  const count = opt.value === 'all' ? schools.length : schools.filter(s => isSchoolInZone(s.zone, opt.value)).length;
+                  return (
+                    <button key={opt.value} type="button" onClick={() => setZoneFilter(opt.value)}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition flex items-center gap-1 border cursor-pointer ` +
+                        (zoneFilter === opt.value ? 'bg-indigo-700 text-white border-indigo-700 shadow-xs' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100')}>
+                      <span>{opt.label}</span>
+                      <span className={`text-[9px] font-bold px-1 py-0.5 rounded ` + (zoneFilter === opt.value ? 'bg-indigo-500 text-white' : 'bg-white text-slate-500 border border-slate-200')}>{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 border rounded-xl">
-              {filteredSchools.map(s => (
+              {filteredSchools.length === 0 ? (
+                <div className="p-3 text-center text-xs text-slate-400 italic">ကျောင်း မတွေ့ပါ</div>
+              ) : filteredSchools.map(s => (
                 <div 
                   key={s.id} 
                   onClick={() => setSelectedSchool(s)}
                   className={`p-3 cursor-pointer transition ${selectedSchool?.id === s.id ? 'bg-emerald-50 border-l-4 border-emerald-500' : 'hover:bg-slate-50'}`}
                 >
                   <p className="font-bold text-sm text-slate-900">{s.name}</p>
+                  {s.zone && (<span className="inline-flex items-center gap-1 mt-1 text-[10px] font-semibold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200"><MapPin className="w-2.5 h-2.5" />{s.zone}</span>)}
                 </div>
               ))}
             </div>
