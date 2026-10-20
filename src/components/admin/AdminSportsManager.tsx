@@ -31,6 +31,7 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
   const [scoreB, setScoreB] = useState('');
   const [winner, setWinner] = useState('');
   const [medal, setMedal] = useState<'gold'|'silver'|'bronze'|''>('');
+  const [matchTime, setMatchTime] = useState('');
 
   const fetchEvents = async () => {
     const snap = await getDocs(collection(db, 'sports_events')).catch(() => ({ docs: [] }));
@@ -89,14 +90,15 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
       id: Date.now().toString(), 
       teamA, playerA: isIndividual ? playerA : undefined, scoreA, 
       teamB, playerB: isIndividual ? playerB : undefined, scoreB, 
-      winner, medal: medal as any
+      winner, medal: medal as any,
+      matchTime: matchTime.trim() || undefined
     };
 
     await updateDoc(doc(db, 'sports_events', selectedEventId), {
       results: [...(event.results || []), newMatch]
     });
     toast.success('ရလဒ် ထည့်ပြီးပါပြီ');
-    setTeamA(''); setPlayerA(''); setScoreA(''); setTeamB(''); setPlayerB(''); setScoreB(''); setWinner(''); setMedal('');
+    setTeamA(''); setPlayerA(''); setScoreA(''); setTeamB(''); setPlayerB(''); setScoreB(''); setWinner(''); setMedal(''); setMatchTime('');
     fetchEvents();
   };
 
@@ -245,6 +247,13 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
                         <option value="bronze">🥉 ကြေး</option>
                       </select>
                     </div>
+                    <input
+                      type="text"
+                      value={matchTime}
+                      onChange={e => setMatchTime(e.target.value)}
+                      placeholder="ပွဲချိန် (Optional — ဥပမာ 10:00 AM သို့မဟုတ် ည ၇:၀၀)"
+                      className="w-full p-2 border rounded-lg text-xs"
+                    />
                     <button type="submit" className="w-full bg-sky-600 text-white py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1"><PlusCircle className="w-3.5 h-3.5" /> ရလဒ်ထည့်မည်</button>
                   </form>
                 </div>
@@ -258,6 +267,11 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
                         <span className="text-sky-600 font-mono text-sm mx-1">{match.scoreA} - {match.scoreB}</span> 
                         <span>{match.teamB}</span> 
                         <span className="text-slate-400 font-normal ml-1">{match.playerB && `(${match.playerB})`}</span>
+                        {match.matchTime && (
+                          <span className="ml-2 text-[10px] bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded border border-sky-200 font-semibold">
+                            {match.matchTime}
+                          </span>
+                        )}
                       </div>
                     </div>
                   ))}

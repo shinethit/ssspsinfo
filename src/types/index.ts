@@ -438,6 +438,7 @@ export interface SportsMatchResult {
   scoreB: string | number;
   winner?: string; // အနိုင်ရသူ
   medal?: 'gold' | 'silver' | 'bronze'; // ရရှိသည့် ဆုတံဆိပ်
+  matchTime?: string; // ပွဲချိန် (optional)
 }
 
 export interface SportsEvent {
