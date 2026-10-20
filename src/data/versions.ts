@@ -8,9 +8,19 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v15.5',
+    version: 'v15.6',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'ဖုန်း (Mobile) များတွင် PWA Auto-Update အပြည့်အစုံ အလုပ်လုပ်နိုင်စေရန် ပြင်ဆင်ခြင်း',
+    changes: [
+      { type: 'fix', text: 'App ဖွင့်တိုင်း နှင့် ဖုန်း Screen ပြန်ဖွင့်တိုင်း Cloud နှင့် Local Version ကို အလိုအလျောက် တိုက်စစ်ပြီး အသစ်ရှိပါက ချက်ချင်း Update ဖြစ်စေခြင်း' },
+      { type: 'improve', text: 'Cloudflare မှ sw.js နှင့် index.html ဖိုင်များကို Cache မလုပ်တော့ဘဲ အမြဲတမ်း အသစ်ဆုံး Version ကို ဆွဲယူစေခြင်း' },
+    ],
+  },
+  {
+    version: 'v15.5',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'PWA Auto Update စနစ် အပြည့်အစုံ ပြန်လည်ထည့်သွင်းခြင်း',
     changes: [
       { type: 'fix', text: 'PWA စနစ် (App ကဲ့သို့ သွင်းယူနိုင်ခြင်း) ပြန်လည်အလုပ်လုပ်နိုင်ရန် Service Worker အား မှန်ကန်စွာ ပြန်လည်မှတ်ပုံတင်ခြင်း' },

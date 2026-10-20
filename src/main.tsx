@@ -4,16 +4,26 @@ import App from './App.tsx';
 import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 
-// PWA Service Worker Registration & Auto Update
+// App ဖွင့်တိုင်း Auto Update စစ်ဆေးရန်
 const updateSW = registerSW({
   onNeedRefresh() {
-    // Cloud မှာ Version အသစ်တွေ့ရင် အလိုအလျောက် Update လုပ်ပြီး Reload လုပ်မယ်
-    console.log('[PWA] New update found, updating...');
-    updateSW(true);
+    console.log('[PWA] Update found. Applying automatically...');
+    updateSW(true); // Update ရှိရင် ချက်ချင်း သွင်းမယ်
   },
   onOfflineReady() {
-    console.log('[PWA] App is ready to work offline.');
+    console.log('[PWA] App is ready for offline use.');
   },
+});
+
+// ဖုန်း Screen ပြန်ဖွင့်တိုင်း (သို့မဟုတ်) App ပြန်ဝင်တိုင်း Cloud နဲ့ တိုက်စစ်မယ်
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    navigator.serviceWorker.getRegistration().then((reg) => {
+      if (reg) {
+        reg.update().catch(console.error); // Cloud မှာ Update ရှိမရှိ လှမ်းမေးမယ်
+      }
+    });
+  }
 });
 
 createRoot(document.getElementById('root')!).render(<App />);
