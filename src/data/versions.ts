@@ -8,9 +8,19 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v19.4',
+    version: 'v20.0',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'Major PWA Overhaul (Custom Service Worker)',
+    changes: [
+      { type: 'fix', text: 'iOS နှင့် Windows တွင် ချိတ်ဆက်မှု ပြတ်တောက်ခြင်းကို ဖြေရှင်းရန် Workbox ကို ဖယ်ရှားပြီး Custom Service Worker သို့ ပြောင်းလဲခြင်း' },
+      { type: 'improve', text: 'ကွန်ရက်နှေးသွားပါက ၁.၅ စက္ကန့်အတွင်း Cache မှ အလိုအလျောက် ပြန်လည်ဖွင့်ပေးသည့် fetchWithTimeout စနစ် ထည့်သွင်းခြင်း' }
+    ],
+  },
+  {
+    version: 'v19.4',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'iOS Cache Bypass & Normal PWA Restore',
     changes: [
       { type: 'fix', text: 'iOS Safari တွင် sw.js ကို Cache မလုပ်စေရန် _headers ဖိုင်အား ဘေးကင်းစွာ ပြန်လည်ထည့်သွင်းခြင်း' },

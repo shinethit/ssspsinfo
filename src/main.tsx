@@ -1,17 +1,15 @@
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
-import { registerSW } from 'virtual:pwa-register';
 
-const updateSW = registerSW({
-  immediate: true,
-  onNeedRefresh() {
-    console.log('[PWA] Update found. Applying automatically...');
-    updateSW(true);
-  },
-  onOfflineReady() {
-    console.log('[PWA] App is ready for offline use.');
-  },
-});
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').then((registration) => {
+      console.log('Custom SW registered: ', registration);
+    }).catch((registrationError) => {
+      console.log('SW registration failed: ', registrationError);
+    });
+  });
+}
 
 createRoot(document.getElementById('root')!).render(<App />);
