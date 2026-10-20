@@ -8,9 +8,29 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v19.0',
+    version: 'v19.3',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'Zombie Service Worker Killer (Force Reset)',
+    changes: [
+      { type: 'fix', text: 'iOS နှင့် Windows တွင် ပိတ်မိနေသော Service Worker များကို ကိုယ်တိုင် ဖျက်ဆီးပစ်သည့် Self-Destructing SW စနစ် ထည့်သွင်းခြင်း' }
+    ],
+  },
+  {
+    version: 'v19.0',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
+    title: 'Emergency PWA Core Fix & iOS/Windows Compatibility',
+    changes: [
+      { type: 'fix', text: 'iOS နှင့် Windows တွင် Error တက်စေသော _headers ဖိုင်အား လုံးဝ ဖယ်ရှားခြင်း' },
+      { type: 'fix', text: 'main.tsx ရှိ Force Reload (Self-healing) ကုဒ်များအား ဖယ်ရှားပြီး မူလ Vite PWA AutoUpdate စနစ်အတိုင်း ပြန်လည်ထားရှိခြင်း' },
+      { type: 'improve', text: 'Version များကို စနစ်တကျ ပြန်လည်သတ်မှတ်ပြီး တည်ငြိမ်မှုရှိစေရန် ပြင်ဆင်ခြင်း' }
+    ],
+  },
+  {
+    version: 'v19.0',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'Emergency PWA Core Fix & iOS/Windows Compatibility',
     changes: [
       { type: 'fix', text: 'iOS နှင့် Windows တွင် Error တက်စေသော _headers ဖိုင်အား လုံးဝ ဖယ်ရှားခြင်း' },
