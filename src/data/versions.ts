@@ -8,9 +8,21 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v14.8',
+    version: 'v14.9',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'PWA Auto-Update အပြည့်အစုံ ပြင်ဆင်ခြင်း (Cloudflare Cache Bypass)',
+    changes: [
+      { type: 'fix', text: 'Cloudflare Pages တွင် sw.js နှင့် index.html ကို Cache မ လုပ်စေရန် _headers ဖိုင် ထည့်သွင်းခြင်း' },
+      { type: 'feat', text: 'Service Worker အသစ် Activate ဖြစ်သည်နှင့် Page ကို အလိုအလျောက် Reload လုပ်သည့် controllerchange စနစ် ထည့်သွင်းခြင်း' },
+      { type: 'feat', text: 'Page load တိုင်းနှင့် ၃၀ စက္ကန့်တိုင်း SW Update ကို အလိုအလျောက် စစ်ဆေးခြင်း' },
+      { type: 'feat', text: 'VersionUpdateModal တွင် Update Now နှင့် Force Reload ခလုတ်များ ထည့်သွင်းခြင်း' },
+    ],
+  },
+  {
+    version: 'v14.8',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'Event Smart Calendar နှင့် ကျောင်း Activity တင်ခြင်းစနစ်',
     changes: [
       { type: 'feat', text: 'Home Page တွင်သာ Share နှင့် QR စနစ်ကို ထည့်သွင်းပြီး အခြားစာမျက်နှာများမှ ဖယ်ရှားခြင်း' },
