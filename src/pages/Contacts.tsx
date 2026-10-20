@@ -36,6 +36,7 @@ import {
   UnifiedSchoolLevel,
   isSchoolInLevel,
 } from '../lib/schoolLevels';
+import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../constants';
 
 export type SortOption = 'category_name' | 'name_asc' | 'name_desc' | 'newest' | 'oldest';
 
@@ -45,6 +46,7 @@ export default function Contacts() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') || '';
   const initialCategory = searchParams.get('category') || searchParams.get('level') || 'all';
+  const initialZone = searchParams.get('zone') || 'all';
 
   const { schools, loading, isSyncing, syncData, schoolLevels } = useData();
   const [searchTerm, setSearchTerm] = useState(initialSearch);
@@ -55,6 +57,7 @@ export default function Contacts() {
 
   const [feeFilter, setFeeFilter] = useState<'all' | 'paid' | 'unpaid'>('all');
   const [levelFilter, setLevelFilter] = useState<string>(initialCategory);
+  const [selectedZone, setSelectedZone] = useState<string>(initialZone);
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
@@ -119,8 +122,21 @@ export default function Contacts() {
     [setSearchParams]
   );
 
+  const handleSelectZone = useCallback(
+    (zone: string) => {
+      setSelectedZone(zone);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (zone === 'all') next.delete('zone');
+        else next.set('zone', zone);
+        return next;
+      });
+    },
+    [setSearchParams]
+  );
+
   // Update from URL params if changed
-  useEffect(() => { setCurrentPage(1); }, [searchTerm, selectedCategoryTab, feeFilter, sortOption, viewMode]);
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, selectedCategoryTab, feeFilter, sortOption, viewMode, selectedZone]);
 
   useEffect(() => {
     const urlSearch = searchParams.get('search');
@@ -137,6 +153,8 @@ export default function Contacts() {
       setSelectedCategoryTab('all');
       setLevelFilter('all');
     }
+    const urlZone = searchParams.get('zone');
+    if (urlZone && urlZone !== selectedZone) setSelectedZone(urlZone);
   }, [searchParams]);
 
   // Distinct school levels for filter options
@@ -162,14 +180,16 @@ export default function Contacts() {
     let count = 0;
     if (feeFilter !== 'all') count++;
     if (selectedCategoryTab !== 'all') count++;
+    if (selectedZone !== 'all') count++;
     return count;
-  }, [feeFilter, selectedCategoryTab]);
+  }, [feeFilter, selectedCategoryTab, selectedZone]);
 
   const resetFilters = () => {
     setFeeFilter('all');
     setLevelFilter('all');
     setSearchTerm('');
     setSelectedCategoryTab('all');
+    setSelectedZone('all');
     setSortOption('category_name');
     setSearchParams({});
   };
@@ -210,6 +230,7 @@ export default function Contacts() {
         !q ||
         (s.name && s.name.toLowerCase().includes(q)) ||
         (s.level && s.level.toLowerCase().includes(q)) ||
+        (s.zone && s.zone.toLowerCase().includes(q)) ||
         (s.category && s.category.toLowerCase().includes(q)) ||
         (s.founderName && s.founderName.toLowerCase().includes(q)) ||
         (s.adminName && s.adminName.toLowerCase().includes(q)) ||
@@ -253,9 +274,11 @@ export default function Contacts() {
           ? s.isAnnualFeePaid === true
           : !s.isAnnualFeePaid;
 
-      return matchSearch && matchCategoryTab && matchFee;
+      const matchZone = selectedZone === 'all' ? true : isSchoolInZone(s.zone, selectedZone);
+
+      return matchSearch && matchCategoryTab && matchFee && matchZone;
     });
-  }, [schools, searchTerm, selectedCategoryTab, levelFilter, feeFilter]);
+  }, [schools, searchTerm, selectedCategoryTab, levelFilter, feeFilter, selectedZone]);
 
   // 2. Sort schools cleanly
   const sortedSchools = useMemo(() => {
@@ -606,8 +629,31 @@ export default function Contacts() {
               </div>
             </div>
 
+            {/* Zone Filter */}
+            <div className="space-y-2 pt-3 border-t border-slate-100">
+              <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-indigo-600" />
+                <span>ဇုန် အလိုက် စစ်ထုတ်ရန်:</span>
+              </label>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {ZONE_FILTER_OPTIONS.map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => handleSelectZone(opt.value)}
+                    type="button"
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ` +
+                      (selectedZone === opt.value
+                        ? 'bg-indigo-700 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Reset Filters Option */}
-            {(activeFilterCount > 0 || searchTerm || selectedCategoryTab !== 'all' || sortOption !== 'category_name') && (
+            {(activeFilterCount > 0 || searchTerm || selectedCategoryTab !== 'all' || sortOption !== 'category_name' || selectedZone !== 'all') && (
               <div className="flex justify-end pt-1">
                 <button
                   onClick={resetFilters}
