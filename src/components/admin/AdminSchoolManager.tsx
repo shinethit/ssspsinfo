@@ -4,6 +4,10 @@ import {
   ChevronDown, ChevronUp, ListFilter, FileSpreadsheet, Loader2, Layers, GraduationCap, ArrowUpDown, ChevronLeft, ChevronRight, Printer, UserPlus, MapPin
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { collection, addDoc, getDocs, query, where, updateDoc, doc } from 'firebase/firestore';
+import { db, auth } from '../../lib/firebase';
+import { generateVoucherNo } from '../../utils/voucher';
+import { toast } from 'sonner';
 import { School, SchoolLevelItem } from '../../types';
 import { getUnifiedSchoolLevels } from '../../lib/schoolLevels';
 import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../../constants';
@@ -37,6 +41,10 @@ export default function AdminSchoolManager({
   const [currentPage, setCurrentPage] = useState(1);
   const [receiptSchool, setReceiptSchool] = useState<School | null>(null);
   const itemsPerPage = 20;
+  const [feeModalSchool, setFeeModalSchool] = useState<School | null>(null);
+  const [feeDate, setFeeDate] = useState(new Date().toISOString().split('T')[0]);
+  const [feeAmount, setFeeAmount] = useState('');
+  const [isSubmittingFee, setIsSubmittingFee] = useState(false);
 
   // 1. Filter
   const filteredSchools = useMemo(() => {
@@ -247,7 +255,15 @@ export default function AdminSchoolManager({
 
                         <div className="flex items-center gap-2 shrink-0 ml-14 md:ml-0">
                           <button 
-                            onClick={() => onToggleFee(school)}
+                            onClick={() => {
+                              if (school.isAnnualFeePaid) {
+                                onToggleFee(school); // Toggle off directly if already paid (with confirmation in parent)
+                              } else {
+                                setFeeModalSchool(school);
+                                setFeeDate(new Date().toISOString().split('T')[0]);
+                                setFeeAmount(school.feeAmount?.toString() || '');
+                              }
+                            }}
                             className={`text-[11px] font-bold px-2.5 py-1 rounded-md border transition ${school.isAnnualFeePaid ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'}`}
                           >
                             {school.isAnnualFeePaid ? 'နှစ်စဉ်ကြေးပေးသွင်းပြီး' : 'နှစ်စဉ်ကြေးမသွင်းရသေး'}

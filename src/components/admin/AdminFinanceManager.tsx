@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../../constants';
 import * as XLSX from 'xlsx';
 import AnnualFeeReceipt from './AnnualFeeReceipt';
+import { generateVoucherNo } from '../../utils/voucher';
 
 export default function AdminFinanceManager({ schools }: { schools: School[] }) {
   const [search, setSearch] = useState('');
@@ -82,6 +83,7 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
     setIsSubmitting(true);
 
     try {
+      const newVoucherNo = generateVoucherNo(paidDate, transactions);
       await addDoc(collection(db, 'transactions'), {
         schoolId: selectedSchool.id,
         schoolName: selectedSchool.name,
@@ -91,7 +93,8 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
         note,
         academicYear: formAcademicYear,
         recordedBy: auth.currentUser?.email || 'Admin',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        voucherNo: newVoucherNo
       });
       
       toast.success('ငွေသွင်းမှု မှတ်တမ်းတင်ပြီးပါပြီ');

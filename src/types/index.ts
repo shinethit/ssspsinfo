@@ -517,6 +517,7 @@ export interface SchoolUpdateRequest {
 
 export interface TransactionRecord {
   id: string;
+  voucherNo?: string;
   schoolId: string;
   schoolName: string;
   feeType: string;

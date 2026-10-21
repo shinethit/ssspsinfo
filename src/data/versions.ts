@@ -8,6 +8,17 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
+    version: 'v22.5',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: true,
+    title: 'Immutable Finance Records & Running Voucher No',
+    changes: [
+      { type: 'feat', text: 'Voucher / Receipt နံပါတ်များကို နေ့စဉ် Reset ဖြစ်သည့် Running Number (SSSPSFV-YYYYMMDD-0001) ဖြင့် စနစ်တကျ ထုတ်ပေးခြင်း။' },
+      { type: 'improve', text: 'ငွေသွင်းမှတ်တမ်းများ (Date နှင့် Vr ID) ကို Database တွင် တိုက်ရိုက်သိမ်းဆည်းထားသဖြင့် နောက်ပိုင်း မည်သူမှ ပြန်လည်ပြင်ဆင်၍ မရတော့ခြင်း (Immutable)။' },
+      { type: 'improve', text: 'နှစ်စဉ်ကြေး သွင်းသည့်အခါ ရက်စွဲနှင့် ပမာဏကို ထည့်သွင်းနိုင်သည့် Popup စနစ် ထည့်သွင်းခြင်း။' }
+    ],
+  },
+  {
     version: 'v22.1',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,

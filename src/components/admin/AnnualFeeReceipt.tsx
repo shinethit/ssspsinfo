@@ -83,13 +83,7 @@ export default function AnnualFeeReceipt({ school, onClose }: { school: School; 
                 <div>
                   <span className="text-slate-500 font-semibold block mb-1">ဖြတ်ပိုင်းအမှတ်:</span>
                   <span className="font-mono font-bold bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">
-                    {(() => {
-                  const d = new Date(school.feePaidDate || new Date());
-                  const yyyy = d.getFullYear();
-                  const mm = String(d.getMonth() + 1).padStart(2, '0');
-                  const dd = String(d.getDate()).padStart(2, '0');
-                  return `SSSPSFV-${yyyy}${mm}${dd}-${school.id.substring(0, 4).toUpperCase()}`;
-                })()}
+                    {school.feePaidDate ? `SSSPSFV-${new Date(school.feePaidDate).toISOString().slice(0,10).replace(/-/g, '')}-${school.id.substring(0, 4).toUpperCase()}` : 'N/A'}
                   </span>
                 </div>
                 <div className="text-right">

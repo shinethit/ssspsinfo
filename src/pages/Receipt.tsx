@@ -33,14 +33,7 @@ export default function Receipt() {
   }, [id]);
 
   
-  const formatDateStr = (dateStr: string) => {
-    const d = new Date(dateStr);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}${mm}${dd}`;
-  };
-  const voucherNo = `SSSPSFV-${formatDateStr(transaction.paidDate)}-${transaction.id.substring(0, 4).toUpperCase()}`;
+  const displayVoucherNo = transaction.voucherNo || `SSSPSFV-${transaction.paidDate.replace(/-/g, '')}-${transaction.id.substring(0, 4).toUpperCase()}`;
 
   const handlePrint = () => {
     window.print();
@@ -122,7 +115,7 @@ export default function Receipt() {
             <div>
               <span className="text-slate-500 font-semibold block mb-1">ဖြတ်ပိုင်းအမှတ် (Receipt No):</span>
               <span className="font-mono font-bold text-slate-900 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">
-                {voucherNo}
+                {displayVoucherNo}
               </span>
             </div>
             <div className="text-right">
