@@ -402,6 +402,16 @@ export interface AdminUser {
   email: string;
   name?: string;
   role: 'super_admin' | 'admin' | 'editor' | 'sports_moderator' | 'news_editor';
+  permissions?: {
+    manage_schools?: boolean;
+    delete_schools?: boolean;
+    manage_announcements?: boolean;
+    manage_events?: boolean;
+    manage_sports?: boolean;
+    manage_documents?: boolean;
+    manage_finance?: boolean;
+    manage_users?: boolean;
+  };
   phone?: string;
   phone2?: string;
   phones?: string[]; // Multiple contact numbers for administrator

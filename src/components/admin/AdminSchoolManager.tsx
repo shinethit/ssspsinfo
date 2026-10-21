@@ -27,6 +27,7 @@ interface AdminSchoolManagerProps {
   onExcelUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   isUploadingExcel: boolean;
   excelUploadState: any;
+  canDelete?: boolean;
 }
 
 export default function AdminSchoolManager({
@@ -280,9 +281,11 @@ export default function AdminSchoolManager({
                           <button onClick={() => onEdit(school)} className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-md transition" title="ပြင်ဆင်ရန်">
                             <Edit2 className="w-4 h-4" />
                           </button>
-                          <button onClick={() => onDelete(school.id, school.name)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition" title="ဖျက်ရန်">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {canDelete && (
+                            <button onClick={() => onDelete(school.id, school.name)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition" title="ဖျက်ရန်">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
 
                       </div>
