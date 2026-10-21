@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { School, SchoolLevelItem } from '../../types';
 import { getUnifiedSchoolLevels } from '../../lib/schoolLevels';
 import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../../constants';
+import AnnualFeeReceipt from './AnnualFeeReceipt';
 
 interface AdminSchoolManagerProps {
   schools: School[];
@@ -34,6 +35,7 @@ export default function AdminSchoolManager({
   const [showExcelPanel, setShowExcelPanel] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [currentPage, setCurrentPage] = useState(1);
+  const [receiptSchool, setReceiptSchool] = useState<School | null>(null);
   const itemsPerPage = 20;
 
   // 1. Filter
@@ -297,6 +299,11 @@ export default function AdminSchoolManager({
             </button>
           </div>
         </div>
+      )}
+    
+      {/* Annual Fee Receipt Modal */}
+      {receiptSchool && (
+        <AnnualFeeReceipt school={receiptSchool} onClose={() => setReceiptSchool(null)} />
       )}
     </div>
   );

@@ -117,12 +117,15 @@ export default function SchoolForm({ initialData, isEditing, onCancel, onSubmit,
                 <option value="inactive">⚪ ရပ်နား (Inactive)</option>
               </select>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">နှစ်စဉ်ကြေး ပေးသွင်းပြီးပြီလား</label>
-              <label className="flex items-center gap-2 p-2.5 border rounded-lg bg-slate-50 cursor-pointer">
+            <div className="space-y-3 p-3 border rounded-xl bg-slate-50">
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" {...schoolForm.register('isAnnualFeePaid')} className="w-4 h-4 text-sky-600 rounded" />
-                <span className="text-sm font-semibold text-slate-700">ပေးသွင်းပြီး (Paid)</span>
+                <span className="text-sm font-bold text-slate-700">နှစ်စဉ်ကြေး ပေးသွင်းပြီး (Paid)</span>
               </label>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">သွင်းသည့် ရက်စွဲ (Payment Date)</label>
+                <input type="date" {...schoolForm.register('feePaidDate')} className="w-full p-2 border rounded-lg text-sm bg-white" />
+              </div>
             </div>
 
             <div className="sm:col-span-2 p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-4">

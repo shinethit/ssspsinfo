@@ -8,9 +8,19 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v21.4',
+    version: 'v21.5',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'Annual Fee Receipts & Date Tracking',
+    changes: [
+      { type: 'feat', text: 'နှစ်စဉ်ကြေး သွင်းပြီးပါက ကျောင်းတစ်ခုချင်းစီအတွက် ဖြတ်ပိုင်း (Receipt) ကို PDF သို့မဟုတ် JPEG အဖြစ် ထုတ်ယူနိုင်သည့် စနစ် ထည့်သွင်းခြင်း။' },
+      { type: 'improve', text: 'နှစ်စဉ်ကြေး သွင်းသည့်အခါ ရက်စွဲ (Payment Date) ကို ထည့်သွင်းနိုင်စေရန် ပြင်ဆင်ခြင်း။' }
+    ],
+  },
+  {
+    version: 'v21.4',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'Finance Export Feature',
     changes: [
       { type: 'feat', text: 'ငွေစာရင်း မှတ်တမ်းအားလုံးကို တစ်ခါတည်း Excel ဖိုင်အဖြစ် ထုတ်ယူနိုင်သည့် Export All စနစ် ထည့်သွင်းခြင်း။' }
