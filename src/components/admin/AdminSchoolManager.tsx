@@ -237,7 +237,7 @@ export default function AdminSchoolManager({
                             <div className="flex flex-wrap items-center gap-2 mt-0.5">
                               {school.status === 'under_review' && <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">စိစစ်ဆဲ</span>}
                               {school.status === 'inactive' && <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">ရပ်နား</span>}
-                              <span className="text-[10px] text-slate-500">{school.township || school.city || 'မြို့နယ်မသတ်မှတ်'}</span>
+                              {(school.township || school.city) && <span className="text-[10px] text-slate-500">{school.township || school.city}</span>}
                               {school.zone && (<span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200"><MapPin className="w-2.5 h-2.5" />{school.zone}</span>)}
                             </div>
                           </div>

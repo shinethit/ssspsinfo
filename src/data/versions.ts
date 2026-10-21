@@ -8,9 +8,19 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v21.1',
+    version: 'v21.2',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'UI Cleanup: Zone Badges in School Manager',
+    changes: [
+      { type: 'improve', text: 'ကျောင်းစီမံခန့်ခွဲမှု (School Manager) တွင် မြို့နယ်မသတ်မှတ်ထားသော ကျောင်းများအတွက် "မြို့နယ်မသတ်မှတ်" ဆိုသော စာသားများကို ဖယ်ရှားခြင်း။' },
+      { type: 'improve', text: 'မြို့နယ်/ဇုန် အချက်အလက်များကို ပိုမိုရှင်းလင်းသော Badge ပုံစံဖြင့် ပြသစေရန် ပြင်ဆင်ခြင်း။' }
+    ],
+  },
+  {
+    version: 'v21.1',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'Global Button UX & Feedback Enhancement',
     changes: [
       { type: 'improve', text: 'ခလုတ်များကို နှိပ်လိုက်ပါက ချက်ချင်း တုံ့ပြန်မှုရှိစေရန် (Active state နှင့် Transition) စနစ်တကျ ထည့်သွင်းခြင်း။' },
