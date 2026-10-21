@@ -3,7 +3,8 @@ import { collection, getDocs, addDoc, query, orderBy, deleteDoc, doc, updateDoc 
 import { db, auth } from '../../lib/firebase';
 import { School, TransactionRecord, PaymentRecord } from '../../types';
 import { toast } from 'sonner';
-import { Coins, Plus, Search, Printer, Trash2, ArrowRightLeft, History, MapPin } from 'lucide-react';
+import { Coins, Plus, Search, Printer, Trash2, ArrowRightLeft, History, MapPin, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { Link } from 'react-router-dom';
 import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../../constants';
 
@@ -124,6 +125,38 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
     }
   };
 
+  
+  const handleExportAllTransactions = () => {
+    if (transactions.length === 0) {
+      toast.info('ထုတ်ယူရန် မှတ်တမ်း မရှိသေးပါ');
+      return;
+    }
+
+    const wsData = transactions.map((t, index) => ({
+      'စဉ် (No)': index + 1,
+      'ကျောင်းအမည် (School Name)': t.schoolName,
+      'ကြေးအမျိုးအစား (Fee Type)': t.feeType,
+      'ပမာဏ (Amount)': t.amount,
+      'ရက်စွဲ (Date)': t.paidDate,
+      'မှတ်ချက် (Note)': t.note || '',
+      'မှတ်တမ်းတင်သူ (Recorded By)': t.recordedBy || 'Admin'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(wsData);
+    
+    // Column တွေရဲ့ အကျယ်ကို ချိန်ညှိခြင်း
+    ws['!cols'] = [
+      { wch: 8 }, { wch: 30 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 30 }, { wch: 20 }
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Finance_Records');
+    
+    const fileName = `Finance_Records_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+    toast.success('မှတ်တမ်းအားလုံးကို Excel ဖိုင်အဖြစ် အောင်မြင်စွာ ထုတ်ယူပြီးပါပြီ');
+  };
+
   const filteredSchools = schools.filter(s => {
     const matchSearch = s.name.includes(search);
     const matchZone = isSchoolInZone(s.zone, zoneFilter);
@@ -237,10 +270,19 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
         {/* Right Side: Transaction History */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[500px]">
           <div className="p-4 border-b bg-slate-50 flex items-center justify-between">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-              <History className="w-4 h-4 text-sky-600" /> 
-              {selectedSchool ? `${selectedSchool.name} ၏ မှတ်တမ်းများ` : 'ကျောင်းတစ်ခုကို ရွေးချယ်ပါ'}
-            </h3>
+            <div className="flex items-center gap-3">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <History className="w-4 h-4 text-sky-600" /> 
+                {selectedSchool ? `${selectedSchool.name} ၏ မှတ်တမ်းများ` : 'ကျောင်းတစ်ခုကို ရွေးချယ်ပါ'}
+              </h3>
+              <button 
+                onClick={handleExportAllTransactions}
+                className="bg-sky-600 hover:bg-sky-700 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                title="မှတ်တမ်းအားလုံးကို Excel ဖြင့် ထုတ်ယူရန်"
+              >
+                <Download className="w-3.5 h-3.5" /> Export All
+              </button>
+            </div>
             {selectedSchool && (
               <span className="text-xs font-bold bg-emerald-100 text-emerald-800 px-2 py-1 rounded">
                 စုစုပေါင်း: {schoolTransactions.reduce((sum, t) => sum + t.amount, 0).toLocaleString('my-MM')} ကျပ်

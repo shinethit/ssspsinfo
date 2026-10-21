@@ -8,9 +8,18 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v21.3',
+    version: 'v21.4',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'Finance Export Feature',
+    changes: [
+      { type: 'feat', text: 'ငွေစာရင်း မှတ်တမ်းအားလုံးကို တစ်ခါတည်း Excel ဖိုင်အဖြစ် ထုတ်ယူနိုင်သည့် Export All စနစ် ထည့်သွင်းခြင်း။' }
+    ],
+  },
+  {
+    version: 'v21.3',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'Finance Update: Annual Fee & Spelling Fix',
     changes: [
       { type: 'feat', text: 'ငွေစာရင်း ထည့်သွင်းရာတွင် နှစ်စဉ်ကြေး (Annual Fee) ကို Certificate/Voucher ထုတ်ပေးနိုင်ရန် ထည့်သွင်းပေးခြင်း။' },
