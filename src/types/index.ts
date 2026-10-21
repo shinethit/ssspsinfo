@@ -525,6 +525,7 @@ export interface TransactionRecord {
   note?: string;
   recordedBy?: string;
   createdAt: string;
+  academicYear?: string;
 }
 
 

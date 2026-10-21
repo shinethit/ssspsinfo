@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, query, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, query, orderBy, deleteDoc, doc, writeBatch } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebase';
 import { School, TransactionRecord } from '../../types';
 import { toast } from 'sonner';
-import { Coins, Plus, Search, Printer, Trash2, ArrowRightLeft, History, MapPin, Download } from 'lucide-react';
+import { Coins, Plus, Search, Printer, Trash2, ArrowRightLeft, History, MapPin, Download, Settings, Save } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../../constants';
 import * as XLSX from 'xlsx';
@@ -13,18 +13,22 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
   const [search, setSearch] = useState('');
   const [zoneFilter, setZoneFilter] = useState<string>('all');
   
-  // State အသစ် - Data တွေ ချက်ချင်း sync ဖြစ်စေရန် ID ကိုသာ သိမ်းမည်
   const [selectedSchoolId, setSelectedSchoolId] = useState<string | null>(null);
   const selectedSchool = schools.find(s => s.id === selectedSchoolId) || null;
 
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
   const [receiptSchool, setReceiptSchool] = useState<School | null>(null);
 
+  // Global Academic Year
+  const [globalAcademicYear, setGlobalAcademicYear] = useState(() => localStorage.getItem('global_academic_year') || '၂၀၂၄-၂၀၂၅');
+  const [isUpdatingBatch, setIsUpdatingBatch] = useState(false);
+
   // Form State
-  const [feeType, setFeeType] = useState('အားကစားကြေး (Sports Fee)');
+  const [feeType, setFeeType] = useState('နှစ်စဉ်ကြေး (Annual Fee)');
   const [amount, setAmount] = useState('');
   const [paidDate, setPaidDate] = useState(new Date().toISOString().split('T')[0]);
   const [note, setNote] = useState('');
+  const [formAcademicYear, setFormAcademicYear] = useState(globalAcademicYear);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [isMigrating, setIsMigrating] = useState(false);
@@ -43,6 +47,35 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
     fetchTransactions();
   }, []);
 
+  const handleSaveGlobalYear = () => {
+    localStorage.setItem('global_academic_year', globalAcademicYear);
+    toast.success('ပညာသင်နှစ် သတ်မှတ်ချက်ကို သိမ်းဆည်းပြီးပါပြီ');
+  };
+
+  const handleBatchUpdateYear = async () => {
+    if (!confirm(`နှစ်စဉ်ကြေး သွင်းပြီးထားသော ကျောင်းအားလုံးကို "${globalAcademicYear}" သို့ ပြောင်းလဲပါမည်။ သေချာပါသလား?`)) return;
+    setIsUpdatingBatch(true);
+    try {
+      const q = query(collection(db, 'schools'));
+      const snap = await getDocs(q);
+      const batch = writeBatch(db);
+      let count = 0;
+      snap.docs.forEach(d => {
+        if (d.data().isAnnualFeePaid) {
+          batch.update(doc(db, 'schools', d.id), { feeAcademicYear: globalAcademicYear });
+          count++;
+        }
+      });
+      await batch.commit();
+      toast.success(`ကျောင်း (${count}) ခု၏ ပညာသင်နှစ်ကို ပြောင်းလဲပြီးပါပြီ`);
+    } catch (error) {
+      console.error(error);
+      toast.error('Batch Update လုပ်၍ မရပါ');
+    } finally {
+      setIsUpdatingBatch(false);
+    }
+  };
+
   const handleAddPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSchool) return;
@@ -54,8 +87,9 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
         schoolName: selectedSchool.name,
         feeType,
         amount: Number(amount),
-        paidDate: paidDate, // ရွေးချယ်လိုက်သော ရက်စွဲကို သုံးမည်
+        paidDate: paidDate,
         note,
+        academicYear: formAcademicYear,
         recordedBy: auth.currentUser?.email || 'Admin',
         createdAt: new Date().toISOString()
       });
@@ -90,13 +124,13 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
       'စဉ် (No)': index + 1,
       'ကျောင်းအမည် (School Name)': t.schoolName,
       'ကြေးအမျိုးအစား (Fee Type)': t.feeType,
+      'ပညာသင်နှစ် (Academic Year)': t.academicYear || '',
       'ပမာဏ (Amount)': t.amount,
       'ရက်စွဲ (Date)': t.paidDate,
       'မှတ်ချက် (Note)': t.note || '',
       'မှတ်တမ်းတင်သူ (Recorded By)': t.recordedBy || 'Admin'
     }));
     const ws = XLSX.utils.json_to_sheet(wsData);
-    ws['!cols'] = [{ wch: 8 }, { wch: 30 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 30 }, { wch: 20 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Finance_Records');
     XLSX.writeFile(wb, `Finance_Records_${new Date().toISOString().split('T')[0]}.xlsx`);
@@ -124,12 +158,13 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
             amount: payment.amount,
             paidDate: payment.paidDate || new Date().toISOString().split('T')[0],
             note: payment.note || '',
+            academicYear: globalAcademicYear,
             recordedBy: 'System Migration',
             createdAt: new Date().toISOString()
           });
           migratedCount++;
         }
-        await updateDoc(doc(db, 'schools', school.id), { payments: [] });
+        await writeBatch(db).update(doc(db, 'schools', school.id), { payments: [] }).commit();
       }
       toast.success(`မှတ်တမ်း (${migratedCount}) ခုကို အောင်မြင်စွာ ရွှေ့ပြောင်းပြီးပါပြီ`);
       fetchTransactions();
@@ -149,6 +184,34 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
 
   return (
     <div className="space-y-6">
+      {/* Global Setting Box */}
+      <div className="bg-white p-4 rounded-xl border border-indigo-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <div className="p-2 bg-indigo-50 text-indigo-700 rounded-lg">
+            <Settings className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-800">ဗဟို ပညာသင်နှစ် သတ်မှတ်ချက် (Global Setting)</h3>
+            <p className="text-xs text-slate-500">Form များတွင် ဤပညာသင်နှစ်ကို Default အဖြစ် အသုံးပြုမည်</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <input 
+            type="text" 
+            value={globalAcademicYear} 
+            onChange={e => setGlobalAcademicYear(e.target.value)} 
+            placeholder="ဥပမာ - ၂၀၂၄-၂၀၂၅" 
+            className="p-2 border border-slate-300 rounded-lg text-sm w-36 font-bold text-indigo-900" 
+          />
+          <button onClick={handleSaveGlobalYear} className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5">
+            <Save className="w-3.5 h-3.5" /> သိမ်းမည်
+          </button>
+          <button onClick={handleBatchUpdateYear} disabled={isUpdatingBatch} className="bg-amber-100 text-amber-800 hover:bg-amber-200 px-3 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-50">
+            <ArrowRightLeft className="w-3.5 h-3.5" /> {isUpdatingBatch ? 'ပြောင်းလဲနေပါသည်...' : 'သွင်းပြီးကျောင်းများကို ဤနှစ်သို့ပြောင်းမည်'}
+          </button>
+        </div>
+      </div>
+
       {schools.some(s => (s as any).payments && (s as any).payments.length > 0) && (
         <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-amber-800 text-sm font-semibold">
@@ -162,7 +225,6 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
       )}
 
       <div className="grid md:grid-cols-2 gap-6">
-        {/* Left Side: School Selection & Form */}
         <div className="space-y-4">
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
             <h3 className="font-bold text-slate-900 flex items-center gap-2 border-b pb-2">
@@ -174,23 +236,6 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
               <input type="text" placeholder="ကျောင်းအမည် ရှာရန်..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:border-emerald-500 outline-none" />
             </div>
             
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-bold text-slate-700 flex items-center gap-1">
-                <MapPin className="w-3 h-3 text-indigo-600" /> ဇုန် အလိုက် စစ်ထုတ်ရန်:
-              </label>
-              <div className="flex flex-wrap gap-1.5">
-                {ZONE_FILTER_OPTIONS.map(opt => {
-                  const count = opt.value === 'all' ? schools.length : schools.filter(s => isSchoolInZone(s.zone, opt.value)).length;
-                  return (
-                    <button key={opt.value} type="button" onClick={() => setZoneFilter(opt.value)} className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition flex items-center gap-1 border cursor-pointer ${zoneFilter === opt.value ? 'bg-indigo-700 text-white border-indigo-700 shadow-xs' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}>
-                      <span>{opt.label}</span>
-                      <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${zoneFilter === opt.value ? 'bg-indigo-500 text-white' : 'bg-white text-slate-500 border border-slate-200'}`}>{count}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
             <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 border rounded-xl">
               {filteredSchools.length === 0 ? (
                 <div className="p-3 text-center text-xs text-slate-400 italic">ကျောင်း မတွေ့ပါ</div>
@@ -218,11 +263,15 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
                 </div>
                 
                 <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">ပညာသင်နှစ် (Academic Year)</label>
+                  <input type="text" value={formAcademicYear} onChange={e => setFormAcademicYear(e.target.value)} placeholder="ဥပမာ - ၂၀၂၄-၂၀၂၅" className="w-full p-2.5 border rounded-xl text-sm bg-white font-bold" />
+                </div>
+
+                <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">ပမာဏ (ကျပ်)</label>
                   <input type="number" required value={amount} onChange={e => setAmount(e.target.value)} className="w-full p-2.5 border rounded-xl text-sm bg-white" />
                 </div>
                 
-                {/* ရက်စွဲ မဖြစ်မနေ ထည့်ရမည် */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">ငွေသွင်းသည့် ရက်စွဲ (Payment Date) *</label>
                   <input type="date" required value={paidDate} onChange={e => setPaidDate(e.target.value)} className="w-full p-2.5 border rounded-xl text-sm bg-white font-bold" />
@@ -241,8 +290,7 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
           </div>
         </div>
 
-        {/* Right Side: Transaction History */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[500px]">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[600px]">
           <div className="p-4 border-b bg-slate-50 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <h3 className="font-bold text-slate-800 flex items-center gap-2">
@@ -272,7 +320,6 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
               </div>
             ) : (
               <>
-                {/* နှစ်စဉ်ကြေး မှတ်တမ်း (သွင်းထားရင် ဒီကားချပ်လေး အမြဲပေါ်မယ်) */}
                 {selectedSchool.isAnnualFeePaid && (
                   <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex justify-between items-center group shadow-sm animate-in fade-in">
                     <div>
@@ -291,11 +338,10 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
                   </div>
                 )}
 
-                {/* အခြားကြေးများ မှတ်တမ်း */}
                 {schoolTransactions.map(t => (
                   <div key={t.id} className="p-3 bg-white border border-slate-200 rounded-xl hover:shadow-sm transition flex justify-between items-center group">
                     <div>
-                      <p className="font-bold text-sm text-slate-900">{t.feeType}</p>
+                      <p className="font-bold text-sm text-slate-900">{t.feeType} {t.academicYear && <span className="text-xs text-slate-500 font-normal">({t.academicYear})</span>}</p>
                       <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
                         <span>{new Date(t.paidDate).toLocaleDateString('my-MM')}</span>
                         <span>•</span>

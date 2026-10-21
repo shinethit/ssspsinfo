@@ -8,9 +8,21 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v21.9',
+    version: 'v22.0',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'Global Academic Year & Voucher Formatting',
+    changes: [
+      { type: 'feat', text: 'ငွေစာရင်းတွင် ပညာသင်နှစ်ကို ဗဟိုမှ (Global) သတ်မှတ်နိုင်ပြီး Form များတွင် Default အဖြစ် အသုံးပြုနိုင်ခြင်း။' },
+      { type: 'feat', text: 'သွင်းပြီးသား ကျောင်းများအားလုံးကို ပညာသင်နှစ်အသစ်သို့ တစ်ချက်တည်း Batch ပြောင်းလဲနိုင်သည့် စနစ် ထည့်သွင်းခြင်း။' },
+      { type: 'improve', text: 'Voucher/Receipt နံပါတ်များကို SSSPSFV-YYYYMMDD ဖော်မတ်ဖြင့် စနစ်တကျ ထုတ်ပေးခြင်း။' },
+      { type: 'improve', text: 'Receipt တွင် မှတ်စု (Note) နှင့် ပညာသင်နှစ်ကို ရှင်းလင်းစွာ ပြသခြင်း။' }
+    ],
+  },
+  {
+    version: 'v21.9',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'Receipt Details Update',
     changes: [
       { type: 'improve', text: 'ကျောင်းအချက်အလက် ပြင်ဆင်သည့်နေရာတွင် ပညာသင်နှစ် (Academic Year) ထည့်သွင်းနိုင်စေရန် ပြင်ဆင်ခြင်း။' },

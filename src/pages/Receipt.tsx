@@ -32,6 +32,16 @@ export default function Receipt() {
     fetchTransaction();
   }, [id]);
 
+  
+  const formatDateStr = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}${mm}${dd}`;
+  };
+  const voucherNo = `SSSPSFV-${formatDateStr(transaction.paidDate)}-${transaction.id.substring(0, 4).toUpperCase()}`;
+
   const handlePrint = () => {
     window.print();
   };
@@ -112,7 +122,7 @@ export default function Receipt() {
             <div>
               <span className="text-slate-500 font-semibold block mb-1">ဖြတ်ပိုင်းအမှတ် (Receipt No):</span>
               <span className="font-mono font-bold text-slate-900 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">
-                RCPT-{transaction.id.substring(0, 6).toUpperCase()}
+                {voucherNo}
               </span>
             </div>
             <div className="text-right">
@@ -144,8 +154,9 @@ export default function Receipt() {
             <tbody>
               <tr>
                 <td className="py-4 px-4 border-b border-slate-100">
-                  {transaction.feeType}
-                  {transaction.note && <span className="block text-xs text-slate-500 mt-1">({transaction.note})</span>}
+                  <span className="font-bold">{transaction.feeType}</span>
+                  {transaction.academicYear && <span className="block text-xs text-slate-600 mt-0.5">ပညာသင်နှစ်: {transaction.academicYear}</span>}
+                  {transaction.note && <span className="block text-xs text-slate-500 mt-1 bg-slate-50 p-1.5 rounded border border-slate-100">မှတ်စု: {transaction.note}</span>}
                 </td>
                 <td className="py-4 px-4 text-right border-b border-slate-100 font-mono font-bold">
                   {transaction.amount.toLocaleString('my-MM')} ကျပ်
