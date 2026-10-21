@@ -76,3 +76,35 @@ p, span, li, a {
   animation-play-state: paused;
 }
 
+
+/* =========================================
+   Global Button Feedback & Active States
+   ========================================= */
+button, [role="button"], input[type="submit"], input[type="button"] {
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* နှိပ်လိုက်ရင် ခဏလေး ကျုံ့ဝင်သွားမည် (Tactile Feedback) */
+button:active:not(:disabled), 
+[role="button"]:active:not(:disabled),
+input[type="submit"]:active:not(:disabled),
+input[type="button"]:active:not(:disabled) {
+  transform: scale(0.94) !important;
+  opacity: 0.85 !important;
+}
+
+/* Disabled ဖြစ်နေရင် နှိပ်လို့မရကြောင်း ပြသခြင်း */
+button:disabled, 
+input[type="submit"]:disabled {
+  cursor: not-allowed !important;
+  opacity: 0.6 !important;
+  transform: none !important;
+}
+
+/* Focus ဖြစ်နေရင် Outline ပြသခြင်း */
+button:focus-visible {
+  outline: 2px solid #0284c7;
+  outline-offset: 2px;
+}

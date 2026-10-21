@@ -8,9 +8,20 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v21.0',
+    version: 'v21.1',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'Global Button UX & Feedback Enhancement',
+    changes: [
+      { type: 'improve', text: 'ခလုတ်များကို နှိပ်လိုက်ပါက ချက်ချင်း တုံ့ပြန်မှုရှိစေရန် (Active state နှင့် Transition) စနစ်တကျ ထည့်သွင်းခြင်း။' },
+      { type: 'improve', text: 'Loading ဖြစ်နေစဉ်အတွင်း ခလုတ်များ အလုပ်မလုပ်တော့ခြင်းနှင့် Spinner ပြသခြင်းတို့ကို ပိုမိုရှင်းလင်းစွာ မြင်တွေ့နိုင်စေရန် ပြင်ဆင်ခြင်း။' },
+      { type: 'fix', text: 'ခလုတ်များ နှိပ်လိုက်ပါက အသံတိတ်နေခြင်း (No feedback) ပြဿနာကို ဖြေရှင်းခြင်း။' }
+    ],
+  },
+  {
+    version: 'v21.0',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'Performance Optimization & Lazy Loading',
     changes: [
       { type: 'improve', text: 'App ၏ performance ကို မြှင့်တင်ရန် Lazy Loading (Code Splitting) စနစ် ထည့်သွင်းခြင်း' },
