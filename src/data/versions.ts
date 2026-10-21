@@ -8,9 +8,20 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v21.6',
+    version: 'v21.7',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'Finance Manager Receipts Fix & Mandatory Dates',
+    changes: [
+      { type: 'fix', text: 'နှစ်စဉ်ကြေး (Annual Fee) သွင်းထားသော ကျောင်းများအတွက် ငွေစာရင်းတွင် Printer ပုံပေါ်လာစေရန် ပြင်ဆင်ခြင်း။' },
+      { type: 'improve', text: 'ငွေသွင်းမှတ်တမ်း တင်သည့်အခါ မည်သည့်ကြေးမဆို ရက်စွဲ (Payment Date) မဖြစ်မနေ ထည့်သွင်းရန် ပြင်ဆင်ခြင်း။' },
+      { type: 'feat', text: 'Receipt (ဖြတ်ပိုင်း) များကို PDF နှင့် JPEG အဖြစ် ဒေါင်းလုဒ်ဆွဲနိုင်သည့် ခလုတ်များ ထည့်သွင်းခြင်း။' }
+    ],
+  },
+  {
+    version: 'v21.6',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'Finance Manager Receipts & Date Fixes',
     changes: [
       { type: 'feat', text: 'ငွေစာရင်း Manager တွင် နှစ်စဉ်ကြေး (Annual Fee) ကို မှတ်တမ်းအနေဖြင့် ပြသပြီး ဖြတ်ပိုင်း တိုက်ရိုက်ထုတ်ယူနိုင်စေရန် ပြင်ဆင်ခြင်း။' },
