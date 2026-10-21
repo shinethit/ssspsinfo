@@ -102,6 +102,10 @@ export default function AnnualFeeReceipt({ school, onClose }: { school: School; 
                     <span className="text-slate-500 font-semibold block mb-1">ကျောင်းအဆင့် / ဇုန်:</span>
                     <span className="font-bold">{school.level} {school.zone ? `(${school.zone})` : ''}</span>
                   </div>
+                  <div>
+                    <span className="text-slate-500 font-semibold block mb-1">ကျောင်းသားဦးရေ (Range):</span>
+                    <span className="font-bold">{school.studentRange || 'မသတ်မှတ်ထားပါ'} {school.studentCount ? `(${school.studentCount} ဦး)` : ''}</span>
+                  </div>
                 </div>
               </div>
 
@@ -138,7 +142,7 @@ export default function AnnualFeeReceipt({ school, onClose }: { school: School; 
             <div className="mt-16 pt-8 flex justify-between items-end relative z-10">
               <div className="text-center">
                 <div className="w-32 border-b border-slate-400 mb-2"></div>
-                <span className="text-xs text-slate-500 font-semibold">ငွေကိုင်ဌာန</span>
+                <span className="text-xs text-slate-500 font-semibold">ဘဏ္ဍာရေးမှူး</span>
               </div>
               <div className="text-center">
                 <div className="w-40 border-b border-slate-400 mb-2"></div>

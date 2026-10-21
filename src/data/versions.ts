@@ -8,9 +8,20 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v21.8',
+    version: 'v21.9',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'Receipt Details Update',
+    changes: [
+      { type: 'improve', text: 'ကျောင်းအချက်အလက် ပြင်ဆင်သည့်နေရာတွင် ပညာသင်နှစ် (Academic Year) ထည့်သွင်းနိုင်စေရန် ပြင်ဆင်ခြင်း။' },
+      { type: 'feat', text: 'နှစ်စဉ်ကြေး ဖြတ်ပိုင်းတွင် ကျောင်းသားဦးရေ (Range) ကို ထည့်သွင်းပြသခြင်း။' },
+      { type: 'improve', text: '"ငွေကိုင်ဌာန" နေရာတွင် "ဘဏ္ဍာရေးမှူး" ဟု ပြောင်းလဲပြသခြင်း။' }
+    ],
+  },
+  {
+    version: 'v21.8',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'Ultimate Finance Sync & Receipt Fixes',
     changes: [
       { type: 'fix', text: 'နှစ်စဉ်ကြေး သွင်းထားသော ကျောင်းများ၏ အချက်အလက်များ ငွေစာရင်းတွင် ချက်ချင်း Sync ဖြစ်ပြီး ဖြတ်ပိုင်း (Printer) ခလုတ် ပေါ်လာစေရန် အပြည့်အဝ ပြင်ဆင်ခြင်း။' },

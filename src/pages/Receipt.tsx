@@ -168,7 +168,7 @@ export default function Receipt() {
         <div className="mt-16 pt-8 flex justify-between items-end relative z-10">
           <div className="text-center">
             <div className="w-32 border-b border-slate-400 mb-2"></div>
-            <span className="text-xs text-slate-500 font-semibold">ငွေကိုင်ဌာန</span>
+            <span className="text-xs text-slate-500 font-semibold">ဘဏ္ဍာရေးမှူး</span>
           </div>
           <div className="text-center">
             <div className="w-40 border-b border-slate-400 mb-2"></div>
