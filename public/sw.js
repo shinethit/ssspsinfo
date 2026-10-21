@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ssspsinfo-live-v2';
+const CACHE_NAME = 'ssspsinfo-live-v3';
 
 const PRECACHE_ASSETS = [
   '/',
@@ -59,6 +59,7 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
 
   if (request.method !== 'GET') return;
+  if (!request.url.startsWith('http')) return; // ignore chrome-extension://, etc.
   const url = new URL(request.url);
 
   if (
@@ -81,7 +82,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetchWithTimeout(request, 1500)
         .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
+          if (networkResponse && networkResponse.status === 200 && !networkResponse.redirected) {
             const responseClone = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(request, responseClone);
@@ -113,7 +114,7 @@ self.addEventListener('fetch', (event) => {
         return cachedResponse;
       }
       return fetch(request).then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
+        if (networkResponse && networkResponse.status === 200 && !networkResponse.redirected) {
           const responseClone = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(request, responseClone);

@@ -8,9 +8,21 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v22.7',
+    version: 'v22.8',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'Ultimate Account Control Center & SW Fixes',
+    changes: [
+      { type: 'fix', text: 'Service Worker တွင် chrome-extension နှင့် Redirect ဖြစ်နေသော Response များကြောင့် Error တက်နေခြင်းကို ပြင်ဆင်ခြင်း။' },
+      { type: 'feat', text: 'Admin/Moderator နှင့် ကျောင်း(User) အကောင့်များကို တစ်နေရာတည်းတွင် စီမံခန့်ခွဲနိုင်သည့် Account Control Center အသစ် ထည့်သွင်းခြင်း။' },
+      { type: 'feat', text: 'Moderator များအတွက် ကျောင်းဖျက်ခွင့်၊ ငွေစာရင်းထည့်ခွင့် စသည့် ခွင့်ပြုချက်များကို Checkbox ဖြင့် သီးသန့်သတ်မှတ်ပေးနိုင်ခြင်း။' },
+      { type: 'improve', text: 'ကျောင်းအကောင့်ဖွင့်ရာတွင် prompt() အစား သပ်ရပ်သော Popup (Modal) ဖြင့် ဖန်တီးနိုင်စေရန် ပြင်ဆင်ခြင်း။' }
+    ],
+  },
+  {
+    version: 'v22.7',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'Account Control Center & Granular Permissions',
     changes: [
       { type: 'feat', text: 'Admin/Moderator နှင့် ကျောင်း(User) အကောင့်များကို တစ်နေရာတည်းတွင် စီမံခန့်ခွဲနိုင်သည့် Account Control Center အသစ် ထည့်သွင်းခြင်း။' },

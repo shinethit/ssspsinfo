@@ -1,11 +1,38 @@
-// D:\ssspsinfo-main\ultimate-account-control.cjs
+// D:\ssspsinfo-main\ultimate-fix-v22-8.cjs
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-console.log('🚀 Account Control Center နှင့် Role ခွင့်ပြုချက်များ စနစ်တကျ ပြင်ဆင်နေပါသည်...');
+console.log('🚀 Service Worker နှင့် Account Control Center ကို စနစ်တကျ ပြင်ဆင်နေပါသည် (v22.8)...');
 
-// 1. types/index.ts တွင် permissions ထည့်သွင်းခြင်း
+// 1. sw.js ကို Error မတက်အောင် ပြင်ဆင်ခြင်း
+const swPath = path.join(__dirname, 'public', 'sw.js');
+let swContent = fs.readFileSync(swPath, 'utf8');
+
+// chrome-extension နှင့် အခြား scheme များကို ကျော်ရန်
+swContent = swContent.replace(
+  "self.addEventListener('fetch', (event) => {\n  const { request } = event;\n\n  if (request.method !== 'GET') return;",
+  "self.addEventListener('fetch', (event) => {\n  const { request } = event;\n\n  if (request.method !== 'GET') return;\n  if (!request.url.startsWith('http')) return; // ignore chrome-extension://, etc."
+);
+
+// Redirect ဖြစ်နေသော response များကို Cache မသိမ်းရန် (redirect error ဖြေရှင်းရန်)
+swContent = swContent.replace(
+  "if (networkResponse && networkResponse.status === 200) {\n            const responseClone = networkResponse.clone();\n            caches.open(CACHE_NAME).then((cache) => {\n              cache.put(request, responseClone);\n            });\n          }",
+  "if (networkResponse && networkResponse.status === 200 && !networkResponse.redirected) {\n            const responseClone = networkResponse.clone();\n            caches.open(CACHE_NAME).then((cache) => {\n              cache.put(request, responseClone);\n            });\n          }"
+);
+swContent = swContent.replace(
+  "if (networkResponse && networkResponse.status === 200) {\n          const responseClone = networkResponse.clone();\n          caches.open(CACHE_NAME).then((cache) => {\n            cache.put(request, responseClone);\n          });\n        }",
+  "if (networkResponse && networkResponse.status === 200 && !networkResponse.redirected) {\n          const responseClone = networkResponse.clone();\n          caches.open(CACHE_NAME).then((cache) => {\n            cache.put(request, responseClone);\n          });\n        }"
+);
+
+// Cache Version ကို မြှင့်တင်ခြင်း
+swContent = swContent.replace(/ssspsinfo-live-v2/g, 'ssspsinfo-live-v3');
+
+fs.writeFileSync(swPath, swContent);
+console.log('✅ sw.js တွင် Cache လုပ်ခြင်းဆိုင်ရာ Error များ ပြင်ဆင်ပြီးပါပြီ။');
+
+
+// 2. types/index.ts တွင် permissions ထည့်သွင်းခြင်း
 const typesPath = path.join(__dirname, 'src', 'types', 'index.ts');
 let typesContent = fs.readFileSync(typesPath, 'utf8');
 if (!typesContent.includes('permissions?: {')) {
@@ -17,22 +44,21 @@ if (!typesContent.includes('permissions?: {')) {
   console.log('✅ types/index.ts တွင် permissions ထည့်သွင်းပြီးပါပြီ။');
 }
 
-// 2. AdminSchoolManager.tsx တွင် Delete ခလုတ်ကို ခွင့်ပြုချက်အလိုက် ကာကွယ်ခြင်း
+
+// 3. AdminSchoolManager.tsx တွင် Delete ခလုတ်ကို ကာကွယ်ခြင်း
 const managerPath = path.join(__dirname, 'src', 'components', 'admin', 'AdminSchoolManager.tsx');
 let managerContent = fs.readFileSync(managerPath, 'utf8');
 
 if (!managerContent.includes('canDelete')) {
-  // Props တွင် ထည့်ခြင်း
   managerContent = managerContent.replace(
     "  excelUploadState: any;\n}",
     "  excelUploadState: any;\n  canDelete?: boolean;\n}"
   );
   managerContent = managerContent.replace(
-    "  isUploadingExcel, excelUploadState, role = 'admin'\n}: AdminSchoolManagerProps) {",
-    "  isUploadingExcel, excelUploadState, role = 'admin', canDelete = true\n}: AdminSchoolManagerProps) {"
+    "  isUploadingExcel, excelUploadState\n}: AdminSchoolManagerProps) {",
+    "  isUploadingExcel, excelUploadState, canDelete = true\n}: AdminSchoolManagerProps) {"
   );
   
-  // Delete ခလုတ်ကို ကာကွယ်ခြင်း
   const oldDeleteBtn = `<button onClick={() => onDelete(school.id, school.name)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition" title="ဖျက်ရန်">
                             <Trash2 className="w-4 h-4" />
                           </button>`;
@@ -49,64 +75,38 @@ if (!managerContent.includes('canDelete')) {
   console.log('✅ AdminSchoolManager.tsx တွင် Delete ခလုတ် ကာကွယ်ပြီးပါပြီ။');
 }
 
-// 3. Admin.tsx ကို အစအဆုံး ပြင်ဆင်ခြင်း
+
+// 4. Admin.tsx ကို အစအဆုံး ပြင်ဆင်ခြင်း
 const adminPath = path.join(__dirname, 'src', 'pages', 'Admin.tsx');
 let adminContent = fs.readFileSync(adminPath, 'utf8');
 
 // (က) Import အသစ်များ ထည့်သွင်းခြင်း
 adminContent = adminContent.replace(
   "Coins } from 'lucide-react';",
-  "Coins, UserCog, ShieldAlert, CheckSquare, Square, Key, UserPlus, Mail, Lock } from 'lucide-react';"
+  "Coins, UserCog, Key } from 'lucide-react';"
 );
 
 // (ခ) Tab အမည်များ ပြောင်းလဲခြင်း ('admins' -> 'accounts')
 adminContent = adminContent.replace(
-  "'admins' | 'levels' |",
-  "'accounts' | 'levels' |"
+  "'audit_logs' | 'admins' | 'levels' |",
+  "'audit_logs' | 'accounts' | 'levels' |"
+);
+adminContent = adminContent.replace(
+  "tabParam === 'admins' ||",
+  "tabParam === 'accounts' ||"
 );
 
-// (ဂ) Permission Logic ကို အသစ်ပြင်ဆင်ခြင်း
-const oldCanAccess = `  const canAccess: Record<string, boolean> = {
-    announcements: isSuperOrAdmin || role === 'news_editor',
-    associations: isSuperOrAdmin,
-    schools: isSuperOrAdmin,
-    levels: isSuperOrAdmin,
-    tickers: isSuperOrAdmin || role === 'news_editor',
-    audit_logs: isSuperOrAdmin,
-    admins: role === 'super_admin',
-    backup: role === 'super_admin',
-    events: isSuperOrAdmin || role === 'sports_moderator',
-    sports: isSuperOrAdmin || role === 'sports_moderator',
-    documents: isSuperOrAdmin || role === 'news_editor',
-    finance: isSuperOrAdmin,
-  };`;
+// (ဂ) Permission Logic အသစ်
+adminContent = adminContent.replace(
+  "    admins: role === 'super_admin',",
+  "    accounts: isSuperOrAdmin,"
+);
 
-const newCanAccess = `  const perms = adminSession.permissions || {};
-
-  const canAccess: Record<string, boolean> = {
-    announcements: isSuperOrAdmin || perms.manage_announcements || role === 'news_editor',
-    associations: isSuperOrAdmin,
-    schools: isSuperOrAdmin || perms.manage_schools,
-    levels: isSuperOrAdmin,
-    tickers: isSuperOrAdmin || perms.manage_announcements || role === 'news_editor',
-    audit_logs: isSuperOrAdmin,
-    accounts: isSuperOrAdmin, // Account Center ကို Admin ပဲ ဝင်ခွင့်ပြုမည်
-    backup: isSuperOrAdmin,
-    events: isSuperOrAdmin || perms.manage_events || role === 'sports_moderator',
-    sports: isSuperOrAdmin || perms.manage_sports || role === 'sports_moderator',
-    documents: isSuperOrAdmin || perms.manage_documents || role === 'news_editor',
-    finance: isSuperOrAdmin || perms.manage_finance,
-  };`;
-
-adminContent = adminContent.replace(oldCanAccess, newCanAccess);
-
-// (ဃ) Admin Form အတွက် State အသစ်များ ထည့်သွင်းခြင်း
-const oldAdminState = `  const [newAdminRole, setNewAdminRole] = useState<'admin' | 'editor' | 'super_admin'>('admin');
-  const [newAdminPhone, setNewAdminPhone] = useState('');`;
-const newAdminState = `  const [newAdminRole, setNewAdminRole] = useState<'admin' | 'editor' | 'super_admin'>('admin');
-  const [newAdminPhone, setNewAdminPhone] = useState('');
+// (ဃ) Admin Form အတွက် State အသစ်များ
+adminContent = adminContent.replace(
+  "  const [newAdminRole, setNewAdminRole] = useState<'admin' | 'editor' | 'super_admin'>('admin');",
+  `  const [newAdminRole, setNewAdminRole] = useState<'admin' | 'editor' | 'super_admin'>('admin');
   
-  // Permissions State
   const [adminPerms, setAdminPerms] = useState<Record<string, boolean>>({
     manage_schools: false,
     delete_schools: false,
@@ -118,21 +118,19 @@ const newAdminState = `  const [newAdminRole, setNewAdminRole] = useState<'admin
     manage_users: false,
   });
 
-  // School Account Creation State
   const [schoolAccountModal, setSchoolAccountModal] = useState<School | null>(null);
   const [schoolAccEmail, setSchoolAccEmail] = useState('');
   const [schoolAccPassword, setSchoolAccPassword] = useState('');
-  const [isCreatingSchoolAcc, setIsCreatingSchoolAcc] = useState(false);`;
-
-adminContent = adminContent.replace(oldAdminState, newAdminState);
-
-// (င) handleAddAdmin တွင် permissions ထည့်သွင်းခြင်း
-adminContent = adminContent.replace(
-  "        note: newAdminNote.trim(),\n        addedBy: auth.currentUser?.email || adminSession.email || 'Super Admin',",
-  "        note: newAdminNote.trim(),\n        permissions: adminPerms,\n        addedBy: auth.currentUser?.email || adminSession.email || 'Super Admin',"
+  const [isCreatingSchoolAcc, setIsCreatingSchoolAcc] = useState(false);`
 );
 
-// (စ) ကျောင်းအကောင့် ဖန်တီးသည့် Function ကို အသစ်ပြင်ဆင်ခြင်း (prompt ဖျက်ပြီး Modal သုံးမည်)
+// (င) handleAddAdmin တွင် permissions ထည့်ခြင်း
+adminContent = adminContent.replace(
+  "        note: newAdminNote.trim(),\n        addedBy:",
+  "        note: newAdminNote.trim(),\n        permissions: adminPerms,\n        addedBy:"
+);
+
+// (စ) ကျောင်းအကောင့် ဖန်တီးသည့် Function ကို prompt() ဖျက်ပြီး Modal သုံးမည်
 const oldHandleSchoolAcc = `  const handleCreateSchoolAccount = async (school: School) => {
     if (school.authUid) {
       toast.info('ဤကျောင်းအတွက် အကောင့် ဖန်တီးပြီးသား ဖြစ်ပါသည်။');
@@ -183,7 +181,7 @@ const newHandleSchoolAcc = `  const handleCreateSchoolAccount = async (e: React.
 
 adminContent = adminContent.replace(oldHandleSchoolAcc, newHandleSchoolAcc);
 
-// (ဆ) Tab ခလုတ်များထဲမှ 'အက်ဒမင်များ' ကို 'အကောင့်စီမံခန့်ခွဲမှု' အဖြစ် ပြောင်းခြင်း
+// (ဆ) Tab ခလုတ်များထဲမှ 'အက်ဒမင်များ' ကို 'အကောင့် စီမံခန့်ခွဲမှု' အဖြစ် ပြောင်းခြင်း
 const oldAdminTab = `          {canAccess.admins && (<button
             onClick={() => setActiveTab('admins')}
             type="button"
@@ -231,10 +229,8 @@ const newTabUIStart = `      {/* Account Control Center Tab */}
 adminContent = adminContent.replace(oldTabUIStart, newTabUIStart);
 
 // Tab အတွင်းပိုင်း UI ကို အစအဆုံး အသစ်ရေးမည်
-// (အဟောင်း UI ကို ရှာပြီး အသစ်နဲ့ အစားထိုးပါမယ်)
 const startIdx = adminContent.indexOf(newTabUIStart);
 if (startIdx !== -1) {
-  // 'levels' tab စတဲ့နေရာကို ရှာပြီး အဲဒီအထိ ဖြတ်ပစ်မယ်
   const endIdx = adminContent.indexOf(`      {/* 7. SCHOOL LEVELS MANAGEMENT TAB */}`);
   if (endIdx !== -1) {
     const before = adminContent.substring(0, startIdx);
@@ -331,7 +327,7 @@ if (startIdx !== -1) {
                   <div key={adm.id || adm.email} className="p-3 hover:bg-slate-50 transition flex items-center justify-between gap-3">
                     <div>
                       <p className="font-bold text-sm text-slate-900">{adm.email}</p>
-                      <div className="flex items-center gap-1.5 mt-1">
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                         <span className="text-[10px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded border border-slate-200 uppercase">{adm.role}</span>
                         {adm.permissions && Object.entries(adm.permissions).filter(([_, v]) => v).map(([k]) => (
                           <span key={k} className="text-[9px] bg-indigo-50 text-indigo-700 px-1 rounded">{k}</span>
@@ -422,22 +418,25 @@ if (startIdx !== -1) {
   }
 }
 
-// 4. Version & Change Log
+fs.writeFileSync(adminPath, adminContent);
+
+// 5. Version & Change Log
 const constantsPath = path.join(__dirname, 'src', 'constants.ts');
 let constantsContent = fs.readFileSync(constantsPath, 'utf8');
-constantsContent = constantsContent.replace(/export const CURRENT_VERSION = 'v\d+\.\d+';/, "export const CURRENT_VERSION = 'v22.7';");
+constantsContent = constantsContent.replace(/export const CURRENT_VERSION = 'v\d+\.\d+';/, "export const CURRENT_VERSION = 'v22.8';");
 fs.writeFileSync(constantsPath, constantsContent);
 
 const versionsPath = path.join(__dirname, 'src', 'data', 'versions.ts');
 let versionsContent = fs.readFileSync(versionsPath, 'utf8');
-versionsContent = versionsContent.replace(/(version: 'v22\.6',\s*date: '.*?',\s*)isLatest: true/, "$1isLatest: false");
+versionsContent = versionsContent.replace(/(version: 'v22\.7',\s*date: '.*?',\s*)isLatest: true/, "$1isLatest: false");
 
 const newLog = `  {
-    version: 'v22.7',
+    version: 'v22.8',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
-    title: 'Account Control Center & Granular Permissions',
+    title: 'Ultimate Account Control Center & SW Fixes',
     changes: [
+      { type: 'fix', text: 'Service Worker တွင် chrome-extension နှင့် Redirect ဖြစ်နေသော Response များကြောင့် Error တက်နေခြင်းကို ပြင်ဆင်ခြင်း။' },
       { type: 'feat', text: 'Admin/Moderator နှင့် ကျောင်း(User) အကောင့်များကို တစ်နေရာတည်းတွင် စီမံခန့်ခွဲနိုင်သည့် Account Control Center အသစ် ထည့်သွင်းခြင်း။' },
       { type: 'feat', text: 'Moderator များအတွက် ကျောင်းဖျက်ခွင့်၊ ငွေစာရင်းထည့်ခွင့် စသည့် ခွင့်ပြုချက်များကို Checkbox ဖြင့် သီးသန့်သတ်မှတ်ပေးနိုင်ခြင်း။' },
       { type: 'improve', text: 'ကျောင်းအကောင့်ဖွင့်ရာတွင် prompt() အစား သပ်ရပ်သော Popup (Modal) ဖြင့် ဖန်တီးနိုင်စေရန် ပြင်ဆင်ခြင်း။' }
@@ -446,9 +445,9 @@ const newLog = `  {
 `;
 versionsContent = versionsContent.replace('export const VERSIONS: VersionItem[] = [\n', 'export const VERSIONS: VersionItem[] = [\n' + newLog);
 fs.writeFileSync(versionsPath, versionsContent);
-console.log('✅ Version v22.7 နှင့် Change Log ထည့်သွင်းပြီးပါပြီ။');
+console.log('✅ Version v22.8 နှင့် Change Log ထည့်သွင်းပြီးပါပြီ။');
 
-// 5. Build & Push
+// 6. Build & Push
 console.log('🔨 Build လုပ်ပြီး Error စစ်ဆေးနေပါသည်...');
 try {
   execSync('npm run build', { stdio: 'inherit' });
@@ -461,17 +460,17 @@ try {
 console.log('📦 GitHub သို့ Commit နှင့် Push လုပ်နေပါသည်...');
 try {
   execSync('git add .', { stdio: 'inherit' });
-  execSync('git commit -m "feat(admin): implement Account Control Center with granular permissions and modal for school account creation"', { stdio: 'inherit' });
+  execSync('git commit -m "feat(admin): implement full Account Control Center, moderator permissions, fix service worker caching errors"', { stdio: 'inherit' });
   execSync('git push origin main', { stdio: 'inherit' });
   console.log('✅ GitHub သို့ အောင်မြင်စွာ Push လုပ်ပြီးပါပြီ။');
 } catch (error) {
   console.warn('⚠️ Git Push မအောင်မြင်ပါ သို့မဟုတ် ပြင်စရာ မရှိပါ။');
 }
 
-// 6. Cleanup
+// 7. Cleanup
 console.log('🧹 ယာယီဖိုင်များကို PowerShell ဖြင့် ရှင်းလင်းနေပါသည်...');
 try {
-  execSync('powershell -Command "Remove-Item -Path \'ultimate-account-control.cjs\' -ErrorAction SilentlyContinue"', { stdio: 'inherit' });
+  execSync('powershell -Command "Remove-Item -Path \'ultimate-fix-v22-8.cjs\' -ErrorAction SilentlyContinue"', { stdio: 'inherit' });
   console.log('✅ ဖိုင်များ ရှင်းလင်းပြီးပါပြီ။');
 } catch (e) {
   console.warn('⚠️ ဖိုင်ရှင်းလင်းရာတွင် အမှားအနည်းငယ် ရှိနေပါသည်။');
