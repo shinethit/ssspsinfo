@@ -7,6 +7,7 @@ import { Coins, Plus, Search, Printer, Trash2, ArrowRightLeft, History, MapPin, 
 import * as XLSX from 'xlsx';
 import { Link } from 'react-router-dom';
 import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../../constants';
+import AnnualFeeReceipt from './AnnualFeeReceipt';
 
 export default function AdminFinanceManager({ schools }: { schools: School[] }) {
   const [search, setSearch] = useState('');
@@ -19,10 +20,12 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
   const [feeType, setFeeType] = useState('အားကစားကြေး (Sports Fee)');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+  const [paidDate, setPaidDate] = useState(new Date().toISOString().split('T')[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Migration State
   const [isMigrating, setIsMigrating] = useState(false);
+  const [receiptSchool, setReceiptSchool] = useState<School | null>(null);
 
   const fetchTransactions = async () => {
     try {
@@ -52,7 +55,7 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
         schoolName: selectedSchool.name,
         feeType,
         amount: Number(amount),
-        paidDate: new Date().toISOString().split('T')[0],
+        paidDate: paidDate,
         note,
         recordedBy: auth.currentUser?.email || 'Admin',
         createdAt: new Date().toISOString()
@@ -256,6 +259,10 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
                   <input type="number" required value={amount} onChange={e => setAmount(e.target.value)} className="w-full p-2.5 border rounded-xl text-sm bg-white" />
                 </div>
                 <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">လက်ခံရရှိ ရက်စွဲ</label>
+                  <input type="date" required value={paidDate} onChange={e => setPaidDate(e.target.value)} className="w-full p-2.5 border rounded-xl text-sm bg-white" />
+                </div>
+                <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">မှတ်ချက်</label>
                   <input value={note} onChange={e => setNote(e.target.value)} placeholder="(Optional)" className="w-full p-2.5 border rounded-xl text-sm bg-white" />
                 </div>
@@ -295,7 +302,7 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
               <div className="h-full flex items-center justify-center text-slate-400 text-sm">
                 မှတ်တမ်းများ ကြည့်ရန် ဘယ်ဘက်မှ ကျောင်းတစ်ခုကို ရွေးပါ
               </div>
-            ) : schoolTransactions.length === 0 ? (
+            ) : (schoolTransactions.length === 0 && !selectedSchool.isAnnualFeePaid) ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-400 text-sm">
                 <Coins className="w-8 h-8 text-slate-300 mb-2" />
                 ငွေသွင်းမှတ်တမ်း မရှိသေးပါ
@@ -326,6 +333,9 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
           </div>
         </div>
       </div>
+      {receiptSchool && (
+        <AnnualFeeReceipt school={receiptSchool} onClose={() => setReceiptSchool(null)} />
+      )}
     </div>
   );
 }

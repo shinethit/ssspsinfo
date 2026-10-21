@@ -3,7 +3,11 @@ import { useParams, Link } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { TransactionRecord } from '../types';
-import { Printer, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
+import { Printer, ArrowLeft, CheckCircle2, Loader2, Download } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+import { toast } from 'sonner';
+import { useRef } from 'react';
 
 export default function Receipt() {
   const { id } = useParams<{ id: string }>();
@@ -28,6 +32,34 @@ export default function Receipt() {
     fetchTransaction();
   }, [id]);
 
+  
+  const receiptRef = useRef<HTMLDivElement>(null);
+
+  const handleDownload = async (format: 'pdf' | 'jpeg') => {
+    if (!receiptRef.current) return;
+    try {
+      const canvas = await html2canvas(receiptRef.current, { scale: 2, useCORS: true });
+      const imgData = canvas.toDataURL('image/jpeg', 1.0);
+
+      if (format === 'jpeg') {
+        const link = document.createElement('a');
+        link.href = imgData;
+        link.download = `Receipt_${transaction.schoolName}_${transaction.id.substring(0,4)}.jpeg`;
+        link.click();
+        toast.success('JPEG ဖိုင်အဖြစ် အောင်မြင်စွာ ဒေါင်းလုဒ်ဆွဲပြီးပါပြီ');
+      } else {
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+        pdf.save(`Receipt_${transaction.schoolName}_${transaction.id.substring(0,4)}.pdf`);
+        toast.success('PDF ဖိုင်အဖြစ် အောင်မြင်စွာ ဒေါင်းလုဒ်ဆွဲပြီးပါပြီ');
+      }
+    } catch (err) {
+      toast.error('ဖိုင်ထုတ်ယူရာတွင် အမှားဖြစ်ပွားပါသည်');
+    }
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -50,13 +82,21 @@ export default function Receipt() {
         <Link to="/admin?tab=finance" className="inline-flex items-center gap-2 text-sm font-bold text-sky-800 hover:text-sky-950">
           <ArrowLeft className="w-4 h-4" /> နောက်သို့
         </Link>
-        <button onClick={handlePrint} className="bg-sky-900 hover:bg-sky-800 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition flex items-center gap-2">
-          <Printer className="w-4 h-4" /> Print / Save as PDF
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => handleDownload('jpeg')} className="bg-amber-100 text-amber-800 hover:bg-amber-200 px-3 py-2.5 rounded-xl font-bold text-xs shadow-sm transition flex items-center gap-1.5">
+            <Download className="w-4 h-4" /> JPEG
+          </button>
+          <button onClick={() => handleDownload('pdf')} className="bg-sky-100 text-sky-800 hover:bg-sky-200 px-3 py-2.5 rounded-xl font-bold text-xs shadow-sm transition flex items-center gap-1.5">
+            <Download className="w-4 h-4" /> PDF
+          </button>
+          <button onClick={handlePrint} className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-md transition flex items-center gap-2">
+            <Printer className="w-4 h-4" /> Print
+          </button>
+        </div>
       </div>
 
       {/* Printable Area */}
-      <div className="bg-white p-8 sm:p-12 rounded-3xl shadow-sm border border-slate-200 relative overflow-hidden print:shadow-none print:border-none print:p-0">
+      <div ref={receiptRef} className="bg-white p-8 sm:p-12 rounded-3xl shadow-sm border border-slate-200 relative overflow-hidden print:shadow-none print:border-none print:p-0">
         
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-5 pointer-events-none">
           <CheckCircle2 className="w-96 h-96 text-emerald-600" />
