@@ -212,9 +212,10 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">ကြေးအမျိုးအစား</label>
                   <select value={feeType} onChange={e => setFeeType(e.target.value)} className="w-full p-2.5 border rounded-xl text-sm bg-white">
+                    <option value="နှစ်စဉ်ကြေး (Annual Fee)">နှစ်စဉ်ကြေး (Annual Fee)</option>
                     <option value="အားကစားကြေး (Sports Fee)">အားကစားကြေး (Sports Fee)</option>
                     <option value="သင်တန်းကြေး (Training Fee)">သင်တန်းကြေး (Training Fee)</option>
-                    <option value="အခြားကြေး (Other Fee)">အခြေး/အခြားကြေး (Other Fee)</option>
+                    <option value="အခြားကြေး (Other Fee)">အခြားကြေး (Other Fee)</option>
                   </select>
                 </div>
                 <div>

@@ -8,9 +8,19 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v21.2',
+    version: 'v21.3',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'Finance Update: Annual Fee & Spelling Fix',
+    changes: [
+      { type: 'feat', text: 'ငွေစာရင်း ထည့်သွင်းရာတွင် နှစ်စဉ်ကြေး (Annual Fee) ကို Certificate/Voucher ထုတ်ပေးနိုင်ရန် ထည့်သွင်းပေးခြင်း။' },
+      { type: 'fix', text: '"အခြေး/အခြားကြေး" ဟု စာလုံးပေါင်းမှားနေခြင်းကို "အခြားကြေး (Other Fee)" ဟု ပြင်ဆင်ခြင်း။' }
+    ],
+  },
+  {
+    version: 'v21.2',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'UI Cleanup: Zone Badges in School Manager',
     changes: [
       { type: 'improve', text: 'ကျောင်းစီမံခန့်ခွဲမှု (School Manager) တွင် မြို့နယ်မသတ်မှတ်ထားသော ကျောင်းများအတွက် "မြို့နယ်မသတ်မှတ်" ဆိုသော စာသားများကို ဖယ်ရှားခြင်း။' },
