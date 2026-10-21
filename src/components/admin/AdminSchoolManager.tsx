@@ -258,6 +258,9 @@ export default function AdminSchoolManager({
                           <Link to={`/schools/${school.id}`} className="p-1.5 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-md transition" title="ကြည့်ရန်">
                             <Eye className="w-4 h-4" />
                           </Link>
+                          <button onClick={() => onCreateAccount(school)} className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition" title="ကျောင်းအကောင့် ဖန်တီးရန်">
+                            <UserPlus className="w-4 h-4" />
+                          </button>
                           <button onClick={() => onEdit(school)} className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-md transition" title="ပြင်ဆင်ရန်">
                             <Edit2 className="w-4 h-4" />
                           </button>

@@ -8,9 +8,18 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v22.0',
+    version: 'v22.1',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'Restore School Account Creation',
+    changes: [
+      { type: 'fix', text: 'ကျောင်းစီမံခန့်ခွဲမှု (School Manager) တွင် ကျောင်းအကောင့် (School Portal Account) ဖန်တီးပေးနိုင်သည့် ခလုတ် ပျောက်ဆုံးနေခြင်းကို ပြန်လည်ဖြည့်စွက်ခြင်း။' }
+    ],
+  },
+  {
+    version: 'v22.0',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'Global Academic Year & Voucher Formatting',
     changes: [
       { type: 'feat', text: 'ငွေစာရင်းတွင် ပညာသင်နှစ်ကို ဗဟိုမှ (Global) သတ်မှတ်နိုင်ပြီး Form များတွင် Default အဖြစ် အသုံးပြုနိုင်ခြင်း။' },
