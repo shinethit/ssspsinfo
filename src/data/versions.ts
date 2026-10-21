@@ -8,9 +8,20 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v20.0',
+    version: 'v21.0',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'Performance Optimization & Lazy Loading',
+    changes: [
+      { type: 'improve', text: 'App ၏ performance ကို မြှင့်တင်ရန် Lazy Loading (Code Splitting) စနစ် ထည့်သွင်းခြင်း' },
+      { type: 'fix', text: 'စာမျက်နှာများ ကူးပြောင်းရာတွင် ထစ်နေခြင်း (Lagging) ပြဿနာကို ဖြေရှင်းခြင်း' },
+      { type: 'fix', text: 'Service Worker Cache Version ကို v2 သို့ မြှင့်တင်ပြီး Cache အဟောင်းများကို ရှင်းလင်းခြင်း' }
+    ],
+  },
+  {
+    version: 'v20.0',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'Major PWA Overhaul (Custom Service Worker)',
     changes: [
       { type: 'fix', text: 'iOS နှင့် Windows တွင် ချိတ်ဆက်မှု ပြတ်တောက်ခြင်းကို ဖြေရှင်းရန် Workbox ကို ဖယ်ရှားပြီး Custom Service Worker သို့ ပြောင်းလဲခြင်း' },
