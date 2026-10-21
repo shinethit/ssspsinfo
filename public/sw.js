@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ssspsinfo-live-v1';
+const CACHE_NAME = 'ssspsinfo-live-v2';
 
 const PRECACHE_ASSETS = [
   '/',
