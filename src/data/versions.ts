@@ -8,9 +8,20 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v21.7',
+    version: 'v21.8',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
+    title: 'Ultimate Finance Sync & Receipt Fixes',
+    changes: [
+      { type: 'fix', text: 'နှစ်စဉ်ကြေး သွင်းထားသော ကျောင်းများ၏ အချက်အလက်များ ငွေစာရင်းတွင် ချက်ချင်း Sync ဖြစ်ပြီး ဖြတ်ပိုင်း (Printer) ခလုတ် ပေါ်လာစေရန် အပြည့်အဝ ပြင်ဆင်ခြင်း။' },
+      { type: 'feat', text: 'Receipt (ဖြတ်ပိုင်း) များကို PDF နှင့် JPEG အဖြစ် တိုက်ရိုက် ဒေါင်းလုဒ်ဆွဲနိုင်သည့် စနစ်ကို အသစ်တည်ဆောက်ခြင်း။' },
+      { type: 'improve', text: 'ငွေသွင်းမှတ်တမ်း တင်သည့်အခါ ရက်စွဲ (Payment Date) ကို မဖြစ်မနေ ထည့်သွင်းရန် ပြင်ဆင်ခြင်း။' }
+    ],
+  },
+  {
+    version: 'v21.7',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: false,
     title: 'Finance Manager Receipts Fix & Mandatory Dates',
     changes: [
       { type: 'fix', text: 'နှစ်စဉ်ကြေး (Annual Fee) သွင်းထားသော ကျောင်းများအတွက် ငွေစာရင်းတွင် Printer ပုံပေါ်လာစေရန် ပြင်ဆင်ခြင်း။' },

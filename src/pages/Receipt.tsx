@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -7,12 +7,12 @@ import { Printer, ArrowLeft, CheckCircle2, Loader2, Download } from 'lucide-reac
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { toast } from 'sonner';
-import { useRef } from 'react';
 
 export default function Receipt() {
   const { id } = useParams<{ id: string }>();
   const [transaction, setTransaction] = useState<TransactionRecord | null>(null);
   const [loading, setLoading] = useState(true);
+  const receiptRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchTransaction = async () => {
@@ -32,11 +32,12 @@ export default function Receipt() {
     fetchTransaction();
   }, [id]);
 
-  
-  const receiptRef = useRef<HTMLDivElement>(null);
+  const handlePrint = () => {
+    window.print();
+  };
 
   const handleDownload = async (format: 'pdf' | 'jpeg') => {
-    if (!receiptRef.current) return;
+    if (!receiptRef.current || !transaction) return;
     try {
       const canvas = await html2canvas(receiptRef.current, { scale: 2, useCORS: true });
       const imgData = canvas.toDataURL('image/jpeg', 1.0);
@@ -60,10 +61,6 @@ export default function Receipt() {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   if (loading) return <div className="p-10 text-center flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-sky-600" /></div>;
   
   if (!transaction) {
@@ -77,25 +74,23 @@ export default function Receipt() {
 
   return (
     <div className="max-w-3xl mx-auto p-4 sm:p-8 space-y-6 bg-slate-50 min-h-screen">
-      {/* Non-printable controls */}
-      <div className="flex items-center justify-between print:hidden">
+      <div className="flex flex-wrap items-center justify-between gap-4 print:hidden">
         <Link to="/admin?tab=finance" className="inline-flex items-center gap-2 text-sm font-bold text-sky-800 hover:text-sky-950">
           <ArrowLeft className="w-4 h-4" /> နောက်သို့
         </Link>
         <div className="flex items-center gap-2">
-          <button onClick={() => handleDownload('jpeg')} className="bg-amber-100 text-amber-800 hover:bg-amber-200 px-3 py-2.5 rounded-xl font-bold text-xs shadow-sm transition flex items-center gap-1.5">
+          <button onClick={() => handleDownload('jpeg')} className="bg-amber-100 text-amber-800 hover:bg-amber-200 px-3 py-2.5 rounded-xl font-bold text-xs shadow-sm transition flex items-center gap-1.5 cursor-pointer">
             <Download className="w-4 h-4" /> JPEG
           </button>
-          <button onClick={() => handleDownload('pdf')} className="bg-sky-100 text-sky-800 hover:bg-sky-200 px-3 py-2.5 rounded-xl font-bold text-xs shadow-sm transition flex items-center gap-1.5">
+          <button onClick={() => handleDownload('pdf')} className="bg-sky-100 text-sky-800 hover:bg-sky-200 px-3 py-2.5 rounded-xl font-bold text-xs shadow-sm transition flex items-center gap-1.5 cursor-pointer">
             <Download className="w-4 h-4" /> PDF
           </button>
-          <button onClick={handlePrint} className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-md transition flex items-center gap-2">
+          <button onClick={handlePrint} className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-md transition flex items-center gap-2 cursor-pointer">
             <Printer className="w-4 h-4" /> Print
           </button>
         </div>
       </div>
 
-      {/* Printable Area */}
       <div ref={receiptRef} className="bg-white p-8 sm:p-12 rounded-3xl shadow-sm border border-slate-200 relative overflow-hidden print:shadow-none print:border-none print:p-0">
         
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-5 pointer-events-none">
