@@ -8,6 +8,18 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
+    version: 'v23.0',
+    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
+    isLatest: true,
+    title: 'Ultimate Admin Layout & Account Center',
+    changes: [
+      { type: 'fix', text: 'Admin.tsx ၏ ကုဒ်များ ပျက်စီးနေခြင်းနှင့် Build Error တက်နေခြင်းကို အပြည့်အဝ ပြင်ဆင်ခြင်း။' },
+      { type: 'feat', text: 'Admin Area ကို ဘေးဘက် Sidebar (Menu) စနစ်သို့ ပြောင်းလဲပြီး ပိုမိုသပ်ရပ်စွာ အသုံးပြုနိုင်စေရန် ပြင်ဆင်ခြင်း။' },
+      { type: 'feat', text: 'Admin/Moderator နှင့် ကျောင်း(User) အကောင့်များကို တစ်နေရာတည်းတွင် စီမံခန့်ခွဲနိုင်သည့် Account Control Center အသစ် ထည့်သွင်းခြင်း။' },
+      { type: 'feat', text: 'Moderator များအတွက် ခွင့်ပြုချက်များကို Checkbox ဖြင့် သီးသန့်သတ်မှတ်ပေးနိုင်ခြင်း။' }
+    ],
+  },
+  {
     version: 'v22.8',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
     isLatest: true,
