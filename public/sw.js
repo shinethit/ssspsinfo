@@ -1,57 +1,18 @@
-const CACHE_NAME = 'ssspsinfo-live-v8';
-const PRECACHE_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.webmanifest',
-  '/icon.svg',
-  '/apple-touch-icon.png',
-  '/pwa-192x192.png',
-  '/pwa-512x512.png',
-  '/pwa-maskable-512x512.png'
-];
+const CACHE_NAME = 'ssspsinfo-live-v9';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_ASSETS).catch(() => {}))
-  );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(keys.map((k) => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });
 
-// Clean redirected responses before putting into cache or returning to browser
-function cleanResponse(response) {
-  if (!response || !response.redirected) return Promise.resolve(response);
-  return response.blob().then((bodyBlob) => {
-    return new Response(bodyBlob, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers
-    });
-  });
-}
-
-function fetchWithTimeout(target, timeoutMs = 3000) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('Timeout')), timeoutMs);
-    fetch(target, { redirect: 'follow' })
-      .then((res) => {
-        clearTimeout(timer);
-        resolve(res);
-      })
-      .catch((err) => {
-        clearTimeout(timer);
-        reject(err);
-      });
-  });
-}
-
+// Fetch event ကို Network First ပုံစံဖြင့်သာ လုပ်ဆောင်စေခြင်း (Redirect error လုံးဝမတက်စေရန်)
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
@@ -68,65 +29,20 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 1. Navigation Requests (e.g. /admin, /schools, /) -> Always use URL string so redirect mode is 'follow'
+  // Navigation requests (যেমন /admin, /schools) ကို Network မှသာ တိုက်ရိုက်ခေါ်ယူရန်
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetchWithTimeout(request.url)
-        .then((response) => cleanResponse(response))
-        .then((cleaned) => {
-          if (cleaned && cleaned.status === 200) {
-            const clone = cleaned.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', clone));
-          }
-          return cleaned;
-        })
-        .catch(() => {
-          return caches.match('/index.html').then((cached) => {
-            if (cached) return cleanResponse(cached);
-            return caches.match('/');
-          });
-        })
+      fetch(request).catch(() => caches.match('/index.html'))
     );
     return;
   }
 
-  // 2. JS, CSS, HTML Assets
-  const isAsset =
-    url.pathname.endsWith('.html') ||
-    url.pathname.endsWith('.js') ||
-    url.pathname.endsWith('.css') ||
-    url.pathname.startsWith('/assets/');
-
-  if (isAsset) {
-    event.respondWith(
-      fetchWithTimeout(request.url)
-        .then((response) => cleanResponse(response))
-        .then((cleaned) => {
-          if (cleaned && cleaned.status === 200) {
-            const clone = cleaned.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          }
-          return cleaned;
-        })
-        .catch(() => caches.match(request).then((cached) => cached || new Response('Network error', { status: 408 })))
-    );
-    return;
-  }
-
-  // 3. Other Static Files & Images
+  // ကျန်သည့် static files များအတွက်
   event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cleanResponse(cached);
-      return fetch(request.url, { redirect: 'follow' })
-        .then((response) => cleanResponse(response))
-        .then((cleaned) => {
-          if (cleaned && cleaned.status === 200) {
-            const clone = cleaned.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          }
-          return cleaned;
-        })
-        .catch(() => new Response('Offline', { status: 404 }));
-    })
+    fetch(request)
+      .then((response) => {
+        return response;
+      })
+      .catch(() => caches.match(request))
   );
 });
