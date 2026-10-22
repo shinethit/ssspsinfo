@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ssspsinfo-live-v9';
+const CACHE_NAME = 'ssspsinfo-live-v10';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -12,7 +12,6 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch event ကို Network First ပုံစံဖြင့်သာ လုပ်ဆောင်စေခြင်း (Redirect error လုံးဝမတက်စေရန်)
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
@@ -29,17 +28,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Navigation requests (যেমন /admin, /schools) ကို Network မှသာ တိုက်ရိုက်ခေါ်ယူရန်
+  // Navigation requests (ဥပမာ /admin, /schools စသည်ဖြင့် ဝင်ရောက်ခြင်း)
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => caches.match('/index.html'))
+      // redirect: 'follow' ကို သုံးပေးခြင်းဖြင့် redirected response error ကို ဖြေရှင်းပေးသည်
+      fetch(request, { redirect: 'follow' }).catch(() => caches.match('/index.html'))
     );
     return;
   }
 
   // ကျန်သည့် static files များအတွက်
   event.respondWith(
-    fetch(request)
+    fetch(request, { redirect: 'follow' })
       .then((response) => {
         return response;
       })
