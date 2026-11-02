@@ -8,9 +8,19 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v24.4',
+    version: 'v24.5',
     date: '၂၀၂၆ ခုနှစ်၊ နိုဝင်ဘာလ',
     isLatest: true,
+    title: 'v24.5 — Cloudflare Build တွင် Bun Version ပျက်နေခြင်းကို ပြင်ဆင်ခြင်း',
+    changes: [
+      { type: 'fix', text: 'Cloudflare build တွင် Bun version စာရင်း တောင်းရာမှ 403 error ဖြစ်ပြီး build ပျက်နေခြင်းကို ပြင်ဆင်ခြင်း — package.json တွင် Bun version 1.4.4 ကို တိတိကျကျ သတ်မှတ်လိုက်သဖြင့် Cloudflare က version စာရင်း ပြန်တောင်းစရာ မလိုတော့ခြင်း။' },
+      { type: 'improve', text: 'npm ဖြင့်ပဲ install လုပ်ဆဲဖြစ်သည် (package-lock.json အတိုင်း) — Bun version သတ်မှတ်ခြင်းက install လုပ်တဲ့ tool ကို မပြောင်းလဲပါ။' },
+    ],
+  },
+  {
+    version: 'v24.4',
+    date: '၂၀၂၆ ခုနှစ်၊ နိုဝင်ဘာလ',
+    isLatest: false,
     title: 'v24.4 — Main Chunk ခွဲခြားခြင်း၊ Tests ထည့်သွင်းခြင်းနှင့် ဖိုင်ရှင်းလင်းခြင်း',
     changes: [
       { type: 'improve', text: 'Main chunk (~998 kB) ကို ခွဲခြားခြင်း — React, Firestore နှင့် Firebase ကျန်အစိတ်အပိုင်းများကို သီးသန့် cached chunk များအဖြစ် ခွဲလိုက်သဖြင့် entry chunk က ~192 kB ပဲ ကျန်ပြီး app ပွင့်တာ ပိုမြန်သွားခြင်း။' },
