@@ -401,17 +401,10 @@ export interface AdminUser {
   id: string;
   email: string;
   name?: string;
-  role: 'super_admin' | 'admin' | 'editor' | 'sports_moderator' | 'news_editor';
-  permissions?: {
-    manage_schools?: boolean;
-    delete_schools?: boolean;
-    manage_announcements?: boolean;
-    manage_events?: boolean;
-    manage_sports?: boolean;
-    manage_documents?: boolean;
-    manage_finance?: boolean;
-    manage_users?: boolean;
-  };
+  // Only two roles: 'admin' (full access) and 'moderator'.
+  // Legacy roles are normalized in code and rules: super_admin → admin,
+  // editor / sports_moderator / news_editor → moderator.
+  role: 'admin' | 'moderator';
   phone?: string;
   phone2?: string;
   phones?: string[]; // Multiple contact numbers for administrator

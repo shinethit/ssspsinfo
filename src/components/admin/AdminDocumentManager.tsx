@@ -3,6 +3,7 @@ import { collection, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore'
 import { db } from '../../lib/firebase';
 import { DocumentItem } from '../../types';
 import { toast } from 'sonner';
+import { confirmDialog } from '../../components/ConfirmModal';
 import { Plus, Trash2, FolderOpen, Link as LinkIcon } from 'lucide-react';
 
 export default function AdminDocumentManager() {
@@ -48,7 +49,7 @@ export default function AdminDocumentManager() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('ဖျက်ရန် သေချာပါသလား?')) return;
+    if (!(await confirmDialog('ဖျက်ရန် သေချာပါသလား?'))) return;
     await deleteDoc(doc(db, 'documents', id));
     fetchDocs();
   };

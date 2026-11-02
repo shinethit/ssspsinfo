@@ -3,6 +3,7 @@ import { collection, getDocs, addDoc, query, orderBy, deleteDoc, doc, writeBatch
 import { db, auth } from '../../lib/firebase';
 import { School, TransactionRecord } from '../../types';
 import { toast } from 'sonner';
+import { confirmDialog } from '../../components/ConfirmModal';
 import { Coins, Plus, Search, Printer, Trash2, ArrowRightLeft, History, MapPin, Download, Settings, Save } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../../constants';
@@ -54,7 +55,7 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
   };
 
   const handleBatchUpdateYear = async () => {
-    if (!confirm(`နှစ်စဉ်ကြေး သွင်းပြီးထားသော ကျောင်းအားလုံးကို "${globalAcademicYear}" သို့ ပြောင်းလဲပါမည်။ သေချာပါသလား?`)) return;
+    if (!(await confirmDialog(`နှစ်စဉ်ကြေး သွင်းပြီးထားသော ကျောင်းအားလုံးကို "${globalAcademicYear}" သို့ ပြောင်းလဲပါမည်။ သေချာပါသလား?`))) return;
     setIsUpdatingBatch(true);
     try {
       const q = query(collection(db, 'schools'));
@@ -108,7 +109,7 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
   };
 
   const handleDeleteTransaction = async (id: string) => {
-    if (!confirm('ဤငွေသွင်းမှတ်တမ်းကို ဖျက်ရန် သေချာပါသလား?')) return;
+    if (!(await confirmDialog('ဤငွေသွင်းမှတ်တမ်းကို ဖျက်ရန် သေချာပါသလား?'))) return;
     try {
       await deleteDoc(doc(db, 'transactions', id));
       toast.success('မှတ်တမ်း ဖျက်ပြီးပါပြီ');
@@ -146,7 +147,7 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
       toast.info('ရွှေ့ပြောင်းရန် မှတ်တမ်းဟောင်း မရှိပါ');
       return;
     }
-    if (!confirm(`ကျောင်း (${schoolsWithOldPayments.length}) ခုတွင် ရှိသော ငွေသွင်းမှတ်တမ်းဟောင်းများကို ရွှေ့ပြောင်းပါမည်။ သေချာပါသလား?`)) return;
+    if (!(await confirmDialog(`ကျောင်း (${schoolsWithOldPayments.length}) ခုတွင် ရှိသော ငွေသွင်းမှတ်တမ်းဟောင်းများကို ရွှေ့ပြောင်းပါမည်။ သေချာပါသလား?`))) return;
 
     setIsMigrating(true);
     let migratedCount = 0;

@@ -4,6 +4,7 @@ import { School, STUDENT_RANGE_TIERS, getStudentRangeTier } from '../types';
 import { useData, getAnnouncementTimestamp } from '../context/DataContext';
 import { db } from '../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
+import { getAdminSession } from '../lib/adminAuth';
 import { Athlete, SportsEvent, TransactionRecord, EventItem } from '../types';
 import { getCategoryBadge } from './Announcements';
 import { getUnifiedSchoolLevels, isSchoolInLevel } from '../lib/schoolLevels';
@@ -50,23 +51,39 @@ export default function Dashboard() {
 
   // --- UNIFIED STATS STATE ---
   const [sportsStats, setSportsStats] = useState({ athletes: 0, events: 0 });
-  const [financeStats, setFinanceStats] = useState({ totalCollected: 0 });
+  // null = transactions total unavailable (guest, or the admin list failed).
+  // It must never silently become 0 — 0 would be shown as a real total.
+  const [financeStats, setFinanceStats] = useState<{ totalCollected: number | null }>({ totalCollected: null });
   const [eventStats, setEventStats] = useState(0);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [athletesSnap, sportsSnap, transSnap, eventsSnap] = await Promise.all([
+        // The transactions collection can only be LISTED by admins (Firestore
+        // rules), so guests must never attempt that read — a denied read used
+        // to silently collapse to 0 and show a wrong total as fact.
+        const isAdminUser = !!getAdminSession().isLoggedIn;
+        const [athletesSnap, sportsSnap, eventsSnap] = await Promise.all([
           getDocs(collection(db, 'athletes')).catch(() => ({ size: 0 })),
           getDocs(collection(db, 'sports_events')).catch(() => ({ size: 0 })),
-          getDocs(collection(db, 'transactions')).catch(() => ({ docs: [] })),
           getDocs(collection(db, 'events')).catch(() => ({ size: 0 }))
         ]);
-        
+
         setSportsStats({ athletes: athletesSnap.size, events: sportsSnap.size });
-        const total = transSnap.docs.reduce((sum: number, d: any) => sum + (Number(d.data().amount) || 0), 0);
-        setFinanceStats({ totalCollected: total });
         setEventStats(eventsSnap.size);
+
+        if (!isAdminUser) {
+          setFinanceStats({ totalCollected: null });
+          return;
+        }
+        try {
+          const transSnap = await getDocs(collection(db, 'transactions'));
+          const total = transSnap.docs.reduce((sum: number, d: any) => sum + (Number(d.data().amount) || 0), 0);
+          setFinanceStats({ totalCollected: total });
+        } catch {
+          // Admin, but the list failed (offline / rules): never show a fake 0.
+          setFinanceStats({ totalCollected: null });
+        }
       } catch (err) {
         console.error("Stats fetch error:", err);
       }
@@ -119,6 +136,18 @@ export default function Dashboard() {
   const totalCollectedAmount = useMemo(() => {
     return paidSchools.reduce((sum, s) => sum + getSchoolFee(s), 0);
   }, [paidSchools]);
+
+  // Finance figure shown in the overview card ("အခြားရရှိငွေ"):
+  // - Admins: the real sum of the transactions collection.
+  // - Guests: the transactions list is admin-only, so use the already-public
+  //   schools data instead (annual fees of paid schools).
+  // - Never a fabricated 0: while schools are still loading the figure is
+  //   unavailable, and the card shows '—' instead of 0.
+  const financeTotalForDisplay = useMemo(() => {
+    if (financeStats.totalCollected !== null) return financeStats.totalCollected;
+    if (loading) return null;
+    return totalCollectedAmount;
+  }, [financeStats.totalCollected, loading, totalCollectedAmount]);
 
   const totalExpectedAmount = useMemo(() => {
     return schools.reduce((sum, s) => sum + getSchoolFee(s), 0);
@@ -432,7 +461,7 @@ export default function Dashboard() {
           <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0"><Receipt className="w-5 h-5" /></div>
           <div>
             <p className="text-[11px] text-slate-500 font-semibold">အခြားရရှိငွေ (အားကစားကြေး စသဖြင့်)</p>
-            <p className="text-xl font-black text-amber-950 truncate">{formatMMK(financeStats.totalCollected)} <span className="text-xs font-normal text-slate-500">ကျပ်</span></p>
+            <p className="text-xl font-black text-amber-950 truncate">{financeTotalForDisplay !== null ? (<>{formatMMK(financeTotalForDisplay)} <span className="text-xs font-normal text-slate-500">ကျပ်</span></>) : '—'}</p>
           </div>
         </div>
 

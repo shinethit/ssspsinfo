@@ -5,6 +5,7 @@ import './index.css';
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then((registration) => {
+      (window as any).__swReg = registration;
       console.log('Custom SW registered: ', registration);
     }).catch((registrationError) => {
       console.log('SW registration failed: ', registrationError);

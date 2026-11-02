@@ -178,7 +178,7 @@ export default function Login() {
                           </button>
                         </div>
                         <p className="text-[10px] text-amber-700 font-medium">
-                          Fields: <code className="bg-amber-100 px-1 py-0.5 rounded font-mono">role: "admin"</code> (သို့မဟုတ် <code className="bg-amber-100 px-1 py-0.5 rounded font-mono">"super_admin"</code>)
+                          Fields: <code className="bg-amber-100 px-1 py-0.5 rounded font-mono">role: "admin"</code> (သို့မဟုတ် <code className="bg-amber-100 px-1 py-0.5 rounded font-mono">"moderator"</code>)
                         </p>
                       </div>
                     )}

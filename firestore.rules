@@ -2,30 +2,78 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function isSignedIn() { return request.auth != null; }
-    function isAdmin() { 
-      return isSignedIn() && (
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        (request.auth.token.email != null && exists(/databases/$(database)/documents/admins/$(request.auth.token.email)))
-      ); 
-    }
-    function adminDoc() { 
-      return exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+
+    // The caller's admins doc, resolved by uid first, then by email.
+    // Returns {} when signed out or when no admins doc exists.
+    // Legacy roles are normalized here: super_admin counts as admin,
+    // editor / sports_moderator / news_editor count as moderator.
+    function adminDoc() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
         ? get(/databases/$(database)/documents/admins/$(request.auth.uid)).data
-        : (request.auth.token.email != null && exists(/databases/$(database)/documents/admins/$(request.auth.token.email))
+        : (isSignedIn() && request.auth.token.email != null && exists(/databases/$(database)/documents/admins/$(request.auth.token.email))
             ? get(/databases/$(database)/documents/admins/$(request.auth.token.email)).data
             : {});
     }
-    function isSuperAdmin() { return isAdmin() && adminDoc().role == 'super_admin'; }
+
+    // Any admins doc (admin or moderator, including legacy roles).
+    function isModerator() {
+      return isSignedIn() && adminDoc().role in ['moderator', 'admin', 'super_admin', 'editor', 'sports_moderator', 'news_editor'];
+    }
+
+    // Admin only (legacy super_admin counts as admin).
+    function isAdmin() {
+      return isSignedIn() && adminDoc().role in ['admin', 'super_admin'];
+    }
 
     match /{document=**} { allow read, write: if false; }
 
-    match /schools/{id}        { allow read: if true; allow write: if isAdmin(); }
-    match /announcements/{id}  { allow read: if true; allow write: if isAdmin(); }
-    match /tickers/{id}        { allow read: if true; allow write: if isAdmin(); }
-    match /gallery/{id}        { allow read: if true; allow write: if isAdmin(); }
-    match /associations/{id}   { allow read: if true; allow write: if isAdmin(); }
-    match /school_levels/{id}  { allow read: if true; allow write: if isAdmin(); }
-    match /contacts/{id}       { allow read: if true; allow write: if isAdmin(); } // TODO: tighten to isSignedIn() if contacts contain private phone numbers
+    // Public content — anyone can read; moderators and admins can write
+    // Schools: the owning school may update only its own contact info
+    match /schools/{id} {
+      allow read: if true;
+      allow create, delete: if isModerator();
+      allow update: if isModerator() || (isSignedIn() && resource.data.authUid == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['schoolPhone', 'address', 'township', 'zone', 'studentCount', 'updatedAt']));
+    }
+    match /announcements/{id}  { allow read: if true; allow write: if isModerator(); }
+    match /tickers/{id}        { allow read: if true; allow write: if isModerator(); }
+    match /gallery/{id}        { allow read: if true; allow write: if isModerator(); }
+    match /associations/{id}   { allow read: if true; allow write: if isModerator(); }
+    match /school_levels/{id}  { allow read: if true; allow write: if isModerator(); }
+    match /events/{id} {
+      allow read: if true;
+      allow create: if isModerator() || (isSignedIn() && request.resource.data.schoolId is string && get(/databases/$(database)/documents/schools/$(request.resource.data.schoolId)).data.authUid == request.auth.uid);
+      allow update, delete: if isModerator() || (isSignedIn() && resource.data.schoolId is string && get(/databases/$(database)/documents/schools/$(resource.data.schoolId)).data.authUid == request.auth.uid);
+    }
+    match /sports_events/{id}  { allow read: if true; allow write: if isModerator(); }
+    match /sport_info/{id}     { allow read: if true; allow write: if isModerator(); }
+    match /athletes/{id}       { allow read: if true; allow write: if isModerator(); }
+    match /documents/{id}      { allow read: if true; allow write: if isModerator(); }
+
+    // Contacts are public — anyone can see them to get in touch; only moderators/admins can write
+    match /contacts/{id}       { allow read: if true; allow write: if isModerator(); }
+
+    // Transactions — public receipt links need single-doc reads; listing/writing is moderator/admin-only
+    match /transactions/{id} {
+      allow get: if true;
+      allow list, create, update, delete: if isModerator();
+    }
+
+    // Event registrations — anyone can register (validated), only moderators/admins manage
+    match /event_registrations/{id} {
+      allow create: if request.resource.data.eventId is string
+        && request.resource.data.schoolName is string
+        && request.resource.data.contactPhone is string
+        && request.resource.data.attendeesCount is number
+        && request.resource.data.attendeesCount >= 1
+        && request.resource.data.attendeesCount <= 200;
+      allow read, update, delete: if isModerator();
+    }
+
+    // School update requests — signed-in schools can submit, only moderators/admins manage
+    match /school_update_requests/{id} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if isModerator();
+    }
 
     match /messages/{id} {
       allow read: if isSignedIn();
@@ -35,7 +83,7 @@ service cloud.firestore {
         && request.resource.data.text.size() > 0
         && request.resource.data.text.size() <= 2000;
       allow update: if false;
-      allow delete: if isAdmin();
+      allow delete: if isModerator();
     }
 
     match /audit_logs/{id} {
@@ -45,12 +93,13 @@ service cloud.firestore {
     }
 
     match /admins/{id} {
+      // Read unchanged: self, or any moderator/admin (was isAdmin() when that meant any admins doc)
       allow read: if isSignedIn() && (
-        request.auth.uid == id || 
+        request.auth.uid == id ||
         (request.auth.token.email != null && request.auth.token.email == id) ||
-        isAdmin()
+        isModerator()
       );
-      allow write: if isSuperAdmin();
+      allow write: if isAdmin();
     }
   }
 }

@@ -19,11 +19,14 @@ import {
   Award,
   Ticket,
   Calendar,
+  Images,
+  HelpCircle,
 } from 'lucide-react';
 import NewsTickerBar from './NewsTickerBar';
 import GlobalSearch from './GlobalSearch';
 import { CURRENT_VERSION } from '../constants';
 import { OfflineIndicator } from './OfflineIndicator';
+import { ConfirmModalHost } from './ConfirmModal';
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -39,9 +42,11 @@ export default function Layout() {
     { to: '/sports', label: 'အားကစား', labelEn: 'Sports', icon: Trophy },
     { to: '/medals', label: 'ဆုတံဆိပ်ဇယား', labelEn: 'Medal Tally', icon: Award },
     { to: '/documents', label: 'စာရွက်စာတမ်းများ', labelEn: 'Documents', icon: FolderOpen },
+    { to: '/gallery', label: 'ဓာတ်ပုံများ', labelEn: 'Gallery', icon: Images },
     { to: '/associations', label: 'အသင်းများ', labelEn: 'Associations', icon: Building2 },
     { to: '/contacts', label: 'အသင်းဝင်ကျောင်းများ', labelEn: 'Member Schools', icon: Users },
     { to: '/chat', label: 'Chat ဆွေးနွေးခန်း', labelEn: 'Chat Room', icon: MessageSquare },
+    { to: '/help', label: 'အသုံးပြုနည်း', labelEn: 'How to Use', icon: HelpCircle },
   ];
 
   const utilityLinks = [
@@ -292,6 +297,9 @@ export default function Layout() {
 
       {/* Offline Connectivity State Indicator */}
       <OfflineIndicator />
+
+      {/* In-app confirmation dialog (replaces native confirm()) */}
+      <ConfirmModalHost />
 
       <Toaster
         position="top-right"

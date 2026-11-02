@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, addDoc, query, onSnapshot, orderBy, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, query, onSnapshot, orderBy, limit, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { MessageSquare, Send, UserCircle, ArrowLeft } from 'lucide-react';
@@ -13,9 +13,9 @@ export default function Chat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const q = query(collection(db, 'messages'), orderBy('createdAt', 'asc'));
+    const q = query(collection(db, 'messages'), orderBy('createdAt', 'desc'), limit(100));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse());
     });
     return unsubscribe;
   }, []);

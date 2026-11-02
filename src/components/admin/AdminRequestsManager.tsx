@@ -3,6 +3,7 @@ import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firesto
 import { db } from '../../lib/firebase';
 import { SchoolUpdateRequest } from '../../types';
 import { toast } from 'sonner';
+import { confirmDialog } from '../../components/ConfirmModal';
 import { CheckCircle2, XCircle, Clock, FileText, Check, X, MapPin } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../../constants';
@@ -31,7 +32,7 @@ export default function AdminRequestsManager() {
   useEffect(() => { fetchRequests(); }, []);
 
   const handleApprove = async (req: SchoolUpdateRequest) => {
-    if (!confirm('ဤပြင်ဆင်ချက်များကို အတည်ပြုပြီး ကျောင်းအချက်အလက်သို့ ထည့်သွင်းရန် သေချာပါသလား?')) return;
+    if (!(await confirmDialog('ဤပြင်ဆင်ချက်များကို အတည်ပြုပြီး ကျောင်းအချက်အလက်သို့ ထည့်သွင်းရန် သေချာပါသလား?'))) return;
     
     try {
       // Build the update payload
@@ -54,7 +55,7 @@ export default function AdminRequestsManager() {
   };
 
   const handleReject = async (req: SchoolUpdateRequest) => {
-    if (!confirm('ဤတောင်းဆိုချက်ကို ပယ်ဖျက်ရန် သေချာပါသလား?')) return;
+    if (!(await confirmDialog('ဤတောင်းဆိုချက်ကို ပယ်ဖျက်ရန် သေချာပါသလား?'))) return;
     try {
       await updateDoc(doc(db, 'school_update_requests', req.id), { status: 'rejected' });
       toast.success('တောင်းဆိုချက်ကို ပယ်ဖျက်လိုက်ပါပြီ');
@@ -65,7 +66,7 @@ export default function AdminRequestsManager() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('မှတ်တမ်းကို ဖျက်ရန် သေချာပါသလား?')) return;
+    if (!(await confirmDialog('မှတ်တမ်းကို ဖျက်ရန် သေချာပါသလား?'))) return;
     await deleteDoc(doc(db, 'school_update_requests', id));
     fetchRequests();
   };

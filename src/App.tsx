@@ -19,8 +19,10 @@ const SchoolDetail = lazy(() => import('./pages/SchoolDetail'));
 const Associations = lazy(() => import('./pages/Associations'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const VersionHistory = lazy(() => import('./pages/VersionHistory'));
+const Help = lazy(() => import('./pages/Help'));
 const Sports = lazy(() => import('./pages/Sports'));
 const Documents = lazy(() => import('./pages/Documents'));
+const Gallery = lazy(() => import('./pages/Gallery'));
 const Events = lazy(() => import('./pages/Events'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage'));
 const Receipt = lazy(() => import('./pages/Receipt'));
@@ -51,6 +53,7 @@ export default function App() {
               <Route path="sports" element={<Sports />} />
               <Route path="medals" element={<MedalTally />} />
               <Route path="documents" element={<Documents />} />
+              <Route path="gallery" element={<Gallery />} />
               <Route path="events" element={<Events />} />
               <Route path="calendar" element={<CalendarPage />} />
               <Route path="receipt/:id" element={<Receipt />} />
@@ -62,6 +65,7 @@ export default function App() {
               <Route path="schools/:id" element={<SchoolDetail />} />
               <Route path="chat" element={<Chat />} />
               <Route path="versions" element={<VersionHistory />} />
+              <Route path="help" element={<Help />} />
               <Route path="login" element={<Login />} />
               <Route element={<ProtectedRoute />}>
                 <Route path="admin" element={<Admin />} />

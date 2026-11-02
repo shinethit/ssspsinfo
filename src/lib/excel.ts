@@ -211,6 +211,8 @@ export const normalizeSchoolRow = (row: Record<string, any>) => {
 
       schoolNote: cleanStr(row['schoolNote'] || row['ကျောင်းဘက်မှ မှတ်ချက်'] || ''),
       note: cleanStr(row['note'] || row['မှတ်စုတို'] || row['မှတ်ချက်'] || ''),
+      otherContacts: [],
+      feePaidDate: cleanStr(row['feePaidDate'] ?? row['ကြေးပေးသွင်းသည့်ရက်'] ?? ''),
     };
   };
 

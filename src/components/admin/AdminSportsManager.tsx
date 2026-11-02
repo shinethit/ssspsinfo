@@ -3,6 +3,7 @@ import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, getDoc } from '
 import { db } from '../../lib/firebase';
 import { SportsEvent, SportsMatchResult, School, Athlete } from '../../types';
 import { toast } from 'sonner';
+import { confirmDialog } from '../../components/ConfirmModal';
 import { Plus, Trash2, PlusCircle, Upload, Download, AlertCircle, MapPin } from 'lucide-react';
 import { DEFAULT_SPORTS_TYPES } from '../../data/sports';
 import AdminSportInfoManager from './AdminSportInfoManager';
@@ -83,7 +84,7 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
     );
 
     if (isDuplicate) {
-      if (!confirm('ဤအသင်း (သို့မဟုတ်) အားကစားသမားသည် ဤပွဲစဉ်တွင် ပါဝင်ပြီးသား ဖြစ်နေပါသည်။ ထပ်မံထည့်ရန် သေချာပါသလား?')) return;
+      if (!(await confirmDialog('ဤအသင်း (သို့မဟုတ်) အားကစားသမားသည် ဤပွဲစဉ်တွင် ပါဝင်ပြီးသား ဖြစ်နေပါသည်။ ထပ်မံထည့်ရန် သေချာပါသလား?'))) return;
     }
 
     const newMatch: SportsMatchResult = {
@@ -171,7 +172,7 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
                       <h4 className="font-bold text-sm text-slate-900">{ev.title}</h4>
                       <div className="text-[10px] text-slate-500 mt-1">{ev.startDate} • {ev.location}</div>
                     </div>
-                    <button onClick={(e) => { e.stopPropagation(); if(confirm('ဖျက်ရန် သေချာပါသလား?')) { deleteDoc(doc(db, 'sports_events', ev.id)).then(() => fetchEvents()); } }} className="text-rose-500 p-1 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={async (e) => { e.stopPropagation(); if (await confirmDialog('ဖျက်ရန် သေချာပါသလား?')) { deleteDoc(doc(db, 'sports_events', ev.id)).then(() => fetchEvents()); } }} className="text-rose-500 p-1 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 ))}
               </div>

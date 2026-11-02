@@ -16,7 +16,10 @@ export default function Receipt() {
 
   useEffect(() => {
     const fetchTransaction = async () => {
-      if (!id) return;
+      if (!id) {
+        setLoading(false);
+        return;
+      }
       try {
         const docRef = doc(db, 'transactions', id);
         const docSnap = await getDoc(docRef);
@@ -32,7 +35,19 @@ export default function Receipt() {
     fetchTransaction();
   }, [id]);
 
-  
+  if (loading) return <div className="p-10 text-center flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-sky-600" /></div>;
+
+  if (!transaction) {
+    return (
+      <div className="p-10 text-center space-y-4">
+        <p className="text-slate-900 font-bold text-lg">ဖြတ်ပိုင်း မတွေ့ပါ</p>
+        <p className="text-slate-500">ငွေလက်ခံဖြတ်ပိုင်း အချက်အလက် ရှာမတွေ့ပါ။</p>
+        <Link to="/" className="text-sky-700 font-bold hover:underline">← ပင်မစာမျက်နှာသို့ ပြန်သွားရန်</Link>
+      </div>
+    );
+  }
+
+  // transaction is guaranteed to exist from here on
   const displayVoucherNo = transaction.voucherNo || `SSSPSFV-${transaction.paidDate.replace(/-/g, '')}-${transaction.id.substring(0, 4).toUpperCase()}`;
 
   const handlePrint = () => {
@@ -63,17 +78,6 @@ export default function Receipt() {
       toast.error('ဖိုင်ထုတ်ယူရာတွင် အမှားဖြစ်ပွားပါသည်');
     }
   };
-
-  if (loading) return <div className="p-10 text-center flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-sky-600" /></div>;
-  
-  if (!transaction) {
-    return (
-      <div className="p-10 text-center space-y-4">
-        <p className="text-slate-500">ငွေလက်ခံဖြတ်ပိုင်း အချက်အလက် ရှာမတွေ့ပါ။</p>
-        <Link to="/admin?tab=finance" className="text-sky-700 font-bold hover:underline">← နောက်သို့</Link>
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-3xl mx-auto p-4 sm:p-8 space-y-6 bg-slate-50 min-h-screen">

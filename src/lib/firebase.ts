@@ -10,13 +10,15 @@ import {
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
+// Firebase config: prefer VITE_FIREBASE_* env vars, fall back to the
+// built-in project values when an env var is missing.
 export const firebaseConfig = {
-  apiKey: "AIzaSyBfH74OIc-8mJIPTjjFhD7JDwkMWBWcC_E",
-  authDomain: "southernshanstatepsinfo.firebaseapp.com",
-  projectId: "southernshanstatepsinfo",
-  storageBucket: "southernshanstatepsinfo.firebasestorage.app",
-  messagingSenderId: "474970491001",
-  appId: "1:474970491001:web:4bb740401f9e9fb73aaca8"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyBfH74OIc-8mJIPTjjFhD7JDwkMWBWcC_E",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "southernshanstatepsinfo.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "southernshanstatepsinfo",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "southernshanstatepsinfo.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "474970491001",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:474970491001:web:4bb740401f9e9fb73aaca8"
 };
 
 export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();

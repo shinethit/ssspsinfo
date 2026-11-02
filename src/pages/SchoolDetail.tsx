@@ -6,6 +6,7 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { School } from '../types';
 import { useData } from '../context/DataContext';
 import { toast } from 'sonner';
+import { confirmDialog } from '../components/ConfirmModal';
 import { ArrowLeft, Phone, Send, School as SchoolIcon, CheckCircle2, XCircle, Edit2, Trash2, MapPin } from 'lucide-react';
 import { getAdminSession } from '../lib/adminAuth';
 import { getCategorizedSchoolPhones } from '../lib/phoneUtils';
@@ -51,7 +52,7 @@ export default function SchoolDetail() {
 
   const handleDeleteSchool = async () => {
     if (!school) return;
-    if (!confirm(`"${school.name}" ၏ အချက်အလက်များကို အပြီးပိုင် ဖျက်ရန် သေချာပါသလား?`)) return;
+    if (!(await confirmDialog(`"${school.name}" ၏ အချက်အလက်များကို အပြီးပိုင် ဖျက်ရန် သေချာပါသလား?`))) return;
     try {
       await deleteDoc(doc(db, 'schools', school.id));
       syncData(false);

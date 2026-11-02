@@ -3,6 +3,7 @@ import { collection, getDocs, addDoc, deleteDoc, doc, writeBatch } from 'firebas
 import { db, cleanFirestoreData } from '../../lib/firebase';
 import { Athlete, School } from '../../types';
 import { toast } from 'sonner';
+import { confirmDialog } from '../../components/ConfirmModal';
 import { Plus, Trash2, Upload, Download, User } from 'lucide-react';
 import { downloadAthleteTemplate, parseAthleteExcel } from '../../lib/athleteExcel';
 
@@ -105,7 +106,7 @@ export default function AdminAthleteManager({ activeSport, schools }: { activeSp
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('ဤအားကစားသမားကို ဖျက်ရန် သေချာပါသလား?')) return;
+    if (!(await confirmDialog('ဤအားကစားသမားကို ဖျက်ရန် သေချာပါသလား?'))) return;
     await deleteDoc(doc(db, 'athletes', id));
     fetchAthletes();
   };

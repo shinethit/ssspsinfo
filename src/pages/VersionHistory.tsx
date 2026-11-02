@@ -69,7 +69,7 @@ export default function VersionHistory() {
           <article
             key={item.version}
             className={`bg-white rounded-2xl border p-6 sm:p-8 shadow-xs transition ${
-              item.isLatest
+              idx === 0
                 ? 'border-neutral-900 ring-2 ring-neutral-900/15 shadow-md'
                 : 'border-slate-200'
             }`}
@@ -80,7 +80,7 @@ export default function VersionHistory() {
                 <span className="font-mono text-base sm:text-lg font-black text-sky-950 bg-slate-100 px-3 py-1 rounded-xl border border-slate-200">
                   {item.version}
                 </span>
-                {item.isLatest && (
+                {idx === 0 && (
                   <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-sky-900 text-white shadow-xs">
                     <CheckCircle2 className="w-3.5 h-3.5 text-sky-300" /> လက်ရှိဗားရှင်း (Latest Version)
                   </span>

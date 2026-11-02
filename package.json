@@ -1,14 +1,15 @@
 {
-  "name": "react-example",
+  "name": "ssspsinfo",
   "private": true,
-  "version": "0.0.0",
+  "version": "24.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -47,6 +48,7 @@
     "typescript": "^7.0.2",
     "typescript-eslint": "^8.71.2",
     "vite-plugin-checker": "^0.14.5",
-    "vite-plugin-pwa": "^2.0.0"
+    "vite-plugin-pwa": "^2.0.0",
+    "vitest": "^5.0.5"
   }
 }

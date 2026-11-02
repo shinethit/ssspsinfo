@@ -8,9 +8,72 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
+    version: 'v24.4',
+    date: '၂၀၂၆ ခုနှစ်၊ နိုဝင်ဘာလ',
+    isLatest: true,
+    title: 'v24.4 — Main Chunk ခွဲခြားခြင်း၊ Tests ထည့်သွင်းခြင်းနှင့် ဖိုင်ရှင်းလင်းခြင်း',
+    changes: [
+      { type: 'improve', text: 'Main chunk (~998 kB) ကို ခွဲခြားခြင်း — React, Firestore နှင့် Firebase ကျန်အစိတ်အပိုင်းများကို သီးသန့် cached chunk များအဖြစ် ခွဲလိုက်သဖြင့် entry chunk က ~192 kB ပဲ ကျန်ပြီး app ပွင့်တာ ပိုမြန်သွားခြင်း။' },
+      { type: 'feat', text: 'Tests ထည့်သွင်းခြင်း (Vitest) — role စည်းမျဉ်းများ (ဘယ် role က ဘယ် tab ဖွင့်လို့ရလဲ) နှင့် Version History မှန်ကန်မှုကို အလိုအလျောက် စစ်ဆေးခြင်း။ `npm test` ဖြင့် အချိန်မရွေး run နိုင်ခြင်း။' },
+      { type: 'improve', text: 'ဖိုင်ရှင်းလင်းခြင်း — အဟောင်း fix script များနှင့် *.bak backup ဖိုင်များကို ဖျက်ပစ်ခြင်း။' },
+    ],
+  },
+  {
+    version: 'v24.3',
+    date: '၂၀၂၆ ခုနှစ်၊ နိုဝင်ဘာလ',
+    isLatest: false,
+    title: 'v24.3 — အသုံးပြုသူ အမျိုးအစား ၄ မျိုးတည်း (Admin / Moderator / User / Guest)',
+    changes: [
+      { type: 'improve', text: 'Super Admin ကို ဖျက်သိမ်းခြင်း — အသုံးပြုသူ အမျိုးအစားကို Admin, Moderator, User (ကျောင်းအကောင့်), Guest (အကောင့်မရှိသူ) ၄ မျိုးတည်းသာ ထားခြင်း။ အဟောင်း super_admin အကောင့်များက Admin ဖြစ်သွားပြီး၊ editor / sports_moderator / news_editor များက Moderator ဖြစ်သွားခြင်း။' },
+      { type: 'fix', text: 'Firestore Rules တွင် role အလိုက် တင်းကျပ်ခြင်း — Moderator က Admin အကောင့် ခန့်ခြင်း၊ Backup၊ Audit logs တို့ကို လုပ်လို့ မရတော့ခြင်း (အရင်က app ထဲမှာပဲ ခွဲထားပြီး Rules က ခွဲမထားပါ)။ Admin အကောင့် ခန့်ခြင်းနှင့် Backup ကို Admin ပဲ လုပ်နိုင်ခြင်း။' },
+      { type: 'improve', text: 'အသုံးပြုနည်းစာမျက်နှာတွင် ၄ မျိုးတည်း role များကို ရှင်းပြထားခြင်း — ဘယ်သူက ဘာလုပ်နိုင်လဲ။' },
+    ],
+  },
+  {
+    version: 'v24.2',
+    date: '၂၀၂၆ ခုနှစ်၊ နိုဝင်ဘာလ',
+    isLatest: false,
+    title: 'v24.2 — Admin စာမျက်နှာ ခွဲခြားခြင်းနှင့် အသုံးပြုနည်းစာမျက်နှာ',
+    changes: [
+      { type: 'improve', text: 'Admin စာမျက်နှာ (၁၂၀၄ ကြောင်း) ကို Dashboard, ကြေညာချက်, အသင်း, Levels, Tickers, Accounts, Audit logs, Backup ဆိုတဲ့ သီးသန့် file တွေအဖြစ် ခွဲခြားခြင်း — Admin.tsx က ၄၄၃ ကြောင်းပဲ ကျန်ပြီး ပြင်ရတာ ပိုလွယ်သွားခြင်း။ မျက်နှာပြင်နှင့် အလုပ်လုပ်ပုံ ဘာမှ မပြောင်းလဲပါ။' },
+      { type: 'feat', text: 'အသုံးပြုနည်း (/help) စာမျက်နှာအသစ် — app က ဘာလဲ၊ login မလိုဘဲ ဘာတွေ ကြည့်လို့ရလဲ၊ ကျောင်းက School Portal မှာ ဘာပြင်လို့ရလဲ၊ Admin က ဘာလုပ်လဲ၊ မေးလေ့ရှိတာတွေ မြန်မာလို ရှင်းပြထားခြင်း။ Menu ထဲမှာ link ပါဝင်သည်။' },
+    ],
+  },
+  {
+    version: 'v24.1',
+    date: '၂၀၂၆ ခုနှစ်၊ နိုဝင်ဘာလ',
+    isLatest: false,
+    title: 'v24.1 — လူတိုင်းမြင်ရမည့် Data နှင့် School Portal ပြင်ဆင်မှုများ',
+    changes: [
+      { type: 'fix', text: 'Contacts၊ ကျောင်းစာရင်း၊ ကြေညာချက်များနှင့် မြင်သင့်သော Data များကို login မဝင်ဘဲ လူတိုင်း မြင်နိုင်အောင် ပြန်လည်ဖွင့်ပေးခြင်း — ပြင်ဆင်လိုသူများသာ Account ဖြင့် login ဝင်ရန် လိုအပ်ခြင်း။' },
+      { type: 'feat', text: 'ကျောင်းကိုယ်တိုင် မိမိကျောင်း၏ ဆက်သွယ်ရန် အချက်အလက် (ဖုန်း၊ လိပ်စာ၊ မြို့နယ်၊ ဇုန်၊ ကျောင်းသားဦးရေ) ကို School Portal မှ ပြင်ဆင်သိမ်းဆည်းနိုင်စေခြင်း — ကျေးငွေ၊ အခြေအနေစသည့် အခြား field များကို ပြင်၍မရစေရန် Rules ဖြင့် ကန့်သတ်ထားခြင်း။' },
+      { type: 'feat', text: 'ကျောင်းကိုယ်တိုင် မိမိတို့၏ လှုပ်ရှားမှု/အခမ်းအနား (Events) များကို တင်နိုင်စေခြင်း — မိမိကျောင်း၏ ပွဲများကိုသာ စီမံခန့်ခွဲနိုင်စေရန် Rules ဖြင့် ကန့်သတ်ထားခြင်း။' },
+      { type: 'improve', text: 'ဖျက်ခြင်း/အတည်ပြုခြင်းများတွင် browser ၏ native confirm() အစား သပ်ရပ်သော Modal Dialog ကို အသုံးပြုစေခြင်း။' },
+      { type: 'improve', text: 'အသင်း၏ အတွင်းပိုင်းအသုံးပြုမှုအတွက်သာ ဖြစ်သဖြင့် Search Engine များ ရှာမတွေ့စေရန် noindex, nofollow ထည့်သွင်းခြင်း။' },
+      { type: 'fix', text: 'Dashboard ငွေစာရင်း ကိန်းဂဏန်းများ Guest အနေဖြင့် ကြည့်သည့်အခါ တိတ်တိတ်လေး 0 ပြနေခြင်းကို ပြင်ဆင်ခြင်း — data ဆွဲ၍မရပါက အမှားအခြေအနေကို ရှင်းလင်းစွာ ပြသစေခြင်း။' }
+    ],
+  },
+  {
+    version: 'v24.0',
+    date: '၂၀၂၆ ခုနှစ်၊ နိုဝင်ဘာလ',
+    isLatest: false,
+    title: 'v24.0 — အရေးကြီး ပြင်ဆင်မှုများ (Rules, Receipt, Permissions, Documents, Gallery, PWA)',
+    changes: [
+      { type: 'fix', text: 'Firestore Rules တွင် ပျောက်နေသော collection ၇ ခု (sports_events, athletes, transactions, events, event_registrations, documents, school_update_requests) အတွက် ခွင့်ပြုချက်များ ထည့်သွင်းခြင်း — အားကစား၊ ပွဲ၊ ငွေစာရင်း၊ စာရွက်စာတမ်း စနစ်များ ပြန်လည် အလုပ်လုပ်နိုင်စေခြင်း။' },
+      { type: 'fix', text: 'ဖုန်းနံပါတ်ပါသော contacts data ကို login ဝင်ထားသူများသာ ဖတ်ရှုနိုင်စေရန် တင်းကျပ်ခြင်း။' },
+      { type: 'fix', text: 'Receipt (ဖြတ်ပိုင်း) စာမျက်နှာ ဖွင့်တာနှင့် crash ဖြစ်နေခြင်းကို ပြင်ဆင်ခြင်း — data မရသေးချိန် spinner၊ မတွေ့ပါက "ဖြတ်ပိုင်း မတွေ့ပါ" ပြသခြင်း။' },
+      { type: 'fix', text: 'Admin/Moderator ခွင့်ပြုချက်များ (permissions) ကို AdminSession တွင် တကယ်ထည့်သွင်းခြင်း — v23 တွင် UI တွင်သာ ရှိပြီး အလုပ်မလုပ်ခဲ့သော granular permissions ပြန်လည် အလုပ်လုပ်စေခြင်း။' },
+      { type: 'feat', text: 'Documents စာမျက်နှာကို အစစ်အမှန် Firestore data နှင့် ချိတ်ဆက်ခြင်း — အတု (mock) စာရင်း ၃ ခု ဖြုတ်ပြီး Admin တင်ထားသော စာရွက်စာတမ်းများ အမှန်ပြသခြင်း၊ Download ခလုတ် အလုပ်လုပ်စေခြင်း။' },
+      { type: 'feat', text: 'Gallery စာမျက်နှာကို အစစ်အမှန် ပြခန်းအဖြစ် ဖော်ဆောင်ခြင်း — ဓာတ်ပုံများ ကြည့်ရှုနိုင်ပြီး Menu တွင် ထည့်သွင်းခြင်း။' },
+      { type: 'fix', text: 'PWA / Service Worker ကို တစ်မျိုးတည်းသော စနစ်ဖြင့် ပြန်လည်ရေးသားခြင်း — cache အမှန်သိမ်းခြင်း၊ update စစ်ဆေးခြင်း အလုပ်လုပ်စေခြင်း။' },
+      { type: 'improve', text: 'Firebase config ကို VITE_FIREBASE_* env vars မှ ဖတ်ယူစေခြင်း (မရှိပါက မူလတန်ဖိုးများ သုံးခြင်း)။' },
+      { type: 'improve', text: 'Version History တွင် "Latest" badge ကို ပထမဆုံး entry (index 0) ကို အခြေခံ၍ ပြသစေခြင်း — ဗားရှင်းများစွာ Latest ဖြစ်နေသော အမှားကို ဖြေရှင်းခြင်း။' }
+    ],
+  },
+  {
     version: 'v23.0',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
-    isLatest: true,
+    isLatest: false,
     title: 'Ultimate Admin Layout & Account Center',
     changes: [
       { type: 'fix', text: 'Admin.tsx ၏ ကုဒ်များ ပျက်စီးနေခြင်းနှင့် Build Error တက်နေခြင်းကို အပြည့်အဝ ပြင်ဆင်ခြင်း။' },
@@ -22,7 +85,7 @@ export const VERSIONS: VersionItem[] = [
   {
     version: 'v22.8',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
-    isLatest: true,
+    isLatest: false,
     title: 'Ultimate Account Control Center & SW Fixes',
     changes: [
       { type: 'fix', text: 'Service Worker တွင် chrome-extension နှင့် Redirect ဖြစ်နေသော Response များကြောင့် Error တက်နေခြင်းကို ပြင်ဆင်ခြင်း။' },
@@ -45,7 +108,7 @@ export const VERSIONS: VersionItem[] = [
   {
     version: 'v22.5',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
-    isLatest: true,
+    isLatest: false,
     title: 'Immutable Finance Records & Running Voucher No',
     changes: [
       { type: 'feat', text: 'Voucher / Receipt နံပါတ်များကို နေ့စဉ် Reset ဖြစ်သည့် Running Number (SSSPSFV-YYYYMMDD-0001) ဖြင့် စနစ်တကျ ထုတ်ပေးခြင်း။' },
@@ -56,7 +119,7 @@ export const VERSIONS: VersionItem[] = [
   {
     version: 'v22.1',
     date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
-    isLatest: true,
+    isLatest: false,
     title: 'Restore School Account Creation',
     changes: [
       { type: 'fix', text: 'ကျောင်းစီမံခန့်ခွဲမှု (School Manager) တွင် ကျောင်းအကောင့် (School Portal Account) ဖန်တီးပေးနိုင်သည့် ခလုတ် ပျောက်ဆုံးနေခြင်းကို ပြန်လည်ဖြည့်စွက်ခြင်း။' }
@@ -206,17 +269,6 @@ export const VERSIONS: VersionItem[] = [
     title: 'Zombie Service Worker Killer (Force Reset)',
     changes: [
       { type: 'fix', text: 'iOS နှင့် Windows တွင် ပိတ်မိနေသော Service Worker များကို ကိုယ်တိုင် ဖျက်ဆီးပစ်သည့် Self-Destructing SW စနစ် ထည့်သွင်းခြင်း' }
-    ],
-  },
-  {
-    version: 'v19.0',
-    date: '၂၀၂၆ ခုနှစ်၊ အောက်တိုဘာလ',
-    isLatest: false,
-    title: 'Emergency PWA Core Fix & iOS/Windows Compatibility',
-    changes: [
-      { type: 'fix', text: 'iOS နှင့် Windows တွင် Error တက်စေသော _headers ဖိုင်အား လုံးဝ ဖယ်ရှားခြင်း' },
-      { type: 'fix', text: 'main.tsx ရှိ Force Reload (Self-healing) ကုဒ်များအား ဖယ်ရှားပြီး မူလ Vite PWA AutoUpdate စနစ်အတိုင်း ပြန်လည်ထားရှိခြင်း' },
-      { type: 'improve', text: 'Version များကို စနစ်တကျ ပြန်လည်သတ်မှတ်ပြီး တည်ငြိမ်မှုရှိစေရန် ပြင်ဆင်ခြင်း' }
     ],
   },
   {

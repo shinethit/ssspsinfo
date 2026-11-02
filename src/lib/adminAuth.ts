@@ -8,11 +8,15 @@ import {
   User,
 } from 'firebase/auth';
 import { db, auth } from './firebase';
+import { normalizeRole, type AdminRole } from './roles';
+
+export { normalizeRole };
+export type { AdminRole };
 
 export interface AdminSession {
   isLoggedIn: boolean;
   email: string;
-  role: 'super_admin' | 'admin' | 'editor' | 'sports_moderator' | 'news_editor';
+  role: AdminRole;
   uid?: string;
   name?: string;
 }
@@ -21,14 +25,14 @@ export interface AdminSession {
 let cachedSession: AdminSession = {
   isLoggedIn: false,
   email: '',
-  role: 'admin',
+  role: 'moderator',
 };
 
 // Keep in-memory cache synchronized with Firebase Auth & Firestore admins/{uid}
 if (typeof window !== 'undefined') {
   onAuthStateChanged(auth, async (user: User | null) => {
     if (!user) {
-      cachedSession = { isLoggedIn: false, email: '', role: 'admin' };
+      cachedSession = { isLoggedIn: false, email: '', role: 'moderator' };
       window.dispatchEvent(new Event('sssps_admin_auth_changed'));
       return;
     }
@@ -47,7 +51,7 @@ if (typeof window !== 'undefined') {
         cachedSession = {
           isLoggedIn: true,
           email: user.email || data.email || '',
-          role: (data.role as any) || 'admin',
+          role: normalizeRole(data.role),
           uid: user.uid,
           name: data.name || '',
         };
@@ -55,13 +59,13 @@ if (typeof window !== 'undefined') {
         cachedSession = {
           isLoggedIn: false,
           email: user.email || '',
-          role: 'admin',
+          role: 'moderator',
           uid: user.uid,
         };
       }
     } catch (err) {
       console.error('Error fetching admin profile from admins/{uid}:', err);
-      cachedSession = { isLoggedIn: false, email: user.email || '', role: 'admin' };
+      cachedSession = { isLoggedIn: false, email: user.email || '', role: 'moderator' };
     }
     window.dispatchEvent(new Event('sssps_admin_auth_changed'));
   });
@@ -115,7 +119,7 @@ export function mapFirebaseAuthError(errorCode: string): string {
 export async function verifyAdminCredentials(
   emailInput: string,
   passwordInput: string
-): Promise<{ success: boolean; email?: string; role?: 'super_admin' | 'admin' | 'editor'; uid?: string; error?: string; errorCode?: string }> {
+): Promise<{ success: boolean; email?: string; role?: AdminRole; uid?: string; error?: string; errorCode?: string }> {
   const cleanEmail = emailInput.trim();
   const cleanPass = passwordInput.trim();
 
@@ -153,7 +157,7 @@ export async function verifyAdminCredentials(
       try {
         await firebaseSignOut(auth);
       } catch {}
-      cachedSession = { isLoggedIn: false, email: '', role: 'admin' };
+      cachedSession = { isLoggedIn: false, email: '', role: 'moderator' };
       window.dispatchEvent(new Event('sssps_admin_auth_changed'));
       return {
         success: false,
@@ -172,7 +176,7 @@ export async function verifyAdminCredentials(
       try {
         await firebaseSignOut(auth);
       } catch {}
-      cachedSession = { isLoggedIn: false, email: '', role: 'admin' };
+      cachedSession = { isLoggedIn: false, email: '', role: 'moderator' };
       window.dispatchEvent(new Event('sssps_admin_auth_changed'));
       return {
         success: false,
@@ -184,7 +188,7 @@ export async function verifyAdminCredentials(
     }
 
     const adminData = adminSnap.data();
-    const role = (adminData.role as 'super_admin' | 'admin' | 'editor') || 'admin';
+    const role = normalizeRole(adminData.role);
 
     cachedSession = {
       isLoggedIn: true,
@@ -272,7 +276,7 @@ export function getAdminSession(): AdminSession {
     return {
       isLoggedIn: true,
       email: auth.currentUser.email || cachedSession.email,
-      role: cachedSession.role || 'admin',
+      role: cachedSession.role || 'moderator',
       uid: auth.currentUser.uid,
     };
   }
@@ -283,7 +287,7 @@ export function getAdminSession(): AdminSession {
  * Clear admin session & sign out from Firebase Auth
  */
 export async function clearAdminSession(): Promise<void> {
-  cachedSession = { isLoggedIn: false, email: '', role: 'admin' };
+  cachedSession = { isLoggedIn: false, email: '', role: 'moderator' };
   try {
     await firebaseSignOut(auth);
   } catch (err) {
@@ -299,7 +303,7 @@ export async function clearAdminSession(): Promise<void> {
  */
 export function setAdminSession(
   _email = '',
-  _role: 'super_admin' | 'admin' | 'editor' = 'admin'
+  _role: AdminRole = 'moderator'
 ) {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('sssps_admin_auth_changed'));
