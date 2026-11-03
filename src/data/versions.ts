@@ -8,9 +8,19 @@ export interface VersionItem {
 
 export const VERSIONS: VersionItem[] = [
   {
-    version: 'v24.10',
+    version: 'v24.11',
     date: '၂၀၂၆ ခုနှစ်၊ နိုဝင်ဘာလ',
     isLatest: true,
+    title: 'v24.11 — Admin Console bar က ခေါင်းစဉ် ဖုံးနေတာ ပြင်ခြင်း',
+    changes: [
+      { type: 'fix', text: 'Admin Console bar (အမှောင်ရောင် bar) က အောက်က ခေါင်းစဉ် (Dashboard banner နဲ့ ကြေညာချက် form ခေါင်းစဉ်) ကို ဖုံးပြီး အပေါ်ပိုင်း ပြတ်နေတာ ပြင်ခြင်း — အကြောင်းရင်းက Admin အကြောင်းအရာက သူ့ဘာသာ သီးသန့် box ထဲမှာ scroll ဆွဲလို့ bar နဲ့ ထပ်မလိုက်တာပါ။ အခု စာမျက်နှာတစ်ခုလုံး တစ်ခါတည်း scroll ဆွဲတော့မှာ ဖြစ်ပြီး bar က app header အောက်မှာ ကပ်နေပါမယ်။' },
+      { type: 'fix', text: 'v24.9 မှာ bar ကို ကပ်နေအောင် (sticky) ပြင်ခဲ့ပေမဲ့ အလုပ်မဖြစ်ခဲ့တာ ပြင်ခြင်း — စာမျက်နှာရဲ့ wrapper တွေမှာ overflow-x-hidden ပါလို့ sticky ကို ပိတ်မိနေခဲ့ပါတယ်။ overflow-x-clip လို့ ပြောင်းလိုက်လို့ ဘေးတိုက် ပြန့်တာလည်း တားဆဲ ဖြစ်ပြီး sticky လည်း အလုပ်လုပ်ပါတော့မယ်။' },
+    ],
+  },
+  {
+    version: 'v24.10',
+    date: '၂၀၂၆ ခုနှစ်၊ နိုဝင်ဘာလ',
+    isLatest: false,
     title: 'v24.10 — Admin Console မိုဘိုင်းမှာ အဆင်ပြေအောင် (ကျောင်းစာရင်း)',
     changes: [
       { type: 'improve', text: 'Admin ကျောင်းစာရင်းမှာ ထပ်နေတဲ့ ဇုန် filter bar တစ်ခု ဖြုတ်ခြင်း — အပေါ်က bar နဲ့ စာရင်းထဲက filter နှစ်ခု ထပ်နေလို့ နေရာဖြုန်းနေတာ။ အခု စာရင်းထဲက filter တစ်ခုတည်းနဲ့ စစ်လို့ ရပါတယ်။' },

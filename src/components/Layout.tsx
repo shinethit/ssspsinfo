@@ -71,7 +71,7 @@ export default function Layout() {
   const closeSidebar = () => setSidebarOpen(false);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col w-full max-w-full overflow-x-hidden font-sans">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col w-full max-w-full overflow-x-clip font-sans">
       {/* 
         1. FIXED TOP HEADER
       */}
@@ -281,13 +281,18 @@ export default function Layout() {
       {/* 
         3. MAIN CONTENT AREA
       */}
-      <div className="pt-16 lg:pl-64 flex flex-col flex-1 w-full max-w-full overflow-x-hidden min-h-screen">
+      {/* v24.11: overflow-x-clip (not hidden) on these wrappers — 'hidden' makes
+          each wrapper a scroll container, which traps position:sticky, so the
+          Admin Console bar could never stick to the page scroll and the
+          admin content scrolled underneath it instead. 'clip' still stops
+          horizontal overflow but is not a scroll container, so sticky works. */}
+      <div className="pt-16 lg:pl-64 flex flex-col flex-1 w-full max-w-full overflow-x-clip min-h-screen">
         {/* Real-time Admin News Ticker (စာတန်းပြေး ကြေညာချက်) — v24.10: hidden on
             /admin so the admin screens keep that vertical space for their own
             content; the ticker is public news, not admin tooling. */}
         {!location.pathname.startsWith('/admin') && <NewsTickerBar />}
 
-        <main className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10 flex-1 overflow-x-hidden">
+        <main className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10 flex-1 overflow-x-clip">
           <Outlet />
         </main>
 

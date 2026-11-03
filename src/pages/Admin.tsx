@@ -335,9 +335,13 @@ export default function Admin() {
         onLogout={handleLogout}
       />
 
-      {/* Main Content Area */}
+      {/* Main Content Area — v24.11: NO overflow-y-auto here. It made the admin
+          content scroll inside its own inner box, separately from the page,
+          while the sticky Admin Console bar sits outside that box — so the
+          banner/form titles slid up and were cut off at the bar's edge
+          instead of the bar sticking. The whole page scrolls as one now. */}
       <div className="flex-1 lg:pl-72 flex flex-col min-w-0">
-        <main className="p-4 sm:p-6 lg:p-8 flex-1 overflow-y-auto">
+        <main className="p-4 sm:p-6 lg:p-8 flex-1">
           <div className="max-w-6xl mx-auto space-y-6">
 
             {/* TAB 1: DASHBOARD */}
