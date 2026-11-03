@@ -19,7 +19,12 @@ export default function SchoolDetail() {
   const [school, setSchool] = useState<School | null>(cachedSchool || null);
   const [loading, setLoading] = useState(!cachedSchool);
   const [user] = useAuthState(auth);
-  const isAdmin = Boolean(user || getAdminSession().isLoggedIn);
+  // v24.12: who may touch this school — an admin/moderator session, or the
+  // school's own account (linked via school.authUid). Before, ANY logged-in
+  // user saw the admin controls, including other schools and plain users.
+  const isAdminSession = getAdminSession().isLoggedIn;
+  const isOwnSchool = Boolean(user && school && school.authUid && user.uid === school.authUid);
+  const canEditSchool = isAdminSession || isOwnSchool;
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -116,7 +121,7 @@ export default function SchoolDetail() {
       </Link>
 
       {/* Admin Quick Control Bar (if signed in) */}
-      {isAdmin && (
+      {canEditSchool && (
         <div className="bg-sky-50 border border-sky-200 p-3.5 sm:p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs animate-in fade-in">
           <div className="flex items-center gap-2 text-xs font-bold text-sky-950">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -124,7 +129,8 @@ export default function SchoolDetail() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Quick 1-Click Fee Toggle */}
+            {/* Quick 1-Click Fee Toggle — admin/moderator only */}
+            {isAdminSession && (
             <button
               onClick={handleToggleFeeStatus}
               type="button"
@@ -137,18 +143,30 @@ export default function SchoolDetail() {
             >
               {school.isAnnualFeePaid ? 'နှစ်စဉ်ကြေး: သွင်းပြီး ✓' : 'နှစ်စဉ်ကြေး: မသွင်းရသေး ✗'}
             </button>
+            )}
 
-            {/* Edit School Button */}
-            <Link
-              to={`/admin?tab=schools`}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 transition shadow-2xs"
+            {/* Edit School Button — v24.12: opens the edit form directly.
+                Before, this was a plain link to /admin?tab=schools, so the
+                admin landed on the school list and had to find the school
+                and click edit a second time. Now an admin/moderator goes
+                to Admin with the school id, and Admin opens the form for
+                that school at once; the school's own account goes to its
+                School Portal instead (it cannot use the Admin Console). */}
+            <button
+              onClick={() => {
+                if (isAdminSession) navigate('/admin?tab=schools', { state: { editSchoolId: school.id } });
+                else navigate('/school-portal');
+              }}
+              type="button"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 transition shadow-2xs cursor-pointer"
               title="ဤကျောင်းအချက်အလက်ကို ပြင်ဆင်ရန်"
             >
               <Edit2 className="w-3.5 h-3.5" />
               <span>ပြင်ဆင်ရန် (Edit)</span>
-            </Link>
+            </button>
 
-            {/* Delete School Button */}
+            {/* Delete School Button — admin/moderator only */}
+            {isAdminSession && (
             <button
               onClick={handleDeleteSchool}
               type="button"
@@ -158,6 +176,7 @@ export default function SchoolDetail() {
               <Trash2 className="w-3.5 h-3.5" />
               <span>ဖျက်ရန် (Delete)</span>
             </button>
+            )}
           </div>
         </div>
       )}

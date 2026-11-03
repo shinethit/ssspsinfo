@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { collection, getDocs, doc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { toast } from 'sonner';
@@ -118,6 +118,7 @@ export default function Admin() {
   const [isSendingResetEmail, setIsSendingResetEmail] = useState(false);
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = () => { clearAdminSession(); toast.info('အကောင့်မှ ထွက်ပြီးပါပြီ'); navigate('/login'); };
 
@@ -156,6 +157,27 @@ export default function Admin() {
   // School Handlers
   const startEditSchool = (s: any) => { setEditingSchoolId(s.id); setIsSchoolFormOpen(true); };
   const cancelEditSchool = () => { setEditingSchoolId(null); setIsSchoolFormOpen(false); };
+
+  // v24.12: arriving from a SchoolDetail Edit button carries { editSchoolId }
+  // in location.state — open the edit form for that school directly instead
+  // of landing on the list and making the admin find the school and click
+  // edit a second time. Waits for the schools list to load; consumes the
+  // request afterwards so a refresh or later visit does not reopen it.
+  useEffect(() => {
+    const editSchoolId = (location.state as any)?.editSchoolId as string | undefined;
+    if (!editSchoolId || !canAccess.schools) return;
+    const target = schools.find((s: any) => s.id === editSchoolId);
+    if (!target) {
+      if (schools.length > 0) {
+        toast.error('ပြင်ဆင်ရန် ကျောင်းကို ရှာမတွေ့ပါ');
+        navigate(location.pathname + location.search, { replace: true, state: {} });
+      }
+      return;
+    }
+    setActiveTab('schools');
+    startEditSchool(target);
+    navigate(location.pathname + location.search, { replace: true, state: {} });
+  }, [location.state, schools, canAccess.schools, navigate]);
 
   const onSchoolSubmit = async (data: any) => {
     try {
