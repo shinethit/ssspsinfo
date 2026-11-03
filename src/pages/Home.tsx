@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../lib/firebase';
-import { Announcement, School, Association } from '../types';
 import { useData, getAnnouncementTimestamp } from '../context/DataContext';
 import { getCategoryBadge } from './Announcements';
 import {
@@ -31,22 +30,17 @@ import { PWAInstallButton } from '../components/PWAInstallButton';
 import { getUnifiedSchoolLevels } from '../lib/schoolLevels';
 import ShareButton from '../components/ShareButton';
 import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../constants';
-
-// v24.13: same guarded announcement-date format as Announcements.tsx
-// (Home used an unguarded toLocaleDateString on the raw value).
-function formatHomeAnnouncementDate(a: Announcement): string {
-  const rawDate = a.eventDate || (a.publishedAt ? a.publishedAt.split('T')[0] : '');
-  if (!rawDate) return 'မကြာသေးမီက';
-  const d = new Date(rawDate.includes('T') ? rawDate : `${rawDate}T12:00:00`);
-  return !isNaN(d.getTime())
-    ? d.toLocaleDateString('my-MM', { year: 'numeric', month: 'long', day: 'numeric' })
-    : rawDate;
-}
+import { formatAnnouncementDate } from '../lib/myanmarDate';
 
 export default function Home() {
-  const { schools, announcements, associations, schoolLevels, loading } = useData();
-  // v24.13: the "ဝင်မည်" chat button sent guests to a dead error page.
-  const [user] = useAuthState(auth);
+  // v24.15 V4: loadError (from DataContext) — a failed Firestore read must
+  // show an honest error, never confident 0 counts / "မရှိသေးပါ".
+  const { schools, announcements, associations, schoolLevels, loading, loadError, syncData } = useData();
+  // v24.15 P9/V3: the "ဝင်မည်" chat button sent guests to the ADMIN login
+  // (/login rejects school accounts). Guests go to /school-login, with a
+  // note that an account comes from the Admin. authLoading is kept — a
+  // signed-in user must never briefly see the guest link.
+  const [user, authLoading] = useAuthState(auth);
   const [quickSearch, setQuickSearch] = useState('');
   const [selectedZone, setSelectedZone] = useState<string>('all');
 
@@ -125,6 +119,11 @@ export default function Home() {
             <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight leading-snug">
               သတင်းနှင့် ပြန်ကြားရေးဌာန
             </h1>
+            {/* v24.15 V11: one-line hero subtitle — what this app is and what
+                a visitor can do (login မလိုဘဲ ကြည့်နိုင်သည်). */}
+            <p className="text-sky-200 text-xs sm:text-sm leading-relaxed">
+              ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း၏ သတင်းအချက်အလက် မျှဝေရာ နေရာ — ကျောင်းစာရင်း၊ ကြေညာချက်၊ ပွဲနှင့် အားကစားရလဒ်များကို login ဝင်စရာမလိုဘဲ ကြည့်ရှုနိုင်ပါသည်။
+            </p>
             <ShareButton
               title="ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း"
               text="သတင်းနှင့် ပြန်ကြားရေးဌာန — အသင်းဝင်ကျောင်းများ၏ သတင်းအချက်အလက်များ"
@@ -230,6 +229,24 @@ export default function Home() {
         </div>
       </section>
 
+      {/* v24.15 V4: honest error state — a failed read must not look like
+          "no schools / no announcements". */}
+      {loadError && !loading && (
+        <section className="bg-rose-50 border border-rose-200 rounded-xl p-4 text-center space-y-2">
+          <p className="font-bold text-rose-800 text-sm flex items-center justify-center gap-1.5">
+            <AlertCircle className="w-4 h-4" /> ဒေတာ ဖတ်မရပါ — ပြန်စမ်းကြည့်ပါ
+          </p>
+          <p className="text-xs text-rose-700">အင်တာနက် (သို့) ဆာဗာနှင့် ချိတ်ဆက်၍ မရပါ။ အောက်ပါ အရေအတွက်များနှင့် စာရင်းများသည် မပြည့်စုံနိုင်ပါ။</p>
+          <button
+            type="button"
+            onClick={() => syncData(true)}
+            className="px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold rounded-lg transition cursor-pointer"
+          >
+            ပြန်စမ်းကြည့်မည်
+          </button>
+        </section>
+      )}
+
       {/* 2. TOP LATEST 2 ANNOUNCEMENTS */}
       <section className="space-y-2">
         <div className="flex items-center justify-between">
@@ -254,6 +271,17 @@ export default function Home() {
             <div className="h-16 bg-white rounded-lg border border-slate-100 animate-pulse" />
             <div className="h-16 bg-white rounded-lg border border-slate-100 animate-pulse" />
           </div>
+        ) : loadError ? (
+          <div className="p-4 bg-rose-50 rounded-lg border border-rose-200 text-center space-y-2">
+            <p className="text-rose-700 text-xs font-bold">ဒေတာ ဖတ်မရပါ — ပြန်စမ်းကြည့်ပါ</p>
+            <button
+              type="button"
+              onClick={() => syncData(true)}
+              className="px-3 py-1.5 bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold rounded-lg transition cursor-pointer"
+            >
+              ပြန်စမ်းကြည့်မည်
+            </button>
+          </div>
         ) : latestAnnouncements.length === 0 ? (
           <div className="p-2 bg-white rounded-lg border border-slate-100 text-center text-slate-400 text-xs">
             ကြေညာချက် မရှိသေးပါ
@@ -274,7 +302,7 @@ export default function Home() {
                     </span>
                     <span className="text-xs text-slate-500 font-medium flex items-center gap-0.5 shrink-0">
                       <Calendar className="w-2.5 h-2.5 text-sky-600" />
-                      {formatHomeAnnouncementDate(a)}
+                      {formatAnnouncementDate(a.eventDate || a.publishedAt)}
                     </span>
                   </div>
 
@@ -318,7 +346,9 @@ export default function Home() {
                   ? 'bg-sky-700 text-sky-100'
                   : 'bg-white text-slate-500 border border-slate-200'
               }`}>
-                {zoneCounts[opt.value] ?? 0}
+                {/* v24.15 V5: "—" while loading / on load error, never a
+                    confident 0. */}
+                {loading || loadError ? '—' : (zoneCounts[opt.value] ?? 0)}
               </span>
             </button>
           ))}
@@ -331,11 +361,11 @@ export default function Home() {
               <MapPin className="w-3 h-3 text-sky-600" />
               <span className="font-bold text-sky-900">{selectedZone}</span>
               <span className="text-slate-400">|</span>
-              <span className="text-slate-700">စုစုပေါင်း <strong className="text-sky-900">{filteredSchoolsByZone.length}</strong> ကျောင်း</span>
+              <span className="text-slate-700">စုစုပေါင်း <strong className="text-sky-900">{loading || loadError ? '—' : filteredSchoolsByZone.length}</strong> ကျောင်း</span>
             </div>
             <div className="flex items-center gap-2 text-xs">
               <span className="text-emerald-700 font-bold">
-                ✓ Active: {filteredSchoolsByZone.filter(s => (s.status || 'active') === 'active').length}
+                ✓ Active: {loading || loadError ? '—' : filteredSchoolsByZone.filter(s => (s.status || 'active') === 'active').length}
               </span>
               <span className="text-slate-400">|</span>
               <Link
@@ -349,7 +379,18 @@ export default function Home() {
         )}
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-          {levelStats.map((item) => (
+          {loading ? (
+            <>
+              <div className="h-14 bg-slate-100 rounded-lg animate-pulse" />
+              <div className="h-14 bg-slate-100 rounded-lg animate-pulse" />
+              <div className="h-14 bg-slate-100 rounded-lg animate-pulse" />
+              <div className="h-14 bg-slate-100 rounded-lg animate-pulse" />
+            </>
+          ) : loadError ? (
+            <p className="col-span-full text-xs text-rose-700 font-semibold text-center py-2">ဒေတာ ဖတ်မရပါ — ပြန်စမ်းကြည့်ပါ</p>
+          ) : levelStats.length === 0 ? (
+            <p className="col-span-full text-xs text-slate-400 text-center py-2">ကျောင်းအဆင့် စာရင်း မရှိသေးပါ</p>
+          ) : levelStats.map((item) => (
             <Link
               key={item.id}
               to={`/contacts?level=${encodeURIComponent(item.name)}&zone=${encodeURIComponent(selectedZone)}`}
@@ -382,9 +423,10 @@ export default function Home() {
             <h3 className="font-bold text-sm">မြို့နယ်အသင်းများ</h3>
           </div>
           <div className="pt-0.5">
+            {/* v24.15 V10: ~40px tap target (py-2.5). */}
             <Link
               to="/associations"
-              className="inline-flex items-center gap-1 px-2 py-1 bg-sky-500 hover:bg-sky-400 text-sky-950 font-bold text-sm rounded-md transition"
+              className="inline-flex items-center gap-1 px-2 py-2.5 bg-sky-500 hover:bg-sky-400 text-sky-950 font-bold text-sm rounded-md transition"
             >
               <span>ကြည့်မည်</span>
               <ArrowRight className="w-2.5 h-2.5" />
@@ -398,14 +440,32 @@ export default function Home() {
             <h3 className="font-bold text-sm">ဆွေးနွေးခန်း</h3>
           </div>
           <div className="pt-0.5">
-            <Link
-              to={user ? '/chat' : '/login'}
-              className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold text-sm rounded-md transition"
-            >
-              <span>ဝင်မည်</span>
-              <ArrowRight className="w-2.5 h-2.5" />
-            </Link>
+            {/* v24.15 P9/V3: wait for authLoading before rendering the link
+                target; guests go to /school-login (never /login — the admin
+                login rejects school accounts). */}
+            {authLoading ? (
+              <span className="inline-flex items-center gap-1 px-2 py-2.5 bg-emerald-500/50 text-emerald-950 font-bold text-sm rounded-md">
+                <span>ဖွင့်နေပါသည်…</span>
+              </span>
+            ) : (
+              <Link
+                to={user ? '/chat' : '/school-login'}
+                className="inline-flex items-center gap-1 px-2 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold text-sm rounded-md transition"
+              >
+                <span>ဝင်မည်</span>
+                <ArrowRight className="w-2.5 h-2.5" />
+              </Link>
+            )}
           </div>
+          {!authLoading && !user && (
+            <p className="text-[11px] text-emerald-200/80 leading-snug pt-0.5">
+              အကောင့်ကို အသင်း Admin က ဖွင့်ပေးသည် —{' '}
+              <Link to="/help" className="font-bold underline hover:text-white">
+                အသုံးပြုနည်း (Help)
+              </Link>{' '}
+              တွင် ကြည့်ပါ။
+            </p>
+          )}
         </div>
       </section>
     </div>

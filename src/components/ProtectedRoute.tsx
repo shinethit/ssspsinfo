@@ -4,6 +4,7 @@ import { auth, db } from '../lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
+import { normalizeRole } from '../lib/roles';
 
 export default function ProtectedRoute() {
   const [user, loading] = useAuthState(auth);
@@ -36,8 +37,12 @@ export default function ProtectedRoute() {
             snap = lowerEmailSnap;
           }
         }
+        // v24.15 (P34): an admins doc alone is not enough — its role must
+        // be one the Firestore rules admit. A doc with an unknown/missing
+        // role (e.g. 'user', 'guest') is treated as non-admin, so the user
+        // gets the full moderator UI while every write is denied.
         if (isMounted) {
-          setIsAdmin(snap.exists());
+          setIsAdmin(snap.exists() && normalizeRole((snap.data() as any)?.role) !== null);
           setCheckingAdmin(false);
         }
       } catch (err) {

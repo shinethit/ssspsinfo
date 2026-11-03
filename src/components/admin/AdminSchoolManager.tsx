@@ -8,7 +8,8 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { getGlobalAcademicYear } from '../../lib/academicYear';
+import { getGlobalAcademicYear, normalizeAcademicYear, isCurrentYearPaid, getCurrentAcademicYear, isValidAcademicYear } from '../../lib/academicYear';
+import { toLatinDigits } from '../../lib/myanmarDigits';
 import { recordAnnualFeePayment, findAnnualFeeTransaction, ANNUAL_FEE_TYPE } from '../../lib/finance';
 import { recordAuditLog } from '../../lib/audit';
 import { School, SchoolLevelItem, TransactionRecord } from '../../types';
@@ -56,6 +57,10 @@ export default function AdminSchoolManager({
   // from the transaction that was just recorded, not a number derived
   // on the fly from the school id.
   const [receiptVoucherNo, setReceiptVoucherNo] = useState<string | null>(null);
+  // v24.15 (V16): the transaction's own amount + paid date for the receipt
+  // (the receipt shows THESE, never the flag, never today as a fallback).
+  const [receiptTxnAmount, setReceiptTxnAmount] = useState<number | null>(null);
+  const [receiptTxnPaidDate, setReceiptTxnPaidDate] = useState<string | null>(null);
   const itemsPerPage = 20;
 
   const [feeModalSchool, setFeeModalSchool] = useState<School | null>(null);
@@ -85,8 +90,8 @@ export default function AdminSchoolManager({
       if (sortBy === 'name_asc') return (a.name || '').localeCompare(b.name || '', 'my');
       if (sortBy === 'name_desc') return (b.name || '').localeCompare(a.name || '', 'my');
       if (sortBy === 'newest') return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-      if (sortBy === 'fee_paid') return (b.isAnnualFeePaid ? 1 : 0) - (a.isAnnualFeePaid ? 1 : 0);
-      if (sortBy === 'fee_unpaid') return (a.isAnnualFeePaid ? 1 : 0) - (b.isAnnualFeePaid ? 1 : 0);
+      if (sortBy === 'fee_paid') return (isCurrentYearPaid(b) ? 1 : 0) - (isCurrentYearPaid(a) ? 1 : 0);
+      if (sortBy === 'fee_unpaid') return (isCurrentYearPaid(a) ? 1 : 0) - (isCurrentYearPaid(b) ? 1 : 0);
       return 0;
     });
   }, [filteredSchools, sortBy]);
@@ -126,17 +131,28 @@ export default function AdminSchoolManager({
   // one. Look the stored annual-fee transaction up first (this manager does
   // not load transactions) and pass its voucher; legacy flag-only payments
   // (no transaction) still fall back to the derived number.
+  // v24.15 (A4): prefer the same-year transaction, but fall back to the
+  // school's LATEST annual-fee transaction when no year matches (a stale
+  // feeAcademicYear used to miss entirely) — better than the derived number.
+  // v24.15 (V16): the receipt also gets the transaction's own amount/date.
   const handlePrintReceipt = async (school: School) => {
+    let tx: TransactionRecord | undefined;
     try {
       const q = query(collection(db, 'transactions'), where('schoolId', '==', school.id), where('feeType', '==', ANNUAL_FEE_TYPE));
       const snap = await getDocs(q);
       const txs = snap.docs.map(d => ({ id: d.id, ...d.data() }) as TransactionRecord);
-      const tx = findAnnualFeeTransaction(txs, school.id, school.feeAcademicYear || getGlobalAcademicYear());
+      tx = findAnnualFeeTransaction(txs, school.id, normalizeAcademicYear(school.feeAcademicYear || getGlobalAcademicYear()));
+      if (!tx && txs.length > 0) {
+        tx = [...txs].sort((a, b) =>
+          String(b.paidDate || b.createdAt || '').localeCompare(String(a.paidDate || a.createdAt || '')))[0];
+      }
       setReceiptVoucherNo(tx?.voucherNo ?? null);
     } catch {
       toast.error('voucher နံပါတ် ရှာမတွေ့ပါ — ခန့်မှန်းနံပါတ်နဲ့ ပြေစာထုတ်ပါမယ်');
       setReceiptVoucherNo(null);
     }
+    setReceiptTxnAmount(tx?.amount ?? school.feeAmount ?? null);
+    setReceiptTxnPaidDate(tx?.paidDate ?? school.feePaidDate ?? null);
     setReceiptSchool(school);
   };
 
@@ -149,32 +165,60 @@ export default function AdminSchoolManager({
       // 200,000 ကျပ်. And one write path now does both: the transaction AND
       // the school flag (before, only the flag was written and the money
       // never appeared in the transactions list).
-      const numericAmount = Number(String(feeAmount).replace(/[^0-9]/g, ''));
-      if (!numericAmount || numericAmount <= 0) {
+      // v24.15 (V27): parse the amount like the Finance form — plain
+      // Number() after converting Myanmar digits, so digits, one dot and a
+      // leading minus survive ('-5000' stays -5000 and is rejected as
+      // <= 0; '250000.5' stays 250000.5, not 2500005).
+      const numericAmount = Number(toLatinDigits(String(feeAmount)).replace(/,/g, '').trim());
+      if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
         toast.error('နှစ်စဉ်ကြေး ပမာဏ ထည့်သွင်းပေးပါ');
         return;
       }
-      const year = feeAcademicYear || getGlobalAcademicYear();
-      const { voucherNo } = await recordAnnualFeePayment({
+      // v24.15 (V14): the year is normalized on submit.
+      const year = normalizeAcademicYear(feeAcademicYear) || getGlobalAcademicYear();
+      // v24.15 re-audit (F6): a typed year must be valid — 'abc' used to be
+      // stored verbatim. Reject it here instead of writing garbage.
+      if (!isValidAcademicYear(year)) { toast.error('ပညာသင်နှစ် မမှန်ကန်ပါ — ဥပမာ ၂၀၂၆-၂၀၂၇ ပုံစံဖြင့် ထည့်ပါ'); return; }
+      const result = await recordAnnualFeePayment({
         school: feeModalSchool,
         amount: numericAmount,
         paidDate: feeDate,
         academicYear: year,
       });
-      await recordAuditLog({ action: 'create', entityType: 'transaction', entityId: feeModalSchool.id, entityName: feeModalSchool.name, details: `နှစ်စဉ်ကြေး ${numericAmount.toLocaleString('my-MM')} ကျပ် (${year}, ${voucherNo})` });
+      // v24.15 (V15 + V30): on reuse the flag mirrors the EXISTING
+      // transaction — the audit log says 'update' (not 'create') and the
+      // toast warns that a transaction already existed, instead of
+      // claiming new money moved. result.amount / result.paidDate are the
+      // existing transaction's values on reuse.
+      await recordAuditLog({
+        action: result.reused ? 'update' : 'create',
+        entityType: 'transaction',
+        entityId: feeModalSchool.id,
+        entityName: feeModalSchool.name,
+        details: result.reused
+          ? `နှစ်စဉ်ကြေး (${year}) — ရှိပြီးသား မှတ်တမ်း ပြန်သုံးခြင်း (${result.voucherNo || 'voucher မရှိ'})၊ ပမာဏ ${result.amount.toLocaleString('my-MM')} ကျပ် — ငွေအသစ် မသွင်းပါ`
+          : `နှစ်စဉ်ကြေး ${result.amount.toLocaleString('my-MM')} ကျပ် (${year}, ${result.voucherNo})`,
+      });
       const updates = {
         isAnnualFeePaid: true,
-        feePaidDate: feeDate,
-        feeAmount: numericAmount,
-        feeAcademicYear: year,
+        feePaidDate: result.paidDate,
+        feeAmount: result.amount,
+        feeAcademicYear: result.academicYear,
         updatedAt: new Date().toISOString(),
       };
-      toast.success(`"${feeModalSchool.name}" အတွက် နှစ်စဉ်ကြေး ပေးသွင်းမှု မှတ်တမ်းတင်ပြီးပါပြီ`);
+      if (result.reused) {
+        toast.success(`"${feeModalSchool.name}" အတွက် ${year} ခုနှစ်တွင် နှစ်စဉ်ကြေး မှတ်တမ်း ရှိပြီးသားဖြစ်သည် — အမှတ်အသားကို ရှိပြီးသား မှတ်တမ်း (${result.amount.toLocaleString('my-MM')} ကျပ်) နှင့် ကိုက်ညီအောင် ပြင်ဆင်ပြီးပါပြီ (ငွေအသစ် မသွင်းပါ)`);
+      } else {
+        toast.success(`"${feeModalSchool.name}" အတွက် နှစ်စဉ်ကြေး ပေးသွင်းမှု မှတ်တမ်းတင်ပြီးပါပြီ`);
+      }
       const updatedSchool = { ...feeModalSchool, ...updates };
       setFeeModalSchool(null);
       // v24.13 (F7): pass the stored voucher into the receipt instead of
       // discarding it — the receipt used to re-derive a different number.
-      setReceiptVoucherNo(voucherNo);
+      // v24.15 (V16): also pass the transaction's own amount/date.
+      setReceiptVoucherNo(result.voucherNo);
+      setReceiptTxnAmount(result.amount);
+      setReceiptTxnPaidDate(result.paidDate);
       setReceiptSchool(updatedSchool);
     } catch (err) {
       toast.error('နှစ်စဉ်ကြေး သိမ်းဆည်းရာတွင် အမှားဖြစ်ပွားပါသည်');
@@ -398,13 +442,13 @@ export default function AdminSchoolManager({
                                 setFeeAcademicYear(school.feeAcademicYear || getGlobalAcademicYear());
                               }
                             }}
-                            className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition cursor-pointer flex items-center gap-1.5 ${school.isAnnualFeePaid ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'}`}
+                            className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition cursor-pointer flex items-center gap-1.5 ${isCurrentYearPaid(school) ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'}`}
                           >
-                            {school.isAnnualFeePaid ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
-                            {school.isAnnualFeePaid ? 'နှစ်စဉ်ကြေးသွင်းပြီး' : 'နှစ်စဉ်ကြေးမသွင်းရသေး'}
+                            {isCurrentYearPaid(school) ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                            {isCurrentYearPaid(school) ? 'နှစ်စဉ်ကြေးသွင်းပြီး' : 'နှစ်စဉ်ကြေးမသွင်းရသေး'}
                           </button>
 
-                          {school.isAnnualFeePaid && (
+                          {isCurrentYearPaid(school) && (
                             <button
                               onClick={() => handlePrintReceipt(school)}
                               className="p-2.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition cursor-pointer"
@@ -498,7 +542,7 @@ export default function AdminSchoolManager({
 
       {/* 7. Annual Fee Receipt Modal */}
       {receiptSchool && (
-        <AnnualFeeReceipt school={receiptSchool} voucherNo={receiptVoucherNo ?? undefined} onClose={() => { setReceiptSchool(null); setReceiptVoucherNo(null); }} />
+        <AnnualFeeReceipt school={receiptSchool} voucherNo={receiptVoucherNo ?? undefined} txnAmount={receiptTxnAmount} txnPaidDate={receiptTxnPaidDate} onClose={() => { setReceiptSchool(null); setReceiptVoucherNo(null); setReceiptTxnAmount(null); setReceiptTxnPaidDate(null); }} />
       )}
     </div>
   );

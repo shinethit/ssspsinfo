@@ -51,6 +51,11 @@ export default function SchoolForm({ initialData, isEditing, onCancel, onSubmit,
   });
 
   const [extraSchoolPhones, setExtraSchoolPhones] = useState<string[]>([]);
+  // v24.15 (P17): the school's ORIGINAL zone, captured when the edit starts,
+  // so a non-standard zone stays selectable for the whole edit session even
+  // after another zone is picked (the options used to be built from the
+  // CURRENT value only, so the original vanished mid-edit).
+  const [originalZone, setOriginalZone] = useState<string>('');
   const [extraFounderPhones, setExtraFounderPhones] = useState<string[]>([]);
   const [extraAdminPhones, setExtraAdminPhones] = useState<string[]>([]);
   const [extraCoord1Phones, setExtraCoord1Phones] = useState<string[]>([]);
@@ -69,6 +74,7 @@ export default function SchoolForm({ initialData, isEditing, onCancel, onSubmit,
     lastResetKeyRef.current = key;
     if (initialData) {
       schoolForm.reset({ ...initialData, studentCount: initialData.studentCount ?? '', feeAmount: initialData.feeAmount ?? '' });
+      setOriginalZone((initialData as any)?.zone || '');
       setExtraSchoolPhones(Array.isArray(initialData.schoolPhones) ? [...initialData.schoolPhones] : []);
       setExtraFounderPhones(Array.isArray(initialData.founderPhones) ? [...initialData.founderPhones] : []);
       setExtraAdminPhones(Array.isArray(initialData.adminPhones) ? [...initialData.adminPhones] : []);
@@ -76,6 +82,7 @@ export default function SchoolForm({ initialData, isEditing, onCancel, onSubmit,
       setExtraCoord2Phones(Array.isArray(initialData.contact2Phones) ? [...initialData.contact2Phones] : []);
     } else {
       schoolForm.reset();
+      setOriginalZone('');
       setExtraSchoolPhones([]);
       setExtraFounderPhones([]);
       setExtraAdminPhones([]);
@@ -192,12 +199,17 @@ export default function SchoolForm({ initialData, isEditing, onCancel, onSubmit,
                   <input {...schoolForm.register('city')} placeholder="မြို့" className="w-full p-2.5 border rounded-lg text-sm bg-white" />
                   <select {...schoolForm.register('zone')} className="w-full p-2.5 border rounded-lg text-sm bg-white">
                     <option value="">- ဇုန် ရွေးပါ -</option>
-                    {/* v24.13 S7: a non-standard zone (e.g. from Excel import)
-                        is kept as an extra option so it renders and can be
-                        re-selected instead of showing a blank select. */}
+                    {/* v24.15 (P17): a non-standard zone (e.g. from Excel import)
+                        is kept as an extra option for the whole edit session —
+                        the school's ORIGINAL zone (captured at edit start) plus
+                        the current value — so it can be re-selected after
+                        picking another zone, instead of vanishing mid-edit. */}
                     {(() => {
                       const currentZone: string | undefined = schoolForm.watch('zone');
-                      const zones = ([...STANDARD_ZONES] as string[]).concat(currentZone && !(STANDARD_ZONES as readonly string[]).includes(currentZone) ? [currentZone] : []);
+                      const extras = [currentZone, originalZone].filter(
+                        (z): z is string => !!z && !(STANDARD_ZONES as readonly string[]).includes(z)
+                      );
+                      const zones = ([...STANDARD_ZONES] as string[]).concat([...new Set(extras)]);
                       return zones.map(z => (
                         <option key={z} value={z}>{z}</option>
                       ));

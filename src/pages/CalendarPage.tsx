@@ -41,9 +41,9 @@ export default function CalendarPage() {
       // v24.6: a zone-less event applies to all zones — it used to be hidden
       // under every specific zone filter and wrongly shown under "အခြား"
       if (e.zone && !isSchoolInZone(e.zone, zoneFilter)) return false;
-      // v24.13 P1(b): admin-created events carry no eventType (the stamp is
-      // another agent's job) — treat a missing eventType as 'general' so the
-      // type filter no longer hides every admin event.
+      // v24.15 P25: the admin form stamps eventType ('general' by default,
+      // selectable in the form) — a missing eventType only happens on
+      // legacy docs, so treat it as 'general' here.
       if (typeFilter !== 'all' && (e.eventType || 'general') !== typeFilter) return false;
       return true;
     });

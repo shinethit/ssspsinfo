@@ -206,6 +206,11 @@ export interface School {
   feeAmount?: number | null; // annual fee amount in MMK — null means "not recorded" (v24.7: never invent a default)
   feeAcademicYear?: string; // e.g. '၂၀၂၄-၂၀၂၅'
   feePaidDate?: string; // e.g. '2024-06-15'
+  // v24.15 (P4): the stored voucher + transaction id of the school's
+  // current annual-fee payment, so the portal/receipt can load them from
+  // the school doc alone (no transactions list query).
+  feeVoucherNo?: string;
+  feeTransactionId?: string;
   // School Phone numbers (1 or more)
   schoolPhone: string;
   schoolPhone2?: string;

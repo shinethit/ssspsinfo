@@ -1,7 +1,8 @@
 import { History, GitCommit, Sparkles, CheckCircle2, Shield, Calendar, Tag, ArrowLeft } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { VERSIONS } from '../data/versions';
 import { CURRENT_VERSION } from '../constants';
+import { useInAppBack } from '../hooks/useInAppBack';
 
 interface VersionItem {
   version: string;
@@ -16,7 +17,7 @@ interface VersionItem {
 
 
 export default function VersionHistory() {
-  const navigate = useNavigate();
+  const goBack = useInAppBack();
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto w-full">
@@ -24,13 +25,7 @@ export default function VersionHistory() {
       <div className="flex items-center justify-between pb-3 border-b border-slate-200">
         <button
           type="button"
-          onClick={() => {
-            if (window.history.length > 1) {
-              navigate(-1);
-            } else {
-              navigate('/');
-            }
-          }}
+          onClick={goBack}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-sky-950 font-bold text-xs sm:text-sm transition cursor-pointer shadow-2xs"
           title="နောက်သို့ (Back)"
         >

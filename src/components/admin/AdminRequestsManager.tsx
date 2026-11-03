@@ -1,26 +1,75 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { SchoolUpdateRequest } from '../../types';
+import { SchoolUpdateRequest, DEFAULT_SCHOOL_LEVELS, getStudentRangeTier } from '../../types';
 import { toast } from 'sonner';
 import { confirmDialog } from '../../components/ConfirmModal';
 import { CheckCircle2, XCircle, Clock, FileText, Check, X, MapPin, Trash2 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../../constants';
 import { recordAuditLog } from '../../lib/audit';
+import { parseStoredDate, formatMyanmarDate } from '../../lib/myanmarDate';
+import { toLatinDigits } from '../../lib/myanmarDigits';
 
 // Field names the School Portal can request changes for, shown in Burmese.
 const FIELD_LABELS: Record<string, string> = {
   name: 'ကျောင်းအမည်',
   level: 'ကျောင်းအဆင့်',
   studentRange: 'ကျောင်းသားဦးရေ Range',
+  founderPhone: 'တည်ထောင်သူ ဖုန်း',
+  adminPhone: 'စီမံအုပ်ချုပ်သူ ဖုန်း',
+  contactPhone: 'တာဝန်ခံ (၁) ဖုန်း',
+  contact2Phone: 'တာဝန်ခံ (၂) ဖုန်း',
 };
+
+// v24.15 (P5): only these fields may ever be written to a school doc by
+// approving a request. A crafted request naming authUid / isAnnualFeePaid /
+// feeAmount / accountEmail must be rejected, not applied.
+const REQUESTABLE_FIELDS = new Set(['name', 'level', 'studentRange', 'founderPhone', 'adminPhone', 'contactPhone', 'contact2Phone']);
+const PHONE_FIELDS = new Set(['founderPhone', 'adminPhone', 'contactPhone', 'contact2Phone']);
+
+/** A phone number is plausible when it has 7–15 digits (Myanmar digits converted first). */
+function isPlausiblePhone(value: string): boolean {
+  const digits = toLatinDigits(value).replace(/[^0-9]/g, '');
+  return digits.length >= 7 && digits.length <= 15;
+}
 
 export default function AdminRequestsManager() {
   const [requests, setRequests] = useState<SchoolUpdateRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const { updateSchool, schools } = useData();
+  const { updateSchool, schools, schoolLevels } = useData();
   const [zoneFilter, setZoneFilter] = useState<string>('all');
+
+  // v24.15 (P5): levels a request may set — the admin-configured levels,
+  // plus the built-in defaults (a legacy level in either list is known).
+  const knownLevels = new Set([
+    ...schoolLevels.map(l => l.name),
+    ...DEFAULT_SCHOOL_LEVELS,
+  ]);
+
+  // v24.15 (P5): validate every change BEFORE anything is written.
+  // Returns a Burmese error message, or null when all changes are valid.
+  const validateChanges = (changes: SchoolUpdateRequest['changes']): string | null => {
+    for (const change of changes) {
+      if (!REQUESTABLE_FIELDS.has(change.field)) {
+        return `တောင်းဆိုထားသော အချက် (${change.field}) ကို အတည်ပြု၍မရပါ — ခွင့်ပြုထားသော အချက်သာ ဖြစ်ရပါမည်`;
+      }
+      const value = String(change.newValue ?? '').trim();
+      if (!value) {
+        return `တန်ဖိုး အလွတ်ဖြင့် အတည်ပြု၍မရပါ (${FIELD_LABELS[change.field] || change.field})`;
+      }
+      if (change.field === 'level' && !knownLevels.has(value)) {
+        return `ကျောင်းအဆင့် "${value}" သည် သိရှိထားသော အဆင့် မဟုတ်ပါ`;
+      }
+      if (change.field === 'studentRange' && !getStudentRangeTier(value)) {
+        return `ကျောင်းသားဦးရေ Range "${value}" သည် သိရှိထားသော Range မဟုတ်ပါ`;
+      }
+      if (PHONE_FIELDS.has(change.field) && !isPlausiblePhone(value)) {
+        return `ဖုန်းနံပါတ် "${value}" သည် မှန်ကန်သော ဖုန်းနံပါတ် ပုံစံ မဟုတ်ပါ`;
+      }
+    }
+    return null;
+  };
 
   const fetchRequests = async () => {
     try {
@@ -41,9 +90,25 @@ export default function AdminRequestsManager() {
 
   const handleApprove = async (req: SchoolUpdateRequest) => {
     if (!(await confirmDialog('ဤပြင်ဆင်ချက်များကို အတည်ပြုပြီး ကျောင်းအချက်အလက်သို့ ထည့်သွင်းရန် သေချာပါသလား?'))) return;
-    
+
+    // v24.15 (P5): validate first — a crafted request naming authUid /
+    // isAnnualFeePaid / feeAmount, an unknown level/tier, a bad phone, or
+    // an empty value is rejected before anything is written.
+    const validationError = validateChanges(req.changes);
+    if (validationError) { toast.error(validationError); return; }
+
+    let schoolUpdated = false;
     try {
-      // Build the update payload
+      // v24.15 (P14): re-check the request is still pending AT approve
+      // time, not just in the UI — two admins approving the same request
+      // used to re-apply the values and duplicate the audit entry.
+      const freshSnap = await getDoc(doc(db, 'school_update_requests', req.id));
+      if (!freshSnap.exists() || (freshSnap.data() as any).status !== 'pending') {
+        toast.error('ဤတောင်းဆိုမှုကို အခြား Admin က ဆုံးဖြတ်ပြီးပါပြီ');
+        return;
+      }
+
+      // Build the update payload (only validated, requestable fields).
       const updates: Record<string, any> = {};
       req.changes.forEach(change => {
         updates[change.field] = change.newValue;
@@ -51,15 +116,30 @@ export default function AdminRequestsManager() {
 
       // 1. Update School
       await updateSchool(req.schoolId, updates);
+      schoolUpdated = true;
 
       // 2. Mark request as approved
-      await updateDoc(doc(db, 'school_update_requests', req.id), { status: 'approved' });
+      try {
+        await updateDoc(doc(db, 'school_update_requests', req.id), { status: 'approved' });
+      } catch (statusErr) {
+        // v24.15 (P14): the school WAS changed but the status write failed
+        // — say the truth (not "အမှားဖြစ်ပွားပါသည်") and still write the
+        // audit log, so the change is on record.
+        toast.error('ကျောင်းအချက်အလက် ပြောင်းပြီးပါပြီ — အခြေအနေ မှတ်တမ်းတင်ရာတွင် အမှားဖြစ်ပါသည်');
+        await recordAuditLog({ action: 'update', entityType: 'request', entityId: req.schoolId, entityName: req.schoolName, details: `ပြင်ဆင်ခွင့် တောင်းဆိုမှု အတည်ပြုခြင်း (${req.changes.map(c => FIELD_LABELS[c.field] || c.field).join(', ')}) — အခြေအနေ မှတ်တမ်းတင်မှု မအောင်မြင်` });
+        return;
+      }
 
       await recordAuditLog({ action: 'update', entityType: 'request', entityId: req.schoolId, entityName: req.schoolName, details: `ပြင်ဆင်ခွင့် တောင်းဆိုမှု အတည်ပြုခြင်း (${req.changes.map(c => FIELD_LABELS[c.field] || c.field).join(', ')})` });
       toast.success('အတည်ပြုပြီး ကျောင်းအချက်အလက် Update လုပ်ပြီးပါပြီ');
-      fetchRequests();
     } catch (err) {
-      toast.error('အတည်ပြုရာတွင် အမှားဖြစ်ပွားပါသည်');
+      // Only report a generic approve failure when the school itself was
+      // NOT changed — otherwise the message above already told the truth.
+      if (!schoolUpdated) toast.error('အတည်ပြုရာတွင် အမှားဖြစ်ပွားပါသည်');
+    } finally {
+      // v24.15 (P14): refresh the list whatever happened, so a failed
+      // approve can never be retried forever against a stale list.
+      fetchRequests();
     }
   };
 
@@ -165,7 +245,7 @@ export default function AdminRequestsManager() {
                          <><XCircle className="w-3 h-3"/> ပယ်ဖျက်ပြီး</>}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 mt-1">တောင်းဆိုသူ: {req.requestedBy} • ဖုန်း: {req.contactPhone} • ရက်စွဲ: {new Date(req.createdAt).toLocaleDateString('my-MM')}</p>
+                    <p className="text-xs text-slate-500 mt-1">တောင်းဆိုသူ: {req.requestedBy} • ဖုန်း: {req.contactPhone} • ရက်စွဲ: {formatMyanmarDate(parseStoredDate(req.createdAt))}</p>
                   </div>
                   
                   {req.status === 'pending' && (

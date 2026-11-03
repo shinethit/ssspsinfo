@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { doc, getDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, deleteField, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { School } from '../types';
@@ -10,17 +10,21 @@ import { confirmDialog } from '../components/ConfirmModal';
 import { ArrowLeft, Phone, Send, School as SchoolIcon, CheckCircle2, XCircle, Edit2, Trash2, MapPin } from 'lucide-react';
 import { recordAnnualFeePayment } from '../lib/finance';
 import { recordAuditLog } from '../lib/audit';
-import { getGlobalAcademicYear } from '../lib/academicYear';
+import { isCurrentYearPaid, getCurrentAcademicYear } from '../lib/academicYear';
 import { getAdminSession } from '../lib/adminAuth';
 import { getCategorizedSchoolPhones, cleanDialNumber } from '../lib/phoneUtils';
 
 export default function SchoolDetail() {
   const { id } = useParams<{ id: string }>();
-  const { getSchoolById, syncData } = useData();
+  const { getSchoolById, syncData, deleteSchool: deleteSchoolFromContext, getSchoolDeleteImpact } = useData();
   const cachedSchool = id ? getSchoolById(id) : undefined;
 
   const [school, setSchool] = useState<School | null>(cachedSchool || null);
-  const [loading, setLoading] = useState(!cachedSchool);
+  // v24.15 (P24): start loading=true EVEN when a cached copy exists — a
+  // deleted school used to flash its stale copy until the fresh getDoc
+  // returned. The cached copy still fills the page only after the fetch
+  // confirms the school exists.
+  const [loading, setLoading] = useState(true);
   // v24.13: a fetch error is its own state — before, a failed fetch silently
   // kept whatever stale cached copy was on screen.
   const [fetchError, setFetchError] = useState(false);
@@ -30,13 +34,21 @@ export default function SchoolDetail() {
   // user saw the admin controls, including other schools and plain users.
   const isAdminSession = getAdminSession().isLoggedIn;
   const isOwnSchool = Boolean(user && school && school.authUid && user.uid === school.authUid);
+  // v24.15 re-audit (R3 companion): re-render when the admin session
+  // resolves — getAdminSession() is read at render, so without this a fresh
+  // load could show the page as a non-admin until something else re-rendered.
+  const [, setAdminAuthTick] = useState(0);
+  useEffect(() => {
+    const h = () => setAdminAuthTick((t) => t + 1);
+    window.addEventListener('sssps_admin_auth_changed', h);
+    return () => window.removeEventListener('sssps_admin_auth_changed', h);
+  }, []);
   const canEditSchool = isAdminSession || isOwnSchool;
   const navigate = useNavigate();
 
   useEffect(() => {
     if (cachedSchool) {
       setSchool(cachedSchool);
-      setLoading(false);
     }
   }, [cachedSchool]);
 
@@ -68,13 +80,31 @@ export default function SchoolDetail() {
     fetchSchool();
   }, [id]);
 
+  // v24.15 (V12): the detail-page delete now uses the SAME cascade +
+  // impact confirm as the Admin tab (deleteSchoolFromContext). Before, it
+  // did a single deleteDoc — orphan transactions kept counting in Finance
+  // / Dashboard totals forever.
   const handleDeleteSchool = async () => {
     if (!school) return;
-    if (!(await confirmDialog(`"${school.name}" ၏ အချက်အလက်များကို အပြီးပိုင် ဖျက်ရန် သေချာပါသလား?`))) return;
+    // Count the cascade impact BEFORE confirming, so the dialog lists
+    // exactly what goes with the school (same as Admin.tsx). A failed
+    // count read must not block the delete — the dialog then shows no
+    // counts, but still warns about the login account.
+    let impact: { transactionCount: number; eventCount: number; athleteCount: number; registrationCount: number; requestCount: number } | null = null;
     try {
-      await deleteDoc(doc(db, 'schools', school.id));
+      impact = await getSchoolDeleteImpact(school.id);
+    } catch (e) {
+      console.error('Could not load school delete impact:', e);
+    }
+    const impactText = impact
+      ? ` ဤကျောင်းနှင့် ဆက်စပ်နေသော မှတ်တမ်းများလည်း အတူတကွ ဖျက်ပါမည် — ငွေသွင်းမှတ်တမ်း (${impact.transactionCount}) ခု၊ ပွဲစဉ် (${impact.eventCount}) ခု၊ အားကစားသမား (${impact.athleteCount}) ခု၊ စာရင်းသွင်းမှု (${impact.registrationCount}) ခု၊ တောင်းဆိုချက် (${impact.requestCount}) ခု။`
+      : '';
+    if (!(await confirmDialog(`"${school.name}" ၏ အချက်အလက်များကို အပြီးပိုင် ဖျက်ရန် သေချာပါသလား?${impactText} ကျောင်း၏ Login အကောင့်ကိုတော့ Firebase Console တွင် သီးခြား ဖျက်ရပါမည်။`))) return;
+    try {
+      await deleteSchoolFromContext(school.id);
+      await recordAuditLog({ action: 'delete', entityType: 'school', entityId: school.id, entityName: school.name, details: `ကျောင်း ဖျက်ခြင်း${impact ? ` (ငွေသွင်းမှတ်တမ်း ${impact.transactionCount} ခု၊ ပွဲစဉ် ${impact.eventCount} ခု၊ အားကစားသမား ${impact.athleteCount} ခု၊ စာရင်းသွင်းမှု ${impact.registrationCount} ခု အတူဖျက်ခြင်း)` : ''}` });
       syncData(false);
-      toast.success('ကျောင်းအချက်အလက်ကို ဖျက်ပြီးပါပြီ');
+      toast.success('ကျောင်းအချက်အလက်ကို ဖျက်ပြီးပါပြီ — ကျောင်း၏ Login အကောင့်ကို Firebase Console တွင် သီးခြား ဖျက်ပေးပါ');
       navigate('/contacts');
     } catch (err) {
       toast.error('ဖျက်၍ မရပါ');
@@ -89,29 +119,51 @@ export default function SchoolDetail() {
   const handleToggleFeeStatus = async () => {
     if (!school) return;
     try {
-      const nextStatus = !school.isAnnualFeePaid;
+      // v24.15 re-audit (G1): the toggle means "paid THIS year" — the branch
+      // and the year must both be year-aware. The old branch read the raw
+      // flag, so a school that paid LAST year showed "မသွင်းရသေး" while the
+      // handler took the un-mark path; and the old year defaulted to the
+      // STALE stored year, so marking re-used last year's transaction
+      // instead of recording this year's payment.
+      const nextStatus = !isCurrentYearPaid(school);
       if (nextStatus) {
         const amount = Number(school.feeAmount) || 0;
         if (!amount || amount <= 0) { toast.error('ပမာဏ မရှိသေးပါ'); return; }
         const paidDate = new Date().toISOString().split('T')[0];
-        const academicYear = school.feeAcademicYear || getGlobalAcademicYear();
+        const academicYear = getCurrentAcademicYear();
         // recordAnnualFeePayment reuses the existing transaction when this
         // school+year already has one, so toggling can never duplicate it.
-        const { voucherNo } = await recordAnnualFeePayment({ school, amount, paidDate, academicYear });
-        await recordAuditLog({ action: 'create', entityType: 'transaction', entityId: school.id, entityName: school.name, details: `နှစ်စဉ်ကြေး ${amount.toLocaleString('my-MM')} ကျပ် ပေးပြီးအဖြစ် အမှတ်အသားလုပ်ခြင်း (${voucherNo})` });
-        setSchool({ ...school, isAnnualFeePaid: true, feePaidDate: paidDate, feeAmount: amount, feeAcademicYear: academicYear });
-        toast.success(`"${school.name}" ၏ နှစ်စဉ်ကြေးကို ပေးသွင်းပြီးအဖြစ် ပြောင်းလဲလိုက်ပါပြီ`);
+        // v24.15 (V15/V30): on reuse the flag mirrors the EXISTING
+        // transaction (amount/date/year from the transaction, not the new
+        // args) — and the UI warns that a transaction already exists
+        // instead of toasting success as if new money moved; the audit log
+        // says 'update' on reuse, 'create' on new.
+        const result = await recordAnnualFeePayment({ school, amount, paidDate, academicYear });
+        if (result.reused) {
+          await recordAuditLog({ action: 'update', entityType: 'transaction', entityId: school.id, entityName: school.name, details: `နှစ်စဉ်ကြေး ${result.amount.toLocaleString('my-MM')} ကျပ် ပေးပြီးအဖြစ် အမှတ်အသားလုပ်ခြင်း — ရှိပြီးသား မှတ်တမ်း ပြန်သုံးခြင်း (${result.voucherNo}) — ငွေအသစ် မသွင်းပါ` });
+          setSchool({ ...school, isAnnualFeePaid: true, feePaidDate: result.paidDate, feeAmount: result.amount, feeAcademicYear: result.academicYear });
+          toast.warning(`"${school.name}" အတွက် ဤပညာသင်နှစ်၏ ငွေသွင်းမှတ်တမ်း ရှိပြီးသားပါ — ငွေအသစ် မသွင်းပါ (မှတ်တမ်း ပြန်သုံးခြင်း)`);
+        } else {
+          await recordAuditLog({ action: 'create', entityType: 'transaction', entityId: school.id, entityName: school.name, details: `နှစ်စဉ်ကြေး ${amount.toLocaleString('my-MM')} ကျပ် ပေးပြီးအဖြစ် အမှတ်အသားလုပ်ခြင်း (${result.voucherNo})` });
+          setSchool({ ...school, isAnnualFeePaid: true, feePaidDate: paidDate, feeAmount: amount, feeAcademicYear: academicYear });
+          toast.success(`"${school.name}" ၏ နှစ်စဉ်ကြေးကို ပေးသွင်းပြီးအဖြစ် ပြောင်းလဲလိုက်ပါပြီ`);
+        }
       } else {
         if (!(await confirmDialog(`"${school.name}" ၏ နှစ်စဉ်ကြေးပေးသွင်းပြီးမှုကို ပယ်ဖျက်မည်လား?`))) return;
         // Un-marking only clears the flag. The transaction record stays in
         // Finance (money history is never silently deleted) — delete it
         // there if the payment was recorded by mistake.
+        // v24.15 (V32): also clear the stale fee amount / paid date / year
+        // from the school doc, so no stale date feeds a receipt fallback.
         await updateDoc(doc(db, 'schools', school.id), {
           isAnnualFeePaid: false,
+          feeAmount: deleteField(),
+          feePaidDate: deleteField(),
+          feeAcademicYear: deleteField(),
           updatedAt: new Date().toISOString(),
         });
         await recordAuditLog({ action: 'update', entityType: 'school', entityId: school.id, entityName: school.name, details: 'နှစ်စဉ်ကြေး ပေးပြီးအမှတ် ပယ်ဖျက်ခြင်း (ငွေသွင်းမှတ်တမ်းကိုတော့ Finance တွင် ဆက်ထားပါသည်)' });
-        setSchool({ ...school, isAnnualFeePaid: false });
+        setSchool({ ...school, isAnnualFeePaid: false, feeAmount: null, feePaidDate: undefined, feeAcademicYear: undefined });
         toast.success(`"${school.name}" ၏ နှစ်စဉ်ကြေးကို မပေးသွင်းရသေးအဖြစ် ပြောင်းလဲလိုက်ပါပြီ`);
       }
       syncData(false);
@@ -144,6 +196,12 @@ export default function SchoolDetail() {
     );
   }
 
+  // v24.15 (P24): the categorized phone helper covers every *Phone2 /
+  // *Phones field — the old hand-rolled Coordinator lists omitted the
+  // second numbers entirely. (getCategorizedSchoolPhones was already
+  // imported but unused.)
+  const categorizedPhones = getCategorizedSchoolPhones(school);
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 w-full">
       <Link
@@ -168,13 +226,13 @@ export default function SchoolDetail() {
               onClick={handleToggleFeeStatus}
               type="button"
               className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer shadow-2xs ${
-                school.isAnnualFeePaid
+                isCurrentYearPaid(school)
                   ? 'bg-emerald-100 text-emerald-900 border-emerald-300 hover:bg-emerald-200'
                   : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
               }`}
               title="နှစ်စဉ်ကြေး အခြေအနေ ပြောင်းရန်"
             >
-              {school.isAnnualFeePaid ? 'နှစ်စဉ်ကြေး: သွင်းပြီး ✓' : 'နှစ်စဉ်ကြေး: မသွင်းရသေး ✗'}
+              {isCurrentYearPaid(school) ? 'နှစ်စဉ်ကြေး: သွင်းပြီး ✓' : 'နှစ်စဉ်ကြေး: မသွင်းရသေး ✗'}
             </button>
             )}
 
@@ -256,7 +314,7 @@ export default function SchoolDetail() {
                   <span>လည်ပတ်ဆဲ (Active)</span>
                 </span>
               )}
-              {school.isAnnualFeePaid ? (
+              {isCurrentYearPaid(school) ? (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                   <span>နှစ်စဉ်ကြေး သွင်းပြီး</span>
@@ -299,7 +357,7 @@ export default function SchoolDetail() {
         {/* Annual Fee Status & Student Count Range Section */}
         <div
           className={`p-4 sm:p-5 rounded-2xl border space-y-3 ${
-            school.isAnnualFeePaid
+            isCurrentYearPaid(school)
               ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
               : 'bg-slate-50 border-slate-200 text-slate-800'
           }`}
@@ -308,12 +366,12 @@ export default function SchoolDetail() {
             <div className="flex items-center gap-3">
               <div
                 className={`p-2.5 rounded-xl shrink-0 ${
-                  school.isAnnualFeePaid
+                  isCurrentYearPaid(school)
                     ? 'bg-emerald-600 text-white shadow-2xs'
                     : 'bg-slate-200 text-slate-600'
                 }`}
               >
-                {school.isAnnualFeePaid ? (
+                {isCurrentYearPaid(school) ? (
                   <CheckCircle2 className="w-5 h-5" />
                 ) : (
                   <XCircle className="w-5 h-5" />
@@ -322,12 +380,12 @@ export default function SchoolDetail() {
               <div>
                 <p className="text-xs font-semibold text-slate-500">နှစ်စဉ်ကြေး ပေးသွင်းမှု အခြေအနေ</p>
                 <h3 className="font-extrabold text-base sm:text-lg">
-                  {school.isAnnualFeePaid ? 'နှစ်စဉ်ကြေး ပေးသွင်းပြီးဖြစ်ပါသည်' : 'နှစ်စဉ်ကြေး မသွင်းရသေးပါ'}
+                  {isCurrentYearPaid(school) ? 'နှစ်စဉ်ကြေး ပေးသွင်းပြီးဖြစ်ပါသည်' : 'နှစ်စဉ်ကြေး မသွင်းရသေးပါ'}
                 </h3>
               </div>
             </div>
             <div className="sm:text-right text-xs font-medium text-slate-500 pl-11 sm:pl-0">
-              {school.isAnnualFeePaid ? (
+              {isCurrentYearPaid(school) ? (
                 <span className="inline-block px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-300">
                   အသင်းဝင် အခွင့်အရေး အပြည့်အဝရရှိထားသည်
                 </span>
@@ -418,13 +476,13 @@ export default function SchoolDetail() {
             </h3>
             <p className="text-base font-semibold text-slate-900">{school.founderName || 'မဖော်ပြထားပါ'}</p>
             {(() => {
-              const phones = [school.founderPhone, school.founderPhone2, ...(Array.isArray(school.founderPhones) ? school.founderPhones : [])].filter(Boolean);
+              const phones = categorizedPhones.filter(p => p.category === 'founder');
               if (phones.length === 0) return null;
               return (
                 <div className="space-y-1.5">
-                  {phones.map((ph, idx) => (
-                    <a key={idx} href={`tel:${cleanDialNumber(ph)}`} className="flex items-center gap-2 text-sm text-sky-700 hover:text-sky-900 font-medium">
-                      <Phone className="w-4 h-4 text-sky-500 shrink-0" /> {ph}
+                  {phones.map((p) => (
+                    <a key={p.key} href={`tel:${p.cleanDial}`} className="flex items-center gap-2 text-sm text-sky-700 hover:text-sky-900 font-medium">
+                      <Phone className="w-4 h-4 text-sky-500 shrink-0" /> {p.number}
                     </a>
                   ))}
                 </div>
@@ -439,13 +497,13 @@ export default function SchoolDetail() {
             </h3>
             <p className="text-base font-semibold text-slate-900">{school.adminName || 'မဖော်ပြထားပါ'}</p>
             {(() => {
-              const phones = [school.adminPhone, school.adminPhone2, ...(Array.isArray(school.adminPhones) ? school.adminPhones : [])].filter(Boolean);
+              const phones = categorizedPhones.filter(p => p.category === 'admin');
               if (phones.length === 0) return null;
               return (
                 <div className="space-y-1.5">
-                  {phones.map((ph, idx) => (
-                    <a key={idx} href={`tel:${cleanDialNumber(ph)}`} className="flex items-center gap-2 text-sm text-sky-700 hover:text-sky-900 font-medium">
-                      <Phone className="w-4 h-4 text-sky-500 shrink-0" /> {ph}
+                  {phones.map((p) => (
+                    <a key={p.key} href={`tel:${p.cleanDial}`} className="flex items-center gap-2 text-sm text-sky-700 hover:text-sky-900 font-medium">
+                      <Phone className="w-4 h-4 text-sky-500 shrink-0" /> {p.number}
                     </a>
                   ))}
                 </div>
@@ -460,13 +518,13 @@ export default function SchoolDetail() {
             </h3>
             <p className="text-base font-semibold text-slate-900">{school.responsiblePerson1Name || school.contactName || 'မဖော်ပြထားပါ'}</p>
             {(() => {
-              const phones = [school.responsiblePerson1Phone, school.contactPhone, ...(Array.isArray(school.responsiblePerson1Phones) ? school.responsiblePerson1Phones : [])].filter((p, i, self) => Boolean(p) && self.indexOf(p) === i);
+              const phones = categorizedPhones.filter(p => p.category === 'contact1');
               if (phones.length === 0) return null;
               return (
                 <div className="space-y-1.5">
-                  {phones.map((ph, idx) => (
-                    <a key={idx} href={`tel:${cleanDialNumber(ph)}`} className="flex items-center gap-2 text-sm text-sky-700 hover:text-sky-900 font-medium">
-                      <Phone className="w-4 h-4 text-sky-500 shrink-0" /> {ph}
+                  {phones.map((p) => (
+                    <a key={p.key} href={`tel:${p.cleanDial}`} className="flex items-center gap-2 text-sm text-sky-700 hover:text-sky-900 font-medium">
+                      <Phone className="w-4 h-4 text-sky-500 shrink-0" /> {p.number}
                     </a>
                   ))}
                 </div>
@@ -481,13 +539,13 @@ export default function SchoolDetail() {
             </h3>
             <p className="text-base font-semibold text-slate-900">{school.responsiblePerson2Name || school.contact2Name || 'မဖော်ပြထားပါ'}</p>
             {(() => {
-              const phones = [school.responsiblePerson2Phone, school.contact2Phone, ...(Array.isArray(school.responsiblePerson2Phones) ? school.responsiblePerson2Phones : [])].filter((p, i, self) => Boolean(p) && self.indexOf(p) === i);
+              const phones = categorizedPhones.filter(p => p.category === 'contact2');
               if (phones.length === 0) return null;
               return (
                 <div className="space-y-1.5">
-                  {phones.map((ph, idx) => (
-                    <a key={idx} href={`tel:${cleanDialNumber(ph)}`} className="flex items-center gap-2 text-sm text-sky-700 hover:text-sky-900 font-medium">
-                      <Phone className="w-4 h-4 text-sky-500 shrink-0" /> {ph}
+                  {phones.map((p) => (
+                    <a key={p.key} href={`tel:${p.cleanDial}`} className="flex items-center gap-2 text-sm text-sky-700 hover:text-sky-900 font-medium">
+                      <Phone className="w-4 h-4 text-sky-500 shrink-0" /> {p.number}
                     </a>
                   ))}
                 </div>

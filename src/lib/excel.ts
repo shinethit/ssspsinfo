@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import { School } from '../types';
-import { getGlobalAcademicYear } from './academicYear';
+import { getGlobalAcademicYear, normalizeAcademicYear, isValidAcademicYear, isCurrentYearPaid } from './academicYear';
+import { toLatinDigits } from './myanmarDigits';
 
 export const downloadSchoolTemplate = () => {
   const templateData = [
@@ -81,10 +82,18 @@ export const normalizeSchoolRow = (row: Record<string, any>) => {
     return cleanStr(val) || '0-100';
   };
 
+  // v24.15 (V21): convert Myanmar digits FIRST, then preserve the sign
+  // and decimals — '-5000' stays -5000 (was +5000), '250000.5' stays
+  // 250000.5 (was 2500005), and a Myanmar-digit amount no longer strips
+  // to '' → Number('') = 0 (a paid row importing as UNPAID).
   const parseNumber = (val: any): number | undefined => {
     if (val === undefined || val === null || val === '') return undefined;
-    const num = Number(String(val).replace(/[^0-9.]/g, ''));
-    return isNaN(num) ? undefined : num;
+    if (typeof val === 'number') return Number.isFinite(val) ? val : undefined;
+    const cleaned = toLatinDigits(String(val)).replace(/[,\s]/g, '');
+    const m = cleaned.match(/-?\d+(\.\d+)?/);
+    if (!m) return undefined;
+    const num = Number(m[0]);
+    return Number.isFinite(num) ? num : undefined;
   };
 
   const rawRange = cleanStr(row['studentRange'] ?? row['ကျောင်းသားဦးရေ Range'] ?? row['Range'] ?? row['ကျောင်းသား Range']);
@@ -136,6 +145,15 @@ export const normalizeSchoolRow = (row: Record<string, any>) => {
     const coord2Viber = cleanStr(row['responsiblePerson2Viber'] || row['contact2Viber'] || row['တာဝန်ခံ ပုဂ္ဂိုလ် (၂) Viber'] || row['တာဝန်ခံ (၂) Viber'] || '');
     const coord2Telegram = cleanStr(row['responsiblePerson2Telegram'] || row['contact2Telegram'] || row['တာဝန်ခံ ပုဂ္ဂိုလ် (၂) Telegram'] || row['တာဝန်ခံ (၂) Telegram'] || '');
 
+    // v24.15 re-audit (F6): a row that HAS a year must have a valid one —
+    // 'abc' used to be stored verbatim. Reject the row (the import handler
+    // catches the throw and counts it as a failed row) instead of silently
+    // storing garbage; a missing year still falls back to the global year.
+    const rawYear = cleanStr(row['feeAcademicYear'] ?? row['ပညာသင်နှစ်'] ?? '');
+    if (rawYear && !isValidAcademicYear(normalizeAcademicYear(rawYear))) {
+      throw new Error(`ပညာသင်နှစ် မမှန်ကန်ပါ: ${rawYear}`);
+    }
+
     return {
       name: cleanStr(row['name'] || row['ကျောင်းအမည် *'] || row['ကျောင်းအမည်'] || ''),
       level: cleanStr(row['level'] || row['ကျောင်းအဆင့် *'] || row['ကျောင်းအဆင့်'] || '၁။ အထက်တန်း'),
@@ -148,7 +166,10 @@ export const normalizeSchoolRow = (row: Record<string, any>) => {
       // v24.7: no invented fee — when the row has no explicit amount the
       // fee stays empty instead of silently becoming a tier default.
       feeAmount: explicitFee !== undefined ? explicitFee : null,
-      feeAcademicYear: cleanStr(row['feeAcademicYear'] ?? row['ပညာသင်နှစ်'] ?? getGlobalAcademicYear()),
+      // v24.15 (V14): the row's own year, normalized (Myanmar digits) —
+      // the old code passed the raw text through, so a Latin-digit row year
+      // defeated the duplicate guard downstream.
+      feeAcademicYear: normalizeAcademicYear(rawYear) || getGlobalAcademicYear(),
       // v24.13 (F2b/A17): ALL THREE fee-column spellings must be accepted —
       // template 'နှစ်စဉ်ကြေး (သွင်းပြီး / မသွင်းရသေး)', old parser lookup
       // 'နှစ်စဉ်ကြေး (ပေးပြီး / မပေးရသေး)', export 'နှစ်စဉ်ကြေး အခြေအနေ'.
@@ -228,7 +249,7 @@ export const exportSchoolsToExcel = (schools: School[], filename: string = 'Scho
     'ကျောင်းသားဦးရေ Range': s.studentRange ? `${s.studentRange} ဦး` : '',
     'တိကျသော ကျောင်းသားဦးရေ': s.studentCount ?? '',
     'နှစ်စဉ်ကြေး ပမာဏ (ကျပ်)': s.feeAmount ?? '',
-    'နှစ်စဉ်ကြေး အခြေအနေ': s.isAnnualFeePaid ? 'သွင်းပြီး' : 'မသွင်းရသေး',
+    'နှစ်စဉ်ကြေး အခြေအနေ': isCurrentYearPaid(s) ? 'သွင်းပြီး' : 'မသွင်းရသေး',
     'ပညာသင်နှစ်': s.feeAcademicYear || '',
     'ကြေးပေးသွင်းသည့်ရက်': s.feePaidDate || '',
     'ကျောင်းအခြေအနေ': s.status === 'under_review' ? 'စိစစ်ဆဲ' : s.status === 'inactive' ? 'ယာယီရပ်နား' : 'လည်ပတ်ဆဲ',

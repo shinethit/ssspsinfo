@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { Gallery } from '../../types';
+import { parseStoredDate, formatMyanmarDate } from '../../lib/myanmarDate';
 import { toast } from 'sonner';
 import { confirmDialog } from '../../components/ConfirmModal';
 import { Trash2, Images } from 'lucide-react';
@@ -111,7 +112,7 @@ export default function AdminGalleryManager() {
                 <img src={photo.imageUrl} alt={photo.title} className="w-16 h-16 object-cover rounded-xl border border-slate-200 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <h4 className="font-bold text-slate-900 truncate">{photo.title}</h4>
-                  <span className="text-xs text-slate-500 mt-1">{photo.album}{photo.createdAt ? ` • ${new Date(photo.createdAt).toLocaleDateString('my-MM')}` : ''}</span>
+                  <span className="text-xs text-slate-500 mt-1">{photo.album}{photo.createdAt ? ` • ${formatMyanmarDate(parseStoredDate(photo.createdAt))}` : ''}</span>
                 </div>
                 <button onClick={() => handleDelete(photo.id)} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 shrink-0">
                   <Trash2 className="w-4 h-4" />

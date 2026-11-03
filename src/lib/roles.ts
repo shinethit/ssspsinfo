@@ -3,13 +3,23 @@
 // User = school account (authUid on a school doc, not in the admins collection).
 // Moderator / Admin = admins doc role; normalized here so legacy roles keep working:
 //   super_admin -> admin, editor / sports_moderator / news_editor -> moderator.
+//
+// v24.15 (P34): normalizeRole returns null for any role the Firestore rules
+// do NOT admit (including 'user', 'guest', a missing role, or any other
+// value). The rules' isModerator() admits exactly admin / super_admin /
+// moderator / editor / sports_moderator / news_editor; a null role is
+// treated as non-admin everywhere (ProtectedRoute, getAdminSession).
 
 export type AdminRole = 'admin' | 'moderator';
 
-/** Normalize any stored role value to one of the two admin roles. */
-export function normalizeRole(role: unknown): AdminRole {
+/**
+ * Normalize any stored role value to one of the two admin roles, or null
+ * when the value is not a role the Firestore rules admit.
+ */
+export function normalizeRole(role: unknown): AdminRole | null {
   if (role === 'admin' || role === 'super_admin') return 'admin';
-  return 'moderator';
+  if (role === 'moderator' || role === 'editor' || role === 'sports_moderator' || role === 'news_editor') return 'moderator';
+  return null;
 }
 
 const CONTENT_TABS = new Set([

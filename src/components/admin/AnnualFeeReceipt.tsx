@@ -5,17 +5,26 @@ import jsPDF from 'jspdf';
 import { Download, Printer, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getGlobalAcademicYear } from '../../lib/academicYear';
+import { parseStoredDate, formatMyanmarDate } from '../../lib/myanmarDate';
 
 // v24.13 (F7): the receipt takes the STORED voucher number (and paid date)
 // from the transaction when the caller has it. The derived number
 // SSSPSFV-<date>-<first 4 chars of school id> is only a fallback for
 // legacy flag-only payments that have no transaction — it used to be the
 // only number shown, so it disagreed with the voucher stored in Finance.
-export default function AnnualFeeReceipt({ school, onClose, voucherNo, paidDate }: { school: School; onClose: () => void; voucherNo?: string; paidDate?: string }) {
+// v24.15 (V16): txnAmount / txnPaidDate are the TRANSACTION's own values —
+// when the caller passes them the receipt shows THOSE, never the school
+// flag's amount/date. paidDate (v24.13) and the flag are only fallbacks.
+export default function AnnualFeeReceipt({ school, onClose, voucherNo, paidDate, txnAmount, txnPaidDate }: { school: School; onClose: () => void; voucherNo?: string; paidDate?: string; txnAmount?: number | null; txnPaidDate?: string | null }) {
   const receiptRef = useRef<HTMLDivElement>(null);
-  const displayPaidDate = paidDate || school.feePaidDate;
-  const displayVoucherNo = voucherNo || (displayPaidDate
-    ? `SSSPSFV-${new Date(displayPaidDate).toISOString().slice(0, 10).replace(/-/g, '')}-${school.id.substring(0, 4).toUpperCase()}`
+  const displayAmount = txnAmount ?? school.feeAmount ?? 0;
+  const displayPaidDate = txnPaidDate ?? paidDate ?? school.feePaidDate;
+  // Guarded date: an invalid/missing date never falls back to today and
+  // never throws — the derived voucher and the date line both use the
+  // parsed value (or the guarded label / 'N/A').
+  const parsedPaidDate = parseStoredDate(displayPaidDate);
+  const displayVoucherNo = voucherNo || (parsedPaidDate
+    ? `SSSPSFV-${parsedPaidDate.getFullYear()}${String(parsedPaidDate.getMonth() + 1).padStart(2, '0')}${String(parsedPaidDate.getDate()).padStart(2, '0')}-${school.id.substring(0, 4).toUpperCase()}`
     : 'N/A');
 
   const handleDownload = async (format: 'pdf' | 'jpeg') => {
@@ -43,16 +52,23 @@ export default function AnnualFeeReceipt({ school, onClose, voucherNo, paidDate 
     }
   };
 
+  // v24.15 re-audit (R2): the global print rule only applies while the
+  // `printing-receipt` class is on <body> — add it for this print, remove
+  // it when the print dialog closes (afterprint fires on cancel too).
   const handlePrint = () => {
+    document.body.classList.add('printing-receipt');
+    const cleanup = () => {
+      document.body.classList.remove('printing-receipt');
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
     window.print();
   };
 
-  const formattedDate = displayPaidDate
-    ? new Date(displayPaidDate).toLocaleDateString('my-MM', { year: 'numeric', month: 'long', day: 'numeric' })
-    : new Date().toLocaleDateString('my-MM', { year: 'numeric', month: 'long', day: 'numeric' });
+  const formattedDate = parsedPaidDate ? formatMyanmarDate(parsedPaidDate) : 'ရက်စွဲ မဖော်ပြထားပါ';
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto print:overflow-visible">
       <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 my-auto">
         
         {/* Controls (Hidden on Print) */}
@@ -73,8 +89,8 @@ export default function AnnualFeeReceipt({ school, onClose, voucherNo, paidDate 
         </div>
 
         {/* Printable Area */}
-        <div className="p-4 sm:p-8 bg-slate-50 overflow-x-auto">
-          <div ref={receiptRef} className="bg-white p-4 sm:p-12 rounded-xl border border-slate-200 relative overflow-hidden w-full max-w-[700px] mx-auto text-slate-900" style={{ minHeight: '500px' }}>
+        <div className="p-4 sm:p-8 bg-slate-50 overflow-x-auto print:overflow-visible">
+          <div ref={receiptRef} className="receipt-print-area bg-white p-4 sm:p-12 rounded-xl border border-slate-200 relative overflow-hidden w-full max-w-[700px] mx-auto text-slate-900 print:overflow-visible" style={{ minHeight: '500px' }}>
             
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-5 pointer-events-none">
               <CheckCircle2 className="w-96 h-96 text-emerald-600" />
@@ -132,13 +148,13 @@ export default function AnnualFeeReceipt({ school, onClose, voucherNo, paidDate 
                       နှစ်စဉ်ကြေး (Annual Fee) - {school.feeAcademicYear || getGlobalAcademicYear()}
                     </td>
                     <td className="py-4 px-4 text-right border-b border-slate-100 font-mono font-bold">
-                      {(school.feeAmount || 0).toLocaleString('my-MM')} ကျပ်
+                      {displayAmount.toLocaleString('my-MM')} ကျပ်
                     </td>
                   </tr>
                   <tr>
                     <td className="py-4 px-4 text-right font-bold text-slate-800">စုစုပေါင်း (Total):</td>
                     <td className="py-4 px-4 text-right font-mono font-black text-lg text-sky-900 bg-sky-50 rounded-br-lg">
-                      {(school.feeAmount || 0).toLocaleString('my-MM')} ကျပ်
+                      {displayAmount.toLocaleString('my-MM')} ကျပ်
                     </td>
                   </tr>
                 </tbody>

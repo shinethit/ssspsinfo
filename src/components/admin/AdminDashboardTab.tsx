@@ -1,5 +1,6 @@
 import { AdminUser, Association, NewsTicker } from '../../types';
 import { CheckCircle2, FileText, Megaphone, Plus, School as SchoolIcon, Users } from 'lucide-react';
+import { isCurrentYearPaid } from '../../lib/academicYear';
 
 interface AdminDashboardTabProps {
   schools: any[];
@@ -12,6 +13,20 @@ interface AdminDashboardTabProps {
 }
 
 export default function AdminDashboardTab({ schools, announcements, tickers, associations, admins, onAddSchool, onGoToTab }: AdminDashboardTabProps) {
+  // v24.15 (P18): "ကျန်ရှိ" counts only schools that could still pay — active
+  // schools with a fee amount set. Inactive / under_review schools will never
+  // pay, and a school with no fee amount has nothing to pay, so counting them
+  // overstated the outstanding figure.
+  // v24.15 (V29, parent fix; re-audit G1/G2): paid means CURRENT-year paid —
+  // one shared definition in academicYear.ts, compared against the COMPUTED
+  // June-start year so every device agrees (the saved global year is
+  // per-browser localStorage and could disagree).
+  const payableSchools = schools.filter((s) => {
+    const fee = Number(s.feeAmount);
+    return (s.status || 'active') === 'active' && Number.isFinite(fee) && fee > 0;
+  });
+  const remainingPayable = payableSchools.filter((s) => !isCurrentYearPaid(s)).length;
+  const paidCount = schools.filter(isCurrentYearPaid).length;
   return (
     <div className="space-y-6 animate-in fade-in">
       <div className="bg-gradient-to-r from-sky-900 via-sky-800 to-indigo-900 rounded-3xl p-6 sm:p-8 text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -44,8 +59,8 @@ export default function AdminDashboardTab({ schools, announcements, tickers, ass
             <span className="text-xs font-bold text-slate-500">နှစ်စဉ်ကြေး ပေးသွင်းပြီး</span>
             <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><CheckCircle2 className="w-5 h-5" /></div>
           </div>
-          <p className="text-3xl font-extrabold text-emerald-700 mt-3">{schools.filter(s => s.isAnnualFeePaid).length}</p>
-          <p className="text-sm font-semibold text-rose-600 mt-1">ကျန်ရှိ {schools.filter(s => !s.isAnnualFeePaid).length} ကျောင်း</p>
+          <p className="text-3xl font-extrabold text-emerald-700 mt-3">{paidCount}</p>
+          <p className="text-sm font-semibold text-rose-600 mt-1">ကျန်ရှိ {remainingPayable} ကျောင်း (လည်ပတ်ဆဲ)</p>
         </div>
 
         <div onClick={() => onGoToTab('announcements')} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs hover:border-indigo-300 transition cursor-pointer">

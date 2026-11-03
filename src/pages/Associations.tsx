@@ -1,23 +1,36 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Association, CommitteeMember } from '../types';
 import { useData } from '../context/DataContext';
 import { Building2, Users, Phone, MapPin, Search, Mail, Send, Award, School as SchoolIcon, ArrowLeft } from 'lucide-react';
 import SortSelect from '../components/ui/SortSelect';
+import { cleanDialNumber } from '../lib/phoneUtils';
+import { useInAppBack } from '../hooks/useInAppBack';
 
 export default function Associations() {
-  const navigate = useNavigate();
+  const goBack = useInAppBack();
   const { associations, loading } = useData();
   // v24.13 P3: GlobalSearch links here with ?search=<name> — read it as the
   // initial search (same pattern as Admin ?tab=).
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
-  useEffect(() => {
-    const s = searchParams.get('search');
-    if (s !== null && s !== searchQuery) setSearchQuery(s);
-  }, [searchParams]);
   const [selectedTownship, setSelectedTownship] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'name_asc' | 'name_desc'>('name_asc');
+  // v24.15 P26: the card GlobalSearch pointed at — scrolled to + highlighted.
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  useEffect(() => {
+    const s = searchParams.get('search');
+    if (s !== null) {
+      if (s !== searchQuery) setSearchQuery(s);
+      // v24.15 P26: a new ?search= resets the township filter, or the
+      // target card could be filtered out of view.
+      if (selectedTownship !== 'all') setSelectedTownship('all');
+    } else if (searchQuery !== '') {
+      // v24.15 P26: navigating here WITHOUT ?search= clears a previous search.
+      setSearchQuery('');
+      setHighlightId(null);
+    }
+  }, [searchParams]);
 
   // Extract unique townships for filtering
   const townships = useMemo(() => {
@@ -48,19 +61,26 @@ export default function Associations() {
     });
   }, [associations, selectedTownship, searchQuery, sortBy]);
 
+  // v24.15 P26: after a GlobalSearch navigation, scroll to the first
+  // matched card and highlight it.
+  useEffect(() => {
+    if (searchParams.get('search') === null || filteredAssociations.length === 0) return;
+    const target = filteredAssociations[0];
+    setHighlightId(target.id);
+    // Wait a tick for the card to render, then scroll it into view.
+    const t = window.setTimeout(() => {
+      document.getElementById(`assoc-${target.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+    return () => window.clearTimeout(t);
+  }, [filteredAssociations, searchParams]);
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* Top Action Bar with Back Button */}
       <div className="flex items-center justify-between pb-3 border-b border-slate-200">
         <button
           type="button"
-          onClick={() => {
-            if (window.history.length > 1) {
-              navigate(-1);
-            } else {
-              navigate('/');
-            }
-          }}
+          onClick={goBack}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-sky-950 font-bold text-xs sm:text-sm transition cursor-pointer shadow-2xs"
           title="နောက်သို့ (Back)"
         >
@@ -171,7 +191,8 @@ export default function Associations() {
           {filteredAssociations.map(assoc => (
             <article
               key={assoc.id}
-              className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden transition hover:border-sky-300"
+              id={`assoc-${assoc.id}`}
+              className={`bg-white rounded-2xl border shadow-xs overflow-hidden transition hover:border-sky-300 scroll-mt-24 ${highlightId === assoc.id ? 'border-amber-400 ring-2 ring-amber-400' : 'border-slate-200'}`}
             >
               {/* Association Banner / Header */}
               <div className="p-6 sm:p-8 bg-gradient-to-r from-sky-50/70 to-slate-50 border-b border-slate-200/80">
@@ -208,7 +229,7 @@ export default function Associations() {
                     {assoc.phone && (
                       <div className="flex items-center sm:justify-end gap-1.5">
                         <Phone className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-                        <a href={`tel:${assoc.phone}`} className="hover:text-sky-800 font-medium break-all">
+                        <a href={`tel:${cleanDialNumber(assoc.phone)}`} className="hover:text-sky-800 font-medium break-all">
                           {assoc.phone}
                         </a>
                       </div>
@@ -284,7 +305,7 @@ export default function Associations() {
                         {member.phone && (
                           <div className="pt-1 flex items-center justify-between text-xs border-t border-slate-200/60 min-w-0 gap-2">
                             <a
-                              href={`tel:${member.phone}`}
+                              href={`tel:${cleanDialNumber(member.phone)}`}
                               className="text-sky-700 font-semibold hover:underline inline-flex items-center gap-1 truncate"
                             >
                               <Phone className="w-3 h-3 shrink-0" /> {member.phone}
@@ -292,7 +313,7 @@ export default function Associations() {
                             <div className="flex items-center gap-1.5 text-slate-400 shrink-0">
                               {member.viber && (
                                 <a
-                                  href={`viber://chat?number=${member.viber.replace(/[^0-9]/g, '')}`}
+                                  href={`viber://chat?number=${cleanDialNumber(member.viber)}`}
                                   className="text-purple-600 hover:text-purple-800 font-bold"
                                   title={`Viber: ${member.viber}`}
                                 >

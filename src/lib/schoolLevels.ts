@@ -1,4 +1,5 @@
 import { School, SchoolLevelItem } from '../types';
+import { isCurrentYearPaid } from './academicYear';
 
 export interface LevelColorPalette {
   bg: string;
@@ -189,7 +190,10 @@ export const getUnifiedSchoolLevels = (
   levelItems.forEach((item, idx) => {
     const matchingSchools = levelSchoolMap.get(item.id) || [];
     const total = matchingSchools.length;
-    const paid = matchingSchools.filter((s) => !!s.isAnnualFeePaid).length;
+    // v24.15 re-audit (G1): paid means CURRENT-year paid (shared helper) —
+    // the raw flag leaked into Home's level bars (pct) while the Dashboard
+    // recomputed year-aware, so the two pages disagreed for last-year payers.
+    const paid = matchingSchools.filter(isCurrentYearPaid).length;
     const unpaid = total - paid;
     const pct = total > 0 ? Math.round((paid / total) * 100) : 0;
     const color = LEVEL_COLOR_PALETTES[idx % LEVEL_COLOR_PALETTES.length];
@@ -214,7 +218,8 @@ export const getUnifiedSchoolLevels = (
   const unmatchedSchools = schools.filter((s) => !matchedSchoolIds.has(s.id));
   if (unmatchedSchools.length > 0) {
     const total = unmatchedSchools.length;
-    const paid = unmatchedSchools.filter((s) => !!s.isAnnualFeePaid).length;
+    // v24.15 re-audit (G1): same year-aware paid as the level buckets above.
+    const paid = unmatchedSchools.filter(isCurrentYearPaid).length;
     const unpaid = total - paid;
     const pct = total > 0 ? Math.round((paid / total) * 100) : 0;
 

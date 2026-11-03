@@ -79,6 +79,9 @@ export interface SchoolDeleteImpact {
   eventCount: number;
   athleteCount: number;
   registrationCount: number;
+  // v24.15 (V31): the school's pending/decided change requests — they used
+  // to be left behind as orphans when the school was deleted.
+  requestCount: number;
 }
 
 interface DataContextType {
@@ -90,6 +93,12 @@ interface DataContextType {
   isSyncing: boolean;
   lastSyncTime: number | null;
   isOffline: boolean;
+  // v24.15 (V4): non-null when a Firestore read failed — pages fed by this
+  // context (Home, Dashboard, Contacts, Announcements) must show an honest
+  // error state instead of confident "0 / no data" empty states. Set by any
+  // onSnapshot error handler (or a failed syncData), cleared when that
+  // collection delivers a snapshot again. Message: 'ဒေတာ ဖတ်မရပါ — ပြန်စမ်းကြည့်ပါ'.
+  loadError: string | null;
   syncData: (force?: boolean) => Promise<void>;
   getSchoolById: (id: string) => School | undefined;
   // Robust CRUD Operations with instant optimistic update & storage persistence
@@ -131,6 +140,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
+  // v24.15 (V4): which collections are currently in a failed-read state.
+  // A single flag would flap (one listener's success clearing another's
+  // error), so the error stays until EVERY failed collection recovers.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const loadErrorSourcesRef = React.useRef<Set<string>>(new Set());
+  const reportLoadError = useCallback((source: string, failed: boolean) => {
+    if (failed) loadErrorSourcesRef.current.add(source);
+    else loadErrorSourcesRef.current.delete(source);
+    setLoadError(
+      loadErrorSourcesRef.current.size > 0 ? 'ဒေတာ ဖတ်မရပါ — ပြန်စမ်းကြည့်ပါ' : null
+    );
+  }, []);
 
   // Helper to persist current state to localStorage safely
   const persistCache = useCallback(
@@ -205,6 +226,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           setSchools(updatedSchools);
           setLoading(false);
+          reportLoadError('schools', false);
           // Persist immediately to localStorage
           setAnnouncements((curAnnounce) => {
             setAssociations((curAssoc) => {
@@ -217,6 +239,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         (error) => {
           console.warn('Realtime schools listener error (offline or rules fallback):', error);
           setLoading(false);
+          reportLoadError('schools', true);
         }
       );
 
@@ -229,9 +252,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             ...docSnap.data(),
           })) as Announcement[];
           setAnnouncements(sortAnnouncementsByEventDate(updated));
+          reportLoadError('announcements', false);
         },
         (error) => {
           console.warn('Realtime announcements listener error:', error);
+          reportLoadError('announcements', true);
         }
       );
 
@@ -244,9 +269,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             ...docSnap.data(),
           })) as Association[];
           setAssociations(updated);
+          reportLoadError('associations', false);
         },
         (error) => {
           console.warn('Realtime associations listener error:', error);
+          reportLoadError('associations', true);
         }
       );
 
@@ -261,6 +288,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             })) as SchoolLevelItem[];
             updated.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
             setSchoolLevels(updated);
+            reportLoadError('school_levels', false);
             try {
               localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(updated));
             } catch (e) {}
@@ -268,6 +296,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         },
         (error) => {
           console.warn('Realtime school_levels listener error:', error);
+          reportLoadError('school_levels', true);
         }
       );
     } catch (err) {
@@ -281,7 +310,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (unsubAssociations) unsubAssociations();
       if (unsubLevels) unsubLevels();
     };
-  }, [persistCache]);
+  }, [persistCache, reportLoadError]);
 
   // 3. Manual / Background Sync function (forces fresh fetch)
   const syncData = useCallback(
@@ -323,6 +352,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setAnnouncements(sortAnnouncementsByEventDate(fetchedAnnouncements));
         setAssociations(fetchedAssociations);
         persistCache(fetchedSchools, sortAnnouncementsByEventDate(fetchedAnnouncements), fetchedAssociations);
+        reportLoadError('sync', false);
 
         if (!levelsSnap.empty) {
           const fetchedLevels = levelsSnap.docs.map((docSnap) => ({
@@ -341,6 +371,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch (err) {
         console.error('Offline Sync background error:', err);
+        reportLoadError('sync', true);
         if (force) {
           toast.error('Offline ဒေတာ အသုံးပြုနေပါသည်');
         }
@@ -349,7 +380,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
       }
     },
-    [persistCache]
+    [persistCache, reportLoadError]
   );
 
   // 4. Auto-sync on connection online
@@ -455,6 +486,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const txSnap = await getDocs(query(collection(db, 'transactions'), where('schoolId', '==', id)));
       const evSnap = await getDocs(query(collection(db, 'events'), where('schoolId', '==', id)));
       const athByIdSnap = await getDocs(query(collection(db, 'athletes'), where('schoolId', '==', id)));
+      // v24.15 (V31): the school's update requests (pending or decided) go
+      // with the school — without them the requests list keeps pointing at
+      // a deleted school.
+      const reqSnap = await getDocs(query(collection(db, 'school_update_requests'), where('schoolId', '==', id)));
 
       const athleteRefs = new Map<string, ReturnType<typeof doc>>();
       athByIdSnap.docs.forEach((d) => athleteRefs.set(d.id, d.ref));
@@ -479,6 +514,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ...evSnap.docs.map((d) => d.ref),
         ...Array.from(athleteRefs.values()),
         ...regRefs,
+        ...reqSnap.docs.map((d) => d.ref),
       ];
       return {
         impact: {
@@ -488,6 +524,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           eventCount: evSnap.size,
           athleteCount: athleteRefs.size,
           registrationCount: regRefs.length,
+          requestCount: reqSnap.size,
         },
         refs,
       };
@@ -702,6 +739,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const hasDefaultIds = schoolLevels.some((l) => l.id.startsWith('default-'));
 
+      // v24.15 (V6): snapshot BOTH lists before any optimistic change, so a
+      // failed write rolls the UI and the offline cache back — same pattern
+      // as updateSchool / updateAnnouncement (v24.7).
+      const prevLevels = schoolLevels;
+      const prevSchools = schools;
+      const rollbackLevels = () => {
+        setSchoolLevels(prevLevels);
+        try {
+          localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(prevLevels));
+        } catch (e) {}
+      };
+      const rollbackSchools = () => {
+        setSchools(prevSchools);
+        persistCache(prevSchools, announcements, associations);
+      };
+
       if (hasDefaultIds) {
         // Persist all current levels to Firestore in an atomic batch, updating ONLY target item
         const batch = writeBatch(db);
@@ -743,7 +796,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         });
 
-        await batch.commit();
+        try {
+          await batch.commit();
+        } catch (err) {
+          rollbackLevels();
+          throw err;
+        }
         setSchoolLevels(nextLevels.sort((a, b) => (a.order ?? 999) - (b.order ?? 999)));
         try {
           localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(nextLevels));
@@ -765,7 +823,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (data.order !== undefined) updatePayload.order = data.order;
         if (data.description !== undefined) updatePayload.description = data.description;
 
-        await updateDoc(doc(db, 'school_levels', id), updatePayload);
+        try {
+          await updateDoc(doc(db, 'school_levels', id), updatePayload);
+        } catch (err) {
+          rollbackLevels();
+          throw err;
+        }
       }
 
       // If level name changed, automatically migrate ONLY schools that EXACTLY have oldName
@@ -788,12 +851,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
             await batch.commit();
           } catch (e) {
-            console.warn('Batch update schools on level rename error:', e);
+            // v24.15 (V6): a failed migration used to only console.warn
+            // while the screen kept showing the renamed level on the
+            // schools — roll the schools back and let the caller toast.
+            rollbackSchools();
+            throw e;
           }
         }
       }
     },
-    [schoolLevels, schools]
+    [schoolLevels, schools, announcements, associations, persistCache]
   );
 
   const deleteSchoolLevel = useCallback(
@@ -802,6 +869,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const oldName = existing?.name?.trim();
 
       const hasDefaultIds = schoolLevels.some((l) => l.id.startsWith('default-'));
+
+      // v24.15 (V6): same snapshot + rollback as updateSchoolLevel.
+      const prevLevels = schoolLevels;
+      const prevSchools = schools;
+      const rollbackLevels = () => {
+        setSchoolLevels(prevLevels);
+        try {
+          localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(prevLevels));
+        } catch (e) {}
+      };
+      const rollbackSchools = () => {
+        setSchools(prevSchools);
+        persistCache(prevSchools, announcements, associations);
+      };
 
       if (hasDefaultIds) {
         const batch = writeBatch(db);
@@ -827,7 +908,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         });
 
-        await batch.commit();
+        try {
+          await batch.commit();
+        } catch (err) {
+          rollbackLevels();
+          throw err;
+        }
         setSchoolLevels(nextLevels.sort((a, b) => (a.order ?? 999) - (b.order ?? 999)));
         try {
           localStorage.setItem(LEVELS_CACHE_KEY, JSON.stringify(nextLevels));
@@ -841,7 +927,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return next;
         });
 
-        await deleteDoc(doc(db, 'school_levels', id));
+        try {
+          await deleteDoc(doc(db, 'school_levels', id));
+        } catch (err) {
+          rollbackLevels();
+          throw err;
+        }
       }
 
       // If deleted level had schools, update local schools to unassigned so data is preserved
@@ -864,12 +955,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
             await batch.commit();
           } catch (e) {
-            console.warn('Batch clear school levels on delete error:', e);
+            // v24.15 (V6): roll the schools back and surface the error —
+            // before, this only console.warned while the screen kept
+            // showing the schools as unassigned.
+            rollbackSchools();
+            throw e;
           }
         }
       }
     },
-    [schoolLevels, schools]
+    [schoolLevels, schools, announcements, associations, persistCache]
   );
 
   const resetSchoolLevelsToDefault = useCallback(async (): Promise<void> => {
@@ -931,6 +1026,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isSyncing,
       lastSyncTime,
       isOffline: !isOnline,
+      loadError,
       syncData,
       getSchoolById,
       addSchool,
@@ -954,6 +1050,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isSyncing,
       lastSyncTime,
       isOnline,
+      loadError,
       syncData,
       getSchoolById,
       addSchool,

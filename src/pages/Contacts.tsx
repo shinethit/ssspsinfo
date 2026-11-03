@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { School } from '../types';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useData } from '../context/DataContext';
+import { isCurrentYearPaid } from '../lib/academicYear';
 import {
   Search,
   School as SchoolIcon,
@@ -31,6 +32,8 @@ import {
 } from 'lucide-react';
 import { downloadSchoolTemplate, exportSchoolsToExcel } from '../lib/excel';
 import { getCategorizedSchoolPhones, toBurmeseNumber } from '../lib/phoneUtils';
+import { toLatinDigits } from '../lib/myanmarDigits';
+import { useInAppBack } from '../hooks/useInAppBack';
 import {
   getUnifiedSchoolLevels,
   UnifiedSchoolLevel,
@@ -42,13 +45,13 @@ export type SortOption = 'category_name' | 'name_asc' | 'name_desc' | 'newest' |
 
 
 export default function Contacts() {
-  const navigate = useNavigate();
+  const goBack = useInAppBack();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') || '';
   const initialCategory = searchParams.get('category') || searchParams.get('level') || 'all';
   const initialZone = searchParams.get('zone') || 'all';
 
-  const { schools, loading, isSyncing, syncData, schoolLevels } = useData();
+  const { schools, loading, isSyncing, syncData, schoolLevels, loadError } = useData();
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [selectedCategoryTab, setSelectedCategoryTab] = useState<string>(initialCategory);
   const [sortOption, setSortOption] = useState<SortOption>('category_name');
@@ -138,10 +141,15 @@ export default function Contacts() {
   // Update from URL params if changed
   useEffect(() => { setCurrentPage(1); }, [searchTerm, selectedCategoryTab, feeFilter, sortOption, viewMode, selectedZone]);
 
+  // v24.15 P20: URL params sync BOTH directions — when ?search= / ?zone= /
+  // category params are REMOVED from the URL, the filter resets to 'all'/''
+  // (the old code only ever applied params, never cleared them).
   useEffect(() => {
     const urlSearch = searchParams.get('search');
-    if (urlSearch !== null && urlSearch !== searchTerm) {
-      setSearchTerm(urlSearch);
+    if (urlSearch !== null) {
+      if (urlSearch !== searchTerm) setSearchTerm(urlSearch);
+    } else if (searchTerm !== '') {
+      setSearchTerm('');
     }
     const urlCategory = searchParams.get('category') || searchParams.get('level');
     if (urlCategory) {
@@ -149,22 +157,32 @@ export default function Contacts() {
         setSelectedCategoryTab(urlCategory);
         setLevelFilter(urlCategory);
       }
-    } else if (selectedCategoryTab !== 'all' && (searchParams.has('level') || searchParams.has('category'))) {
+    } else if (selectedCategoryTab !== 'all') {
       setSelectedCategoryTab('all');
       setLevelFilter('all');
     }
     const urlZone = searchParams.get('zone');
-    if (urlZone && urlZone !== selectedZone) setSelectedZone(urlZone);
+    if (urlZone) {
+      if (urlZone !== selectedZone) setSelectedZone(urlZone);
+    } else if (selectedZone !== 'all') {
+      setSelectedZone('all');
+    }
   }, [searchParams]);
+
+  // v24.15 P20: validate the ?zone= param — an unknown zone shows
+  // "ဇုန် မသိပါ" instead of a silent empty list.
+  const isUnknownZone = selectedZone !== 'all' && !ZONE_FILTER_OPTIONS.some(o => o.value === selectedZone);
 
   // Distinct school levels for filter options
   const availableLevels = useMemo(() => {
     return unifiedLevels.map((l) => l.name);
   }, [unifiedLevels]);
 
-  // Fee counts
-  const paidCount = useMemo(() => schools.filter((s) => s.isAnnualFeePaid).length, [schools]);
-  const unpaidCount = useMemo(() => schools.filter((s) => !s.isAnnualFeePaid).length, [schools]);
+  // Fee counts — v24.15 re-audit (G1): paid means CURRENT-year paid (shared
+  // helper), not the raw flag — a last-year payer used to count as paid here
+  // while the Dashboard summary excluded it.
+  const paidCount = useMemo(() => schools.filter(isCurrentYearPaid).length, [schools]);
+  const unpaidCount = useMemo(() => schools.filter((s) => !isCurrentYearPaid(s)).length, [schools]);
 
   // Category counts across ALL schools
   const categoryCounts = useMemo(() => {
@@ -222,41 +240,50 @@ export default function Contacts() {
 
   // 1. Filter schools based on search, category tab, fee status
   const filteredSchools = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
+    // v24.15 P13: convert Myanmar digits in the query (toLatinDigits) so a
+    // Myanmar-digit phone query matches Latin-digit stored numbers, and
+    // match township / city / address too (the placeholder promised
+    // township search but matchSearch never checked it).
+    const q = toLatinDigits(searchTerm.trim().toLowerCase());
+    const matchText = (v?: string | null) => !!v && toLatinDigits(v.toLowerCase()).includes(q);
+    const matchTextList = (arr?: string[]) => Array.isArray(arr) && arr.some(p => matchText(p));
     const activeCategory = selectedCategoryTab !== 'all' ? selectedCategoryTab : (levelFilter !== 'all' ? levelFilter : 'all');
 
     return schools.filter((s) => {
       const matchSearch =
         !q ||
-        (s.name && s.name.toLowerCase().includes(q)) ||
-        (s.level && s.level.toLowerCase().includes(q)) ||
-        (s.zone && s.zone.toLowerCase().includes(q)) ||
-        (s.category && s.category.toLowerCase().includes(q)) ||
-        (s.founderName && s.founderName.toLowerCase().includes(q)) ||
-        (s.adminName && s.adminName.toLowerCase().includes(q)) ||
-        (s.contactName && s.contactName.toLowerCase().includes(q)) ||
-        (s.responsiblePerson1Name && s.responsiblePerson1Name.toLowerCase().includes(q)) ||
-        (s.contact2Name && s.contact2Name.toLowerCase().includes(q)) ||
-        (s.responsiblePerson2Name && s.responsiblePerson2Name.toLowerCase().includes(q)) ||
-        (s.schoolPhone && s.schoolPhone.toLowerCase().includes(q)) ||
-        (s.schoolPhone2 && s.schoolPhone2.toLowerCase().includes(q)) ||
-        (s.contactPhone && s.contactPhone.toLowerCase().includes(q)) ||
-        (s.contactPhone2 && s.contactPhone2.toLowerCase().includes(q)) ||
-        (s.responsiblePerson1Phone && s.responsiblePerson1Phone.toLowerCase().includes(q)) ||
-        (s.contact2Phone && s.contact2Phone.toLowerCase().includes(q)) ||
-        (s.contact2Phone2 && s.contact2Phone2.toLowerCase().includes(q)) ||
-        (s.responsiblePerson2Phone && s.responsiblePerson2Phone.toLowerCase().includes(q)) ||
-        (Array.isArray(s.schoolPhones) && s.schoolPhones.some((p) => p.toLowerCase().includes(q))) ||
-        (Array.isArray(s.contactPhones) && s.contactPhones.some((p) => p.toLowerCase().includes(q))) ||
-        (Array.isArray(s.responsiblePerson1Phones) && s.responsiblePerson1Phones.some((p) => p.toLowerCase().includes(q))) ||
-        (Array.isArray(s.contact2Phones) && s.contact2Phones.some((p) => p.toLowerCase().includes(q))) ||
-        (Array.isArray(s.responsiblePerson2Phones) && s.responsiblePerson2Phones.some((p) => p.toLowerCase().includes(q))) ||
-        (s.founderPhone && s.founderPhone.toLowerCase().includes(q)) ||
-        (s.founderPhone2 && s.founderPhone2.toLowerCase().includes(q)) ||
-        (Array.isArray(s.founderPhones) && s.founderPhones.some((p) => p.toLowerCase().includes(q))) ||
-        (s.adminPhone && s.adminPhone.toLowerCase().includes(q)) ||
-        (s.adminPhone2 && s.adminPhone2.toLowerCase().includes(q)) ||
-        (Array.isArray(s.adminPhones) && s.adminPhones.some((p) => p.toLowerCase().includes(q)));
+        matchText(s.name) ||
+        matchText(s.level) ||
+        matchText(s.zone) ||
+        matchText(s.category) ||
+        matchText(s.township) ||
+        matchText(s.city) ||
+        matchText(s.address) ||
+        matchText(s.founderName) ||
+        matchText(s.adminName) ||
+        matchText(s.contactName) ||
+        matchText(s.responsiblePerson1Name) ||
+        matchText(s.contact2Name) ||
+        matchText(s.responsiblePerson2Name) ||
+        matchText(s.schoolPhone) ||
+        matchText(s.schoolPhone2) ||
+        matchText(s.contactPhone) ||
+        matchText(s.contactPhone2) ||
+        matchText(s.responsiblePerson1Phone) ||
+        matchText(s.contact2Phone) ||
+        matchText(s.contact2Phone2) ||
+        matchText(s.responsiblePerson2Phone) ||
+        matchTextList(s.schoolPhones) ||
+        matchTextList(s.contactPhones) ||
+        matchTextList(s.responsiblePerson1Phones) ||
+        matchTextList(s.contact2Phones) ||
+        matchTextList(s.responsiblePerson2Phones) ||
+        matchText(s.founderPhone) ||
+        matchText(s.founderPhone2) ||
+        matchTextList(s.founderPhones) ||
+        matchText(s.adminPhone) ||
+        matchText(s.adminPhone2) ||
+        matchTextList(s.adminPhones);
 
       const schoolCat = getSchoolCategory(s);
       const matchCategoryTab =
@@ -271,8 +298,8 @@ export default function Contacts() {
         feeFilter === 'all'
           ? true
           : feeFilter === 'paid'
-          ? s.isAnnualFeePaid === true
-          : !s.isAnnualFeePaid;
+          ? isCurrentYearPaid(s)
+          : !isCurrentYearPaid(s);
 
       const matchZone = selectedZone === 'all' ? true : isSchoolInZone(s.zone, selectedZone);
 
@@ -354,6 +381,18 @@ export default function Contacts() {
     return groups;
   }, [sortedSchools, unifiedLevels, getSchoolCategory]);
 
+  // v24.15 P30: same shrink clamp as Announcements — when the list shrinks
+  // (filter/delete), currentPage drops to the last valid page; never a
+  // blank list with "စာမျက်နှာ 3 / 2".
+  const listTotalPages = Math.ceil(sortedSchools.length / itemsPerPage);
+  useEffect(() => {
+    if (listTotalPages === 0) {
+      if (currentPage !== 1) setCurrentPage(1);
+    } else if (currentPage > listTotalPages) {
+      setCurrentPage(listTotalPages);
+    }
+  }, [listTotalPages, currentPage]);
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto w-full pb-10 max-w-full overflow-x-hidden">
       {/* 1. Page Header & Actions (Compact with Back button) */}
@@ -361,13 +400,7 @@ export default function Contacts() {
         <div className="flex items-center gap-2 min-w-0">
           <button
             type="button"
-            onClick={() => {
-              if (window.history.length > 1) {
-                navigate(-1);
-              } else {
-                navigate('/');
-              }
-            }}
+            onClick={goBack}
             className="px-2.5 py-1.5 rounded-xl border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-950 transition flex items-center gap-1.5 text-xs font-bold shrink-0 cursor-pointer shadow-2xs"
             title="နောက်သို့ (Back)"
           >
@@ -380,7 +413,7 @@ export default function Contacts() {
             အသင်းဝင်ကျောင်းများ စာရင်း
           </h2>
           <span className="text-xs sm:text-sm font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 shrink-0">
-            {toBurmeseNumber(schools.length)} ကျောင်း
+            {loading || loadError ? '—' : `${toBurmeseNumber(schools.length)} ကျောင်း`}
           </span>
         </div>
 
@@ -431,7 +464,7 @@ export default function Contacts() {
                 className="w-full bg-transparent font-bold text-slate-900 outline-hidden cursor-pointer text-xs pr-6 truncate"
               >
                 <option value="all">
-                  ကဏ္ဍ အားလုံး — ({toBurmeseNumber(categoryCounts.all || schools.length)} ကျောင်း)
+                  ကဏ္ဍ အားလုံး — ({loading || loadError ? '—' : toBurmeseNumber(categoryCounts.all || schools.length)} ကျောင်း)
                 </option>
                 {unifiedLevels.map((lvl) => {
                   const count = lvl.total;
@@ -477,7 +510,7 @@ export default function Contacts() {
                 type="button"
                 onClick={() => setViewMode('grouped')}
                 title="Category အလိုက် အုပ်စုဖွဲ့ပြရန်"
-                className={`px-2.5 py-1 rounded-md text-xs font-bold flex items-center gap-1 transition cursor-pointer ${
+                className={`px-2.5 py-2.5 rounded-md text-xs font-bold flex items-center gap-1 transition cursor-pointer ${
                   viewMode === 'grouped'
                     ? 'bg-white text-sky-900 shadow-2xs font-extrabold'
                     : 'text-slate-600 hover:text-slate-900'
@@ -490,7 +523,7 @@ export default function Contacts() {
                 type="button"
                 onClick={() => setViewMode('list')}
                 title="စာရင်းတစ်ခုတည်းပြရန်"
-                className={`px-2.5 py-1 rounded-md text-xs font-bold flex items-center gap-1 transition cursor-pointer ${
+                className={`px-2.5 py-2.5 rounded-md text-xs font-bold flex items-center gap-1 transition cursor-pointer ${
                   viewMode === 'list'
                     ? 'bg-white text-sky-900 shadow-2xs font-extrabold'
                     : 'text-slate-600 hover:text-slate-900'
@@ -568,7 +601,7 @@ export default function Contacts() {
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
-                    အားလုံး ({schools.length})
+                    အားလုံး ({loading || loadError ? '—' : schools.length})
                   </button>
                   <button
                     onClick={() => setFeeFilter('paid')}
@@ -580,7 +613,7 @@ export default function Contacts() {
                     }`}
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>နှစ်စဉ်ကြေး သွင်းပြီး ({paidCount})</span>
+                    <span>နှစ်စဉ်ကြေး သွင်းပြီး ({loading || loadError ? '—' : paidCount})</span>
                   </button>
                   <button
                     onClick={() => setFeeFilter('unpaid')}
@@ -592,7 +625,7 @@ export default function Contacts() {
                     }`}
                   >
                     <XCircle className="w-3.5 h-3.5" />
-                    <span>နှစ်စဉ်ကြေး မသွင်းရသေး ({unpaidCount})</span>
+                    <span>နှစ်စဉ်ကြေး မသွင်းရသေး ({loading || loadError ? '—' : unpaidCount})</span>
                   </button>
                 </div>
               </div>
@@ -671,6 +704,21 @@ export default function Contacts() {
         )}
       </div>
 
+      {/* v24.15 P20: unknown ?zone= — say so instead of a silent empty list. */}
+      {isUnknownZone && (
+        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-center space-y-2">
+          <p className="font-bold text-rose-800 text-sm">ဇုန် မသိပါ — “{selectedZone}” ဟူသော ဇုန် မရှိပါ</p>
+          <p className="text-xs text-rose-700">လင့်ခ်ထဲမှ ဇုန်အမည်ကို ပြန်စစ်ပါ၊ သို့မဟုတ် ဇုန်အားလုံးကို ကြည့်ပါ။</p>
+          <button
+            type="button"
+            onClick={() => handleSelectZone('all')}
+            className="px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold rounded-lg transition cursor-pointer"
+          >
+            ဇုန်အားလုံး ပြန်ကြည့်မည်
+          </button>
+        </div>
+      )}
+
       {/* 4. SCHOOLS CONTENT DISPLAY */}
       {loading ? (
         <div className="space-y-4">
@@ -683,6 +731,21 @@ export default function Contacts() {
               </div>
             </div>
           ))}
+        </div>
+      ) : loadError ? (
+        <div className="p-16 text-center bg-rose-50 rounded-2xl border border-rose-200 shadow-xs space-y-3">
+          <SchoolIcon className="w-12 h-12 text-rose-300 mx-auto" />
+          <p className="font-bold text-lg text-rose-800">ဒေတာ ဖတ်မရပါ — ပြန်စမ်းကြည့်ပါ</p>
+          <p className="text-xs text-rose-700 max-w-md mx-auto">
+            ကျောင်းစာရင်း ဖတ်ယူ၍ မရပါ။ အင်တာနက် စစ်ပြီး ပြန်စမ်းကြည့်ပါ — ဤစာမျက်နှာက ပြသော “မရှိသေးပါ” သည် ဒေတာ မရှိခြင်းမဟုတ်ပါ။
+          </p>
+          <button
+            type="button"
+            onClick={() => syncData(true)}
+            className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5" /> ပြန်စမ်းကြည့်မည်
+          </button>
         </div>
       ) : sortedSchools.length === 0 ? (
         <div className="p-16 text-center text-slate-500 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-3">
@@ -923,7 +986,7 @@ export default function Contacts() {
                                 )}
 
                                 {/* Annual Fee Badge */}
-                                {school.isAnnualFeePaid ? (
+                                {isCurrentYearPaid(school) ? (
                                   <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold shrink-0">
                                     နှစ်စဉ်ကြေး သွင်းပြီး ✓
                                   </span>
@@ -1132,7 +1195,7 @@ export default function Contacts() {
                       )}
 
                       {/* Fee Badge */}
-                      {s.isAnnualFeePaid ? (
+                      {isCurrentYearPaid(s) ? (
                         <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold shrink-0">
                           နှစ်စဉ်ကြေး သွင်းပြီး ✓
                         </span>

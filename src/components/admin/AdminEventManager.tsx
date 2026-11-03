@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { EventItem, EventRegistration } from '../../types';
+import { parseStoredDate, formatMyanmarDate } from '../../lib/myanmarDate';
 import { toast } from 'sonner';
 import { confirmDialog } from '../../components/ConfirmModal';
 import { Plus, Trash2, Calendar, MapPin, Eye, EyeOff, Users, Edit2, X } from 'lucide-react';
@@ -19,6 +20,9 @@ export default function AdminEventManager() {
   const [location, setLocation] = useState('');
   const [zone, setZone] = useState('');
   const [zoneFilter, setZoneFilter] = useState<string>('all');
+  // v24.15 P25: event type selector — admin events used to be hardcoded
+  // 'general', so festival/sport filters could never match an admin event.
+  const [eventType, setEventType] = useState<'general' | 'festival' | 'sport' | 'school_activity'>('general');
   const [isSubmitting, setIsSubmitting] = useState(false);
   // A2(a): event being edited (null = creating a new event)
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
@@ -51,16 +55,16 @@ export default function AdminEventManager() {
     try {
       if (editingEventId) {
         await updateDoc(doc(db, 'events', editingEventId), {
-          title, description, date, location, zone: zone || '',
+          title, description, date, location, zone: zone || '', eventType,
         });
         toast.success('ပွဲ/အခမ်းအနား ပြင်ဆင်ပြီးပါပြီ');
       } else {
         await addDoc(collection(db, 'events'), {
-          title, description, date, location, zone: zone || '', eventType: 'general', isActive: true, createdAt: new Date().toISOString()
+          title, description, date, location, zone: zone || '', eventType, isActive: true, createdAt: new Date().toISOString()
         });
         toast.success('ပွဲ/အခမ်းအနား အသစ် တင်ပြီးပါပြီ');
       }
-      setTitle(''); setDescription(''); setDate(''); setLocation(''); setZone('');
+      setTitle(''); setDescription(''); setDate(''); setLocation(''); setZone(''); setEventType('general');
       setEditingEventId(null);
       fetchData();
     } catch (err) {
@@ -77,12 +81,13 @@ export default function AdminEventManager() {
     setDate(ev.date || '');
     setLocation(ev.location || '');
     setZone((ev as any).zone || '');
+    setEventType((ev.eventType as 'general' | 'festival' | 'sport' | 'school_activity') || 'general');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const cancelEditEvent = () => {
     setEditingEventId(null);
-    setTitle(''); setDescription(''); setDate(''); setLocation(''); setZone('');
+    setTitle(''); setDescription(''); setDate(''); setLocation(''); setZone(''); setEventType('general');
   };
 
   // A3(a): delete one registration (moderators may manage event_registrations)
@@ -131,6 +136,12 @@ export default function AdminEventManager() {
           <select value={zone} onChange={e => setZone(e.target.value)} className="p-2.5 border rounded-xl text-sm sm:col-span-2 bg-white">
             <option value="">- ဇုန် မသတ်မှတ် (Association-wide / အားလုံးအတွက်) -</option>
             {STANDARD_ZONES.map(z => <option key={z} value={z}>{z}</option>)}
+          </select>
+          <select value={eventType} onChange={e => setEventType(e.target.value as 'general' | 'festival' | 'sport' | 'school_activity')} className="p-2.5 border rounded-xl text-sm sm:col-span-2 bg-white" title="ပွဲ အမျိုးအစား">
+            <option value="general">အမျိုးအစား: အထွေထွေ</option>
+            <option value="festival">အမျိုးအစား: ပွဲ/အခမ်းအနား</option>
+            <option value="sport">အမျိုးအစား: အားကစား</option>
+            <option value="school_activity">အမျိုးအစား: ကျောင်း Activity</option>
           </select>
           <textarea required value={description} onChange={e => setDescription(e.target.value)} placeholder="အသေးစိတ် အကြောင်းအရာ" rows={2} className="p-2.5 border rounded-xl text-sm sm:col-span-2" />
           <div className="flex gap-2 sm:col-span-2">
@@ -242,7 +253,7 @@ export default function AdminEventManager() {
                       <p className="font-bold text-sm text-slate-900 truncate">{reg.schoolName}</p>
                       <p className="text-xs text-slate-500 mt-0.5">
                         {reg.contactPhone}
-                        {reg.registeredAt ? ` • ${new Date(reg.registeredAt).toLocaleDateString('my-MM')}` : ''}
+                        {reg.registeredAt ? ` • ${formatMyanmarDate(parseStoredDate(reg.registeredAt))}` : ''}
                       </p>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">

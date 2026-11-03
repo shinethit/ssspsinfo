@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Gallery as GalleryItem } from '../types';
 import { Images, ArrowLeft, Loader2, X } from 'lucide-react';
+import { useInAppBack } from '../hooks/useInAppBack';
 
 export default function Gallery() {
-  const navigate = useNavigate();
+  const goBack = useInAppBack();
   const [photos, setPhotos] = useState<GalleryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -52,7 +53,7 @@ export default function Gallery() {
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-10">
       <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-        <button onClick={() => { if (window.history.length > 1) navigate(-1); else navigate('/'); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-sky-950 font-bold text-xs sm:text-sm transition cursor-pointer shadow-2xs">
+        <button onClick={goBack} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-sky-950 font-bold text-xs sm:text-sm transition cursor-pointer shadow-2xs">
           <ArrowLeft className="w-4 h-4 text-sky-800" /> နောက်သို့
         </button>
         <Link to="/" className="text-xs font-semibold text-slate-600 hover:text-sky-800 px-2.5 py-1 rounded-lg hover:bg-slate-100 transition">ပင်မစာမျက်နှာ ➔</Link>

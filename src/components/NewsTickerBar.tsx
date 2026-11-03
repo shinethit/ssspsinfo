@@ -7,10 +7,37 @@ import { Link } from 'react-router-dom';
 
 export default function NewsTickerBar() {
   const [tickers, setTickers] = useState<NewsTicker[]>([]);
-  // v24.13: dismiss sticks — it is cleared only when a NEW ticker id
-  // arrives. The old code reset it on every snapshot (every ticker edit).
-  const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+  // v24.15 P19: per-ticker dismiss, persisted in localStorage so dismissal
+  // survives navigation and reload (Layout unmounts the ticker on /admin
+  // routes, which used to resurrect everything dismissed). A new ticker
+  // clears ONLY the dismissal for that new ticker id — other dismissals
+  // stay dismissed.
+  const DISMISSED_KEY = 'sssps_dismissed_tickers';
+  const [dismissedIds, setDismissedIds] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(DISMISSED_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(DISMISSED_KEY, JSON.stringify(dismissedIds));
+    } catch {
+      // Storage full/unavailable — dismissal just won't persist.
+    }
+  }, [dismissedIds]);
+  const dismissTicker = (id: string) => {
+    setDismissedIds(prev => (prev.includes(id) ? prev : [...prev, id]));
+  };
   const prevIdsRef = useRef<string[]>([]);
+  // v24.15 re-audit (R1): the first snapshot is NOT "new" — prevIdsRef
+  // starts empty, so the first snapshot used to count every active ticker
+  // as genuinely new and wipe every persisted dismissal (Layout unmounts
+  // the ticker on /admin routes, so a remount wiped them again).
+  const isFirstSnapshotRef = useRef(true);
   const [isPaused, setIsPaused] = useState(false);
 
   useEffect(() => {
@@ -40,11 +67,19 @@ export default function NewsTickerBar() {
           return timeB - timeA;
         });
 
-        // Only clear the dismiss when a ticker id appears that was not
-        // there before (a genuinely new ticker).
+        // Only clear the dismissal for ticker ids that appear for the
+        // first time (genuinely new tickers, including a deactivated
+        // ticker that was reactivated) — every other dismissal stays.
+        // The first snapshot only SEEDS prevIdsRef (see R1 above) and
+        // clears nothing.
         const newIds = activeList.map(t => t.id);
-        if (newIds.some(id => !prevIdsRef.current.includes(id))) {
-          setDismissedIds([]);
+        if (isFirstSnapshotRef.current) {
+          isFirstSnapshotRef.current = false;
+        } else {
+          const genuinelyNew = newIds.filter(id => !prevIdsRef.current.includes(id));
+          if (genuinelyNew.length > 0) {
+            setDismissedIds(prev => prev.filter(id => !genuinelyNew.includes(id)));
+          }
         }
         prevIdsRef.current = newIds;
         setTickers(activeList);
@@ -167,12 +202,24 @@ export default function NewsTickerBar() {
                 {visibleTickers.length > 1 && (
                   <span className="text-slate-300 font-bold px-2 select-none">✦</span>
                 )}
+
+                {/* v24.15 P19: per-ticker dismiss — this ✕ dismisses only
+                    this ticker, not all of them. */}
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); dismissTicker(item.id); }}
+                  aria-label={`စာတန်းပြေး ပိတ်ထားရန်: ${item.text}`}
+                  title="ဤစာတန်းပြေးကိုသာ ပိတ်ထားရန်"
+                  className="p-0.5 rounded hover:bg-black/10 text-slate-400 hover:text-slate-700 transition cursor-pointer shrink-0"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               </span>
             ))}
           </div>
         </div>
 
-        {/* Right Controls: Pause/Play & Dismiss */}
+        {/* Right Controls: Pause/Play */}
         <div className="flex items-center gap-1 shrink-0 z-10 bg-inherit pl-2">
           <button
             type="button"
@@ -182,15 +229,6 @@ export default function NewsTickerBar() {
             className="p-1 rounded-lg hover:bg-black/5 text-slate-600 transition cursor-pointer"
           >
             {isPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
-          </button>
-          <button
-            type="button"
-            onClick={() => setDismissedIds(visibleTickers.map(t => t.id))}
-            aria-label="Dismiss banner"
-            title="စာတန်းပြေး ပိတ်ထားရန်"
-            className="p-1 rounded-lg hover:bg-black/5 text-slate-500 hover:text-slate-800 transition cursor-pointer"
-          >
-            <X className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>

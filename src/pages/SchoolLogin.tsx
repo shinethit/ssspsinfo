@@ -13,11 +13,32 @@ export default function SchoolLogin() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sendingReset, setSendingReset] = useState(false);
   const navigate = useNavigate();
-  // v24.13: a school that is already signed in goes straight to the portal
-  // instead of seeing the login form again.
+  // v24.15 (V7): a signed-in user is redirected to the portal ONLY when a
+  // school doc with this authUid exists (one query). Before, EVERY signed-in
+  // user — including admins — was bounced to the portal, where an admin
+  // landed on the "no school" screen and a school user could never reach
+  // the form to switch accounts. While the check runs, show a brief
+  // loading state instead of flashing the form.
   const [signedInUser, authLoading] = useAuthState(auth);
+  const [schoolCheckDone, setSchoolCheckDone] = useState(false);
   useEffect(() => {
-    if (!authLoading && signedInUser) navigate('/school-portal', { replace: true });
+    if (authLoading) return;
+    if (!signedInUser) { setSchoolCheckDone(true); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDocs(query(collection(db, 'schools'), where('authUid', '==', signedInUser.uid)));
+        if (!cancelled && !snap.empty) {
+          navigate('/school-portal', { replace: true });
+          return;
+        }
+      } catch {
+        // Read failure — show the form so the user can sign in again
+        // instead of trapping them on a loading screen.
+      }
+      if (!cancelled) setSchoolCheckDone(true);
+    })();
+    return () => { cancelled = true; };
   }, [signedInUser, authLoading, navigate]);
 
   // v24.13 S4: forgot-password — reset link by email (admins already had
@@ -68,6 +89,13 @@ export default function SchoolLogin() {
   };
 
   return (
+    // v24.15 (V7): while the signed-in school check runs, wait — do not
+    // flash the login form to a user who is about to be redirected.
+    !schoolCheckDone ? (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+        <p className="text-sm text-slate-500">ခဏစောင့်ပါ...</p>
+      </div>
+    ) : (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-slate-200 p-8 space-y-6">
         <div className="text-center space-y-2">
@@ -108,5 +136,6 @@ export default function SchoolLogin() {
         </div>
       </div>
     </div>
+    )
   );
 }

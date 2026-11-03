@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'sonner';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import {
   ShieldCheck,
   Lock,
@@ -24,6 +26,10 @@ export default function Login() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [notAdminInfo, setNotAdminInfo] = useState<{ uid: string; email: string } | null>(null);
+  // v24.15 (P34): the admins-doc setup help (with UID) is only for someone
+  // who is plausibly an admin. A school account signing in here must NOT
+  // see it — it is sent to /school-login instead.
+  const [isSchoolAccount, setIsSchoolAccount] = useState(false);
 
   // Password Reset Mode (Firebase Auth Send Password Reset Email)
   const [showPasswordSetup, setShowPasswordSetup] = useState(false);
@@ -38,6 +44,7 @@ export default function Login() {
     e.preventDefault();
     setLoginError(null);
     setNotAdminInfo(null);
+    setIsSchoolAccount(false);
 
     const cleanUser = username.trim();
     const cleanPass = password.trim();
@@ -61,6 +68,16 @@ export default function Login() {
         }
         if (res.errorCode === 'auth/not-an-admin' && res.uid) {
           setNotAdminInfo({ uid: res.uid, email: res.email || cleanUser });
+          // v24.15 (P34): if a school doc is linked to this uid, this is a
+          // school account at the wrong door — hide the admin-setup help
+          // and point it at the school login instead.
+          try {
+            const schoolSnap = await getDocs(query(collection(db, 'schools'), where('authUid', '==', res.uid)));
+            if (!schoolSnap.empty) setIsSchoolAccount(true);
+          } catch {
+            // Read failure — keep the setup help visible rather than
+            // hiding help from a genuine admin-to-be.
+          }
         }
         setLoginError(res.error || 'စကားဝှက် မှားယွင်းနေပါသည်');
         toast.error(res.error || 'စကားဝှက် မှားယွင်းနေပါသည်');
@@ -156,6 +173,17 @@ export default function Login() {
                     <p className="font-semibold">{loginError}</p>
 
                     {notAdminInfo && notAdminInfo.uid && (
+                      isSchoolAccount ? (
+                        <div className="p-3 bg-sky-50/90 border border-sky-300 rounded-xl text-sky-900 text-sm space-y-2 mt-2">
+                          <p className="font-bold">ဤအကောင့်သည် ကျောင်းအကောင့် ဖြစ်ပါသည်</p>
+                          <p className="text-sky-800 leading-relaxed">
+                            ကျောင်းအကောင့်များသည် Admin Portal မှတစ်ဆင့် ဝင်ရောက်၍မရပါ။ ကျောင်း Portal မှတစ်ဆင့် ဝင်ရောက်ပါ။
+                          </p>
+                          <Link to="/school-login" className="inline-block px-3 py-2 bg-sky-700 text-white rounded-lg text-xs font-bold hover:bg-sky-800">
+                            ကျောင်း အကောင့်ဝင်ရန် သွားမည် →
+                          </Link>
+                        </div>
+                      ) : (
                       <div className="p-3 bg-amber-50/90 border border-amber-300 rounded-xl text-amber-900 text-sm space-y-2 mt-2">
                         <div className="font-bold flex items-center gap-1.5 text-amber-900">
                           <HelpCircle className="w-3.5 h-3.5 text-amber-700 shrink-0" />
@@ -181,6 +209,7 @@ export default function Login() {
                           Fields: <code className="bg-amber-100 px-1 py-0.5 rounded font-mono">role: "admin"</code> (သို့မဟုတ် <code className="bg-amber-100 px-1 py-0.5 rounded font-mono">"moderator"</code>)
                         </p>
                       </div>
+                      )
                     )}
 
                     <p className="text-sm text-rose-600">

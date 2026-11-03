@@ -134,7 +134,10 @@ export default function AdminAccountsTab({ admins, schools, isAdmin, onRefreshAd
                   A linked school now offers unlinking instead, so a new
                   account can be created afterwards. */}
               <div className="flex items-center gap-1.5 shrink-0">
-                {s.authUid && s.accountEmail && (
+                {/* v24.15 (P23): the reset handler only needs accountEmail —
+                    the old s.authUid && s.accountEmail gate hid the button
+                    for email-only (legacy) schools. */}
+                {s.accountEmail && (
                   <button onClick={() => handleSendSchoolPasswordReset(s)} title="စကားဝှက် ပြန်လည်သတ်မှတ်ခြင်း email ပို့ရန်" className="bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer">
                     စကားဝှက် ပြန်ပို့မည်
                   </button>

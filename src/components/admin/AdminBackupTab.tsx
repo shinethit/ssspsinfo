@@ -38,6 +38,10 @@ const BACKUP_COLLECTIONS = [
   'school_update_requests',
   'audit_logs',
   'admins',
+  // v24.15 (V19): sport_info was missing — a backup/restore cycle silently
+  // lost all sports-info content (AdminSportInfoManager writes it,
+  // Sports.tsx reads it). 17 collections total now.
+  'sport_info',
 ] as const;
 
 export default function AdminBackupTab({ schools, announcements, associations, tickers, schoolLevels, onRestoreDone }: AdminBackupTabProps) {
@@ -116,42 +120,70 @@ export default function AdminBackupTab({ schools, announcements, associations, t
       setRestoreReport(null);
       const counts: Record<string, number> = {};
       const errors: string[] = [];
-      // Batched writes, chunked under Firestore's 500-op batch limit.
+      // v24.15 (V23): counts report only FLUSHED (actually written) docs,
+      // never queued ones. Each flush is caught per chunk: a failed chunk
+      // is recorded (which collection + how many docs), the rest of the
+      // restore continues, and the report says exactly what was and
+      // wasn't restored. onRestoreDone is called even on partial failure
+      // (see finally).
       let batch = writeBatch(db);
       let ops = 0;
-      const flush = async () => { if (ops > 0) { await batch.commit(); batch = writeBatch(db); ops = 0; } };
+      // Docs queued since the last flush, per collection, so a failed
+      // flush can be attributed honestly.
+      const pendingByCollection = new Map<string, number>();
+      const flush = async () => {
+        if (ops === 0) return;
+        const toCommit = batch;
+        const pendingNow = new Map(pendingByCollection);
+        batch = writeBatch(db);
+        ops = 0;
+        pendingByCollection.clear();
+        try {
+          await toCommit.commit();
+        } catch (err) {
+          for (const [name, n] of pendingNow) {
+            errors.push(`${name}: မှတ်တမ်း (${n}) ခု သိမ်းဆည်း၍ မရပါ (flush မအောင်မြင်ပါ)`);
+          }
+          console.error('Backup restore chunk failed:', err);
+          return;
+        }
+        for (const [name, n] of pendingNow) counts[name] = (counts[name] || 0) + n;
+      };
       for (const name of present) {
-        let restored = 0;
+        counts[name] = counts[name] || 0;
         for (const rawDoc of (collections as any)[name] as any[]) {
           try {
             if (!rawDoc || typeof rawDoc !== 'object' || !rawDoc.id) { errors.push(`${name}: id မရှိသော မှတ်တမ်း ၁ ခု ကျော်ခြင်း`); continue; }
             const { id, ...data } = rawDoc;
             batch.set(doc(db, name, String(id)), data);
             ops++;
-            restored++;
+            pendingByCollection.set(name, (pendingByCollection.get(name) || 0) + 1);
             if (ops >= 450) await flush();
           } catch (err) {
             errors.push(`${name}: မှတ်တမ်း ၁ ခု သွင်း၍ မရပါ`);
           }
         }
-        counts[name] = restored;
       }
       await flush();
       const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
       const summary = present.map(n => `${n}: ${counts[n]}`).join(', ');
       setRestoreReport({ counts, errors });
-      await recordAuditLog({ action: 'create', entityType: 'school', entityName: 'Database Backup', details: `Backup JSON ပြန်သွင်းခြင်း (${file.name}) — စုစုပေါင်း ${total} ခု (${summary})${errors.length > 0 ? `၊ အမှား ${errors.length} ခု` : ''}` });
+      await recordAuditLog({ action: 'create', entityType: 'school', entityName: 'Database Backup', details: `Backup JSON ပြန်သွင်းခြင်း (${file.name}) — အမှန်တကယ် သိမ်းဆည်းပြီး ${total} ခု (${summary})${errors.length > 0 ? `၊ အမှား ${errors.length} ခု: ${errors.slice(0, 3).join('; ')}` : ''}` });
       if (errors.length > 0) {
-        toast.error(`Backup ပြန်သွင်းပြီး — (${total}) ခု အောင်မြင်ပြီး၊ အမှား (${errors.length}) ခု ရှိပါသည်`);
+        // v24.15 (V23): partial failure is reported honestly — how many
+        // were actually written vs how many failed — not as a total failure.
+        toast.error(`Backup တစ်စိတ်တစ်ပိုင်း ပြန်သွင်းပြီး — (${total}) ခု အောင်မြင်ပြီး၊ အမှား (${errors.length}) ခု ရှိပါသည်။ အောက်ပါ အကျဉ်းချုပ်တွင် အသေးစိတ် ကြည့်ပါ`);
       } else {
         toast.success(`Backup ပြန်သွင်းပြီးပါပြီ — စုစုပေါင်း (${total}) ခု (${summary})`);
       }
-      onRestoreDone();
     } catch (err) {
       console.error(err);
       toast.error('Restore လုပ်ရာတွင် အမှားဖြစ်ပွားပါသည်');
     } finally {
       setIsRestoringBackup(false);
+      // v24.15 (V23): refresh the parent data even on partial failure —
+      // some collections were restored and the UI must show them.
+      onRestoreDone();
     }
   };
 
@@ -173,7 +205,9 @@ export default function AdminBackupTab({ schools, announcements, associations, t
       setRecoverableCache(null);
       onRestoreDone();
     } catch (e) {
-      toast.error('Restore လုပ်ရာတွင် အမှားဖြစ်ပွားပါသည်');
+      // v24.15 re-audit (F8): a partial failure used to show only the
+      // generic error — the real message (with counts) was swallowed.
+      toast.error(`Restore လုပ်ရာတွင် အမှားဖြစ်ပွားပါသည်${e instanceof Error && e.message ? ` — ${e.message}` : ''}`);
     } finally {
       setIsRestoringCache(false);
     }

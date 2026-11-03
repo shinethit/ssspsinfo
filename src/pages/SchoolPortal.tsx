@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { auth, db } from '../lib/firebase';
-import { collection, query, where, getDocs, updateDoc, doc, addDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, getDoc, updateDoc, doc, addDoc, deleteDoc } from 'firebase/firestore';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { School, Athlete, EventItem, SchoolUpdateRequest, TransactionRecord, STUDENT_RANGE_TIERS, DEFAULT_SCHOOL_LEVELS } from '../types';
+import { School, Athlete, EventItem, SchoolUpdateRequest, STUDENT_RANGE_TIERS, DEFAULT_SCHOOL_LEVELS, getStudentRangeTier } from '../types';
 import { useData } from '../context/DataContext';
-import { findAnnualFeeTransaction } from '../lib/finance';
-import { getGlobalAcademicYear } from '../lib/academicYear';
+import { clearAdminSession } from '../lib/adminAuth';
+import { isCurrentYearPaid } from '../lib/academicYear';
 import { toast } from 'sonner';
 import { confirmDialog } from '../components/ConfirmModal';
 import { LogOut, Save, School as SchoolIcon, Phone, MapPin, Users, Eye, ShieldCheck, UserCheck, Calendar, Clock, Trash2, Send, FileText } from 'lucide-react';
@@ -36,15 +36,27 @@ export default function SchoolPortal() {
   // read kicked the school out to /school-login on every refresh.
   const [authUser, authLoading] = useAuthState(auth);
   const { schoolLevels } = useData();
-  // v24.13 S5: the school's annual-fee transaction (for paid date/voucher).
-  const [feeTxn, setFeeTxn] = useState<TransactionRecord | null>(null);
+  // v24.15 (P4): the receipt link target — the school doc's stored
+  // transaction id, shown only after a public single-doc get confirms the
+  // transaction exists. (The old transactions LIST query was moderator-only
+  // and was denied on every portal load.)
+  const [receiptTxnId, setReceiptTxnId] = useState<string | null>(null);
   const [resettingPw, setResettingPw] = useState(false);
+  // v24.15 (P22): true when the school's own requests could not be read —
+  // new requests are then BLOCKED instead of silently passing the
+  // duplicate check.
+  const [requestsLoadFailed, setRequestsLoadFailed] = useState(false);
 
   // Form State
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [township, setTownship] = useState('');
   const [zone, setZone] = useState('');
+  // v24.15 (P17): the school's ORIGINAL zone, captured when the school
+  // loads — it stays in the zone options for the whole edit session even
+  // after another zone is picked (the old code rebuilt the options from
+  // the CURRENT zone, so a non-standard zone vanished mid-session).
+  const [originalZone, setOriginalZone] = useState('');
   const [studentCount, setStudentCount] = useState('');
 
   const [activities, setActivities] = useState<EventItem[]>([]);
@@ -67,15 +79,32 @@ export default function SchoolPortal() {
   const [isSubmittingReq, setIsSubmittingReq] = useState(false);
 
   // v24.13 S2: refetch the school's own change requests (used after submit).
-  const fetchMyRequests = async (uid: string) => {
+  // v24.15 (P22): fetch by requestedByUid AND by schoolId — requests
+  // created before v24.7 carry no requestedByUid and were invisible to the
+  // school, so a duplicate sailed through. If either read fails, the
+  // duplicate check cannot be trusted — new requests are BLOCKED (see
+  // handleSubmitRequest) instead of silently passing.
+  const fetchMyRequests = async (uid: string, schoolId?: string) => {
     try {
-      const reqQuery = query(collection(db, 'school_update_requests'), where('requestedByUid', '==', uid));
-      const reqSnap = await getDocs(reqQuery);
-      const reqData = reqSnap.docs.map(d => ({ id: d.id, ...d.data() } as SchoolUpdateRequest));
+      const results = await Promise.allSettled([
+        getDocs(query(collection(db, 'school_update_requests'), where('requestedByUid', '==', uid))),
+        ...(schoolId ? [getDocs(query(collection(db, 'school_update_requests'), where('schoolId', '==', schoolId)))] : []),
+      ]);
+      const byId = new Map<string, SchoolUpdateRequest>();
+      let failed = false;
+      for (const r of results) {
+        if (r.status === 'fulfilled') {
+          r.value.docs.forEach(d => byId.set(d.id, { id: d.id, ...d.data() } as SchoolUpdateRequest));
+        } else {
+          failed = true;
+        }
+      }
+      const reqData = [...byId.values()];
       reqData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setMyRequests(reqData);
+      setRequestsLoadFailed(failed);
     } catch {
-      // Reading requests is optional — the portal works without it.
+      setRequestsLoadFailed(true);
     }
   };
 
@@ -87,21 +116,33 @@ export default function SchoolPortal() {
 
       try {
         // v24.13 S3: legacy accounts have no authUid — fall back to the
-        // accountEmail lookup, exactly as SchoolLogin does. Never backfill
-        // authUid from the portal (the schools update rule allows the school
-        // only 6 keys, so such a write would be denied).
+        // accountEmail lookup, exactly as SchoolLogin does.
         let snap = await getDocs(query(collection(db, 'schools'), where('authUid', '==', user.uid)));
         if (snap.empty && user.email) {
           snap = await getDocs(query(collection(db, 'schools'), where('accountEmail', '==', user.email)));
         }
-        
+
         if (!snap.empty) {
           const data = { id: snap.docs[0].id, ...snap.docs[0].data() } as School;
+          // v24.15 (P2): legacy email-only account — adopt it once: link
+          // this Auth uid to the school doc. Needs the published adopt rule;
+          // if the write is denied (rules not yet published) show a
+          // one-time toast and continue read-only — the portal must NOT
+          // break. After adoption, saving and event posting work.
+          if (!data.authUid && user.email && data.accountEmail && data.accountEmail === user.email) {
+            try {
+              await updateDoc(doc(db, 'schools', data.id), { authUid: user.uid, updatedAt: new Date().toISOString() });
+              data.authUid = user.uid;
+            } catch {
+              toast.error('အကောင့် ချိတ်ဆက်မှု မအောင်မြင်ပါ — Admin ကို ဆက်သွယ်ပါ');
+            }
+          }
           setSchool(data);
           setPhone(data.schoolPhone || '');
           setAddress(data.address || '');
           setTownship(data.township || '');
           setZone(data.zone || '');
+          setOriginalZone(data.zone || '');
           setStudentCount(data.studentCount?.toString() || '');
 
           // Fetch athletes for this school — v24.7: match by the school's
@@ -118,13 +159,19 @@ export default function SchoolPortal() {
           }
           setAthletes(athleteDocs.map(d => ({ id: d.id, ...d.data() } as Athlete)));
 
-          // v24.13 S5: annual-fee transaction for the paid date / voucher.
-          try {
-            const txnSnap = await getDocs(query(collection(db, 'transactions'), where('schoolId', '==', data.id)));
-            const txns = txnSnap.docs.map(d => ({ id: d.id, ...d.data() } as TransactionRecord));
-            setFeeTxn(findAnnualFeeTransaction(txns, data.id, data.feeAcademicYear) ?? null);
-          } catch {
-            // Fee status still shows from the school flag without it.
+          // v24.15 (P4): the transactions LIST is moderator-only, so the old
+          // list query was denied on every portal load and the voucher /
+          // receipt link could never render. The voucher + transaction id
+          // now live on the school doc (stored at payment time); the receipt
+          // link is shown only after a public single-doc get confirms the
+          // transaction exists.
+          if (data.feeTransactionId) {
+            try {
+              const txnSnap = await getDoc(doc(db, 'transactions', data.feeTransactionId));
+              if (txnSnap.exists()) setReceiptTxnId(txnSnap.id);
+            } catch {
+              // Receipt link stays hidden; the fee flag values still show.
+            }
           }
 
           const actQuery = query(collection(db, 'events'), where('schoolId', '==', data.id));
@@ -133,7 +180,7 @@ export default function SchoolPortal() {
 
           // The school's own change requests (readable by the requester
           // since v24.7 — see firestore.rules).
-          await fetchMyRequests(user.uid);
+          await fetchMyRequests(user.uid, data.id);
         } else {
           toast.error('ကျောင်းအချက်အလက် ရှာမတွေ့ပါ');
         }
@@ -161,6 +208,8 @@ export default function SchoolPortal() {
       });
       // v24.13 S2: refresh local state so the page (and new activities,
       // which stamp the school's zone/name) use the just-saved values.
+      // v24.15 (P17): the saved zone becomes the session's original zone.
+      setOriginalZone(zone);
       setSchool(prev => prev ? {
         ...prev,
         schoolPhone: phone,
@@ -216,8 +265,18 @@ export default function SchoolPortal() {
     const fieldDef = REQUESTABLE_FIELDS.find(f => f.value === reqField);
     const newValue = reqValue.trim();
     if (!fieldDef || !newValue) { toast.error('ပြောင်းလိုသော အချက်အလက်ကို ဖြည့်ပါ'); return; }
+    // v24.15 (P22): when the school's own requests could not be read, the
+    // duplicate check cannot be trusted — BLOCK the new request with an
+    // honest error instead of silently passing it.
+    if (requestsLoadFailed) { toast.error('တောင်းဆိုမှု စာရင်း ဖတ်၍မရပါ — ထပ်နေသော တောင်းဆိုမှု ရှိ၊ မရှိ စစ်၍မရသောကြောင့် ခဏစောင့်ပြီး ပြန်ကြိုးစားပါ'); return; }
     const oldValue = String((school as any)[reqField] ?? '');
-    if (oldValue === newValue) { toast.info('တန်ဖိုး အသစ်က လက်ရှိ တန်ဖိုးနဲ့ အတူတူပဲ ဖြစ်နေပါတယ်'); return; }
+    // v24.15 (P22): normalize tier values through the alias map before the
+    // same-value comparison — a stored legacy range ('101-300', '၁၀၁ - ၁၅၀
+    // ဦး') is the same tier as the new key ('101-150') and must count as
+    // a no-op, not as a change.
+    const normalizeForCompare = (field: string, value: string) =>
+      field === 'studentRange' ? (getStudentRangeTier(value)?.key ?? value) : value;
+    if (normalizeForCompare(reqField, oldValue) === normalizeForCompare(reqField, newValue)) { toast.info('တန်ဖိုး အသစ်က လက်ရှိ တန်ဖိုးနဲ့ အတူတူပဲ ဖြစ်နေပါတယ်'); return; }
     // v24.13 S6: one pending request per field — a second one for the same
     // field would sit behind the first and confuse the admin queue.
     const hasPendingSameField = myRequests.some(r => r.status === 'pending' && r.changes.some(c => c.field === reqField));
@@ -235,7 +294,7 @@ export default function SchoolPortal() {
         createdAt: new Date().toISOString(),
       });
       // v24.13 S2: refetch from Firestore so the list reflects the server.
-      await fetchMyRequests(user.uid);
+      await fetchMyRequests(user.uid, school.id);
       setReqValue('');
       toast.success('တောင်းဆိုမှု ပေးပို့ပြီးပါပြီ — Admin အတည်ပြုပြီးမှ ပြောင်းလဲပါမည်');
     } catch (err) {
@@ -274,12 +333,38 @@ export default function SchoolPortal() {
   };
 
   const handleLogout = async () => {
-    await auth.signOut();
+    // v24.15 (P33): clear the cached admin session too (best-effort — the
+    // portal still navigates even if the sign-out itself fails).
+    await clearAdminSession();
     navigate('/school-login');
   };
 
   if (loading || authLoading) return <div className="p-10 text-center">ခဏစောင့်ပါ...</div>;
-  if (!school) return <div className="p-10 text-center">ကျောင်းအချက်အလက် မရှိပါ။</div>;
+  // v24.15 (P3): the old bare "ကျောင်းအချက်အလက် မရှိပါ။" was a dead end —
+  // no logout, no link, and SchoolLogin used to bounce the user straight
+  // back here. Now it explains, offers logout, and links to Contacts/Help.
+  if (!school) return (
+    <div className="min-h-screen bg-slate-50 p-4 sm:p-8 flex items-center justify-center">
+      <div className="max-w-md w-full bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm text-center space-y-4">
+        <div className="w-14 h-14 bg-amber-100 text-amber-700 rounded-2xl mx-auto flex items-center justify-center">
+          <SchoolIcon className="w-7 h-7" />
+        </div>
+        <h1 className="font-bold text-lg text-slate-900">ကျောင်းအချက်အလက် ရှာမတွေ့ပါ</h1>
+        <p className="text-sm text-slate-600 leading-relaxed">
+          ဤအကောင့်နှင့် ချိတ်ဆက်ထားသော ကျောင်းအချက်အလက် မရှိသေးပါ။ အကောင့်ကို ကျောင်းတစ်ခုနှင့် ချိတ်ဆက်ပေးရန် အသင်း Admin ကို ဆက်သွယ်ပေးပါ။
+        </p>
+        <div className="flex flex-col gap-2 pt-1">
+          <button onClick={handleLogout} className="w-full bg-rose-600 hover:bg-rose-700 text-white py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 cursor-pointer">
+            <LogOut className="w-4 h-4" /> အကောင့်မှ ထွက်မည်
+          </button>
+          <div className="flex gap-2">
+            <Link to="/contacts" className="flex-1 bg-sky-50 hover:bg-sky-100 text-sky-800 py-2.5 rounded-xl font-bold text-sm border border-sky-200">အသင်းဝင်ကျောင်းများ</Link>
+            <Link to="/help" className="flex-1 bg-slate-50 hover:bg-slate-100 text-slate-700 py-2.5 rounded-xl font-bold text-sm border border-slate-200">အသုံးပြုနည်း</Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 sm:p-8">
@@ -300,26 +385,31 @@ export default function SchoolPortal() {
         </div>
 
         {/* v24.13 S5: annual-fee status — paid/unpaid, amount, academic year,
-            paid date and voucher (from the transaction when one exists). */}
-        <div className={`p-4 sm:p-5 rounded-2xl border shadow-sm flex flex-wrap items-center gap-3 ${school.isAnnualFeePaid ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+            paid date and voucher (from the school doc).
+            v24.15 (P21): never fall back to the device-local global year —
+            this browser's localStorage is not the admin's global setting.
+            When no year is known, say so honestly. v24.15 (P4): voucher +
+            receipt link come from the school doc's stored feeVoucherNo /
+            feeTransactionId, not from a (moderator-only) list query. */}
+        <div className={`p-4 sm:p-5 rounded-2xl border shadow-sm flex flex-wrap items-center gap-3 ${isCurrentYearPaid(school) ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
           <div className="flex-1 min-w-[200px]">
-            <p className="text-xs font-bold text-slate-500">နှစ်စဉ်ကြေး အခြေအနေ ({school.feeAcademicYear || feeTxn?.academicYear || getGlobalAcademicYear()} ပညာသင်နှစ်)</p>
-            <p className="font-bold text-slate-900 text-base mt-0.5">{school.isAnnualFeePaid ? '✅ ပေးသွင်းပြီးပါပြီ' : '⏳ ပေးသွင်းရန် ကျန်ရှိပါသည်'}</p>
-            {(school.feeAmount ?? feeTxn?.amount) != null && (
-              <p className="text-sm text-slate-700 mt-0.5">ပမာဏ: <span className="font-bold">{Number(school.feeAmount ?? feeTxn?.amount).toLocaleString('my-MM')} ကျပ်</span></p>
+            <p className="text-xs font-bold text-slate-500">{school.feeAcademicYear ? `နှစ်စဉ်ကြေး အခြေအနေ (${school.feeAcademicYear} ပညာသင်နှစ်)` : 'နှစ်စဉ်ကြေး အခြေအနေ (ပညာသင်နှစ် မဖော်ပြထားပါ)'}</p>
+            <p className="font-bold text-slate-900 text-base mt-0.5">{isCurrentYearPaid(school) ? '✅ ပေးသွင်းပြီးပါပြီ' : '⏳ ပေးသွင်းရန် ကျန်ရှိပါသည်'}</p>
+            {school.feeAmount != null && (
+              <p className="text-sm text-slate-700 mt-0.5">ပမာဏ: <span className="font-bold">{Number(school.feeAmount).toLocaleString('my-MM')} ကျပ်</span></p>
             )}
-            {(school.feePaidDate || feeTxn?.paidDate) && (
-              <p className="text-sm text-slate-700">ပေးသွင်းသည့်ရက်: <span className="font-bold">{school.feePaidDate || feeTxn?.paidDate}</span></p>
+            {school.feePaidDate && (
+              <p className="text-sm text-slate-700">ပေးသွင်းသည့်ရက်: <span className="font-bold">{school.feePaidDate}</span></p>
             )}
-            {feeTxn?.voucherNo && (
-              <p className="text-sm text-slate-700">ဖြတ်ပိုင်းအမှတ်: <span className="font-mono font-bold">{feeTxn.voucherNo}</span></p>
+            {school.feeVoucherNo && (
+              <p className="text-sm text-slate-700">ဖြတ်ပိုင်းအမှတ်: <span className="font-mono font-bold">{school.feeVoucherNo}</span></p>
             )}
-            {!school.isAnnualFeePaid && (
+            {!isCurrentYearPaid(school) && (
               <p className="text-xs text-slate-500 mt-1">နှစ်စဉ်ကြေး ပေးသွင်းရန် အသင်း Admin ကို ဆက်သွယ်ပါ။</p>
             )}
           </div>
-          {feeTxn && (
-            <Link to={`/receipt/${feeTxn.id}`} className="text-xs font-bold text-sky-700 bg-white px-3 py-2 rounded-lg border border-sky-200 hover:bg-sky-50 transition shrink-0">
+          {receiptTxnId && (
+            <Link to={`/receipt/${receiptTxnId}`} className="text-xs font-bold text-sky-700 bg-white px-3 py-2 rounded-lg border border-sky-200 hover:bg-sky-50 transition shrink-0">
               ဖြတ်ပိုင်း ကြည့်ရန်
             </Link>
           )}
@@ -364,10 +454,11 @@ export default function SchoolPortal() {
                 <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1"><MapPin className="w-3 h-3 text-indigo-600"/> ဇုန် (Zone)</label>
                 <select value={zone} onChange={e => setZone(e.target.value)} className="w-full p-2.5 border rounded-xl text-sm bg-white">
                   <option value="">- ဇုန် မသတ်မှတ်ရသေး -</option>
-                  {/* v24.13 S7: a non-standard zone (e.g. from Excel import)
-                      is kept as an extra option so it renders and can be
-                      re-selected instead of showing a blank select. */}
-                  {([...STANDARD_ZONES] as string[]).concat(zone && !(STANDARD_ZONES as readonly string[]).includes(zone) ? [zone] : []).map(z => (
+                  {/* v24.15 (P17): the ORIGINAL zone (captured at load) stays
+                      in the options for the whole edit session — the old
+                      code rebuilt from the current zone, so a non-standard
+                      zone vanished once another zone was picked. */}
+                  {([...STANDARD_ZONES] as string[]).concat(originalZone && !(STANDARD_ZONES as readonly string[]).includes(originalZone) ? [originalZone] : []).map(z => (
                     <option key={z} value={z}>{z}</option>
                   ))}
                 </select>

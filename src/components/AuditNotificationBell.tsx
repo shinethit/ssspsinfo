@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../lib/firebase';
+import { parseStoredDate, formatMyanmarDate } from '../lib/myanmarDate';
 import { AuditLog } from '../types';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -152,7 +153,9 @@ export const AuditNotificationBell: React.FC = () => {
       const diffDays = Math.floor(diffHours / 24);
       if (diffDays === 1) return 'မနေ့က';
       if (diffDays < 7) return `လွန်ခဲ့သော ${diffDays} ရက်က`;
-      return new Date(dateString).toLocaleDateString('my-MM');
+      // v24.15 re-audit (G4): hardcoded Myanmar date — the old Intl 'my-MM'
+      // render fell back to English on the user's phone.
+      return formatMyanmarDate(parseStoredDate(dateString));
     } catch {
       return dateString;
     }

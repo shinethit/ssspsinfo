@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { DocumentItem } from '../../types';
+import { parseStoredDate, formatMyanmarDate } from '../../lib/myanmarDate';
 import { toast } from 'sonner';
 import { confirmDialog } from '../../components/ConfirmModal';
 import { Plus, Trash2, FolderOpen, Link as LinkIcon, Edit2, ExternalLink } from 'lucide-react';
@@ -118,7 +119,7 @@ export default function AdminDocumentManager() {
             <div key={docItem.id} className="p-4 flex flex-col md:flex-row justify-between gap-4 hover:bg-slate-50 transition">
               <div>
                 <h4 className="font-bold text-slate-900">{docItem.title}</h4>
-                <span className="text-xs text-slate-500 mt-1">{docItem.category}{docItem.uploadedAt ? ` • ${new Date(docItem.uploadedAt).toLocaleDateString('my-MM')}` : ''}</span>
+                <span className="text-xs text-slate-500 mt-1">{docItem.category}{docItem.uploadedAt ? ` • ${formatMyanmarDate(parseStoredDate(docItem.uploadedAt))}` : ''}</span>
               </div>
               <div className="flex gap-2 self-start md:self-center">
                 {docItem.fileUrl && (

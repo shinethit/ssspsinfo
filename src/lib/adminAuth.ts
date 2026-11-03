@@ -49,13 +49,26 @@ if (typeof window !== 'undefined') {
       }
       if (snap.exists()) {
         const data = snap.data();
-        cachedSession = {
-          isLoggedIn: true,
-          email: user.email || data.email || '',
-          role: normalizeRole(data.role),
-          uid: user.uid,
-          name: data.name || '',
-        };
+        // v24.15 (P34): an admins doc whose role is not one the Firestore
+        // rules admit (e.g. 'user', 'guest', missing) is NOT an admin —
+        // never report it as logged in.
+        const role = normalizeRole(data.role);
+        if (role === null) {
+          cachedSession = {
+            isLoggedIn: false,
+            email: user.email || '',
+            role: 'moderator',
+            uid: user.uid,
+          };
+        } else {
+          cachedSession = {
+            isLoggedIn: true,
+            email: user.email || data.email || '',
+            role,
+            uid: user.uid,
+            name: data.name || '',
+          };
+        }
       } else {
         cachedSession = {
           isLoggedIn: false,
@@ -195,6 +208,29 @@ export async function verifyAdminCredentials(
 
     const adminData = adminSnap.data();
     const role = normalizeRole(adminData.role);
+    if (role === null) {
+      // v24.15 (P34): the admins doc exists but its role is not one the
+      // Firestore rules admit — this user is not an admin, even though
+      // they authenticated. Treat exactly like a missing admins doc.
+      console.error('Firebase Auth error code (err.code): auth/not-an-admin', {
+        uid: user.uid,
+        email: user.email,
+        role: adminData.role,
+        expectedFirestorePath: `admins/${user.uid}`,
+      });
+      try {
+        await firebaseSignOut(auth);
+      } catch {}
+      cachedSession = { isLoggedIn: false, email: '', role: 'moderator' };
+      window.dispatchEvent(new Event('sssps_admin_auth_changed'));
+      return {
+        success: false,
+        errorCode: 'auth/not-an-admin',
+        uid: user.uid,
+        email: user.email || cleanEmail,
+        error: `ဤအကောင့် (${user.email || cleanEmail}) သည် စနစ်တွင် အက်ဒမင် (Admin) အဖြစ် ခွင့်ပြုချက် ရရှိထားခြင်း မရှိသေးပါ`,
+      };
+    }
 
     cachedSession = {
       isLoggedIn: true,
@@ -283,33 +319,42 @@ export async function changeAdminPassword(
 }
 
 /**
- * Retrieve current synchronous admin session state
+ * Retrieve current synchronous admin session state.
+ *
+ * v24.15 (P1): return the cached session AS-IS — never invent
+ * isLoggedIn:true for a signed-in user. Before, any signed-in user whose
+ * cache said "not logged in" (e.g. a school account, whose admins-doc read
+ * correctly found nothing) was reported as a logged-in moderator, so the
+ * menu hid "School Portal", SchoolDetail showed Admin Controls to everyone,
+ * and Dashboard attempted a moderator-only read. Only a cache that
+ * positively says logged-in counts as logged in; callers re-render on the
+ * 'sssps_admin_auth_changed' event once the async admins-doc read lands.
  */
 export function getAdminSession(): AdminSession {
-  if (auth.currentUser && (!cachedSession.isLoggedIn || cachedSession.uid !== auth.currentUser.uid)) {
-    return {
-      isLoggedIn: true,
-      email: auth.currentUser.email || cachedSession.email,
-      role: cachedSession.role || 'moderator',
-      uid: auth.currentUser.uid,
-    };
-  }
   return { ...cachedSession };
 }
 
 /**
- * Clear admin session & sign out from Firebase Auth
+ * Clear admin session & sign out from Firebase Auth.
+ *
+ * v24.15 (P33): reports failure to the caller instead of swallowing it.
+ * Returns true when the sign-out succeeded (cache cleared), false when it
+ * failed — on failure the cached session is left INTACT so the caller can
+ * show an honest error and stay on the page instead of telling a still
+ * signed-in user they logged out.
  */
-export async function clearAdminSession(): Promise<void> {
-  cachedSession = { isLoggedIn: false, email: '', role: 'moderator' };
+export async function clearAdminSession(): Promise<boolean> {
   try {
     await firebaseSignOut(auth);
   } catch (err) {
     console.error('Error signing out:', err);
+    return false;
   }
+  cachedSession = { isLoggedIn: false, email: '', role: 'moderator' };
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('sssps_admin_auth_changed'));
   }
+  return true;
 }
 
 /**

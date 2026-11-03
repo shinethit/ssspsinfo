@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { DocumentItem } from '../types';
 import { toast } from 'sonner';
 import { FileText, Download, Search, FolderOpen, ArrowLeft, File, Loader2 } from 'lucide-react';
+import { formatMyanmarDate, parseStoredDate } from '../lib/myanmarDate';
+import { useInAppBack } from '../hooks/useInAppBack';
 
 export default function Documents() {
-  const navigate = useNavigate();
+  const goBack = useInAppBack();
   const [searchQuery, setSearchQuery] = useState('');
   const [docs, setDocs] = useState<DocumentItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,17 +44,35 @@ export default function Documents() {
     return !q || (d.title || '').toLowerCase().includes(q) || (d.category || '').toLowerCase().includes(q);
   });
 
-  // v24.13: Google Drive viewer links cannot download directly — they still
-  // open in a new tab. Direct file URLs use a real <a download> instead of
-  // window.open, which only opened another tab.
+  // v24.15 P16: keep the Drive viewer-link behaviour (open in a new tab).
+  // For other URLs: derive the downloaded filename from the file URL's
+  // extension and KEEP the Burmese title (never strip non-ASCII — the old
+  // regex stripped a Burmese title to nothing and the file downloaded
+  // extension-less as "document"). Browsers ignore <a download> for
+  // cross-origin URLs and would navigate the current tab away, so
+  // cross-origin files open in a new tab instead.
   const isDriveViewerLink = (url: string) =>
     url.includes('drive.google.com') || url.includes('docs.google.com');
+  const isCrossOrigin = (url: string) => {
+    try {
+      return new URL(url, window.location.href).origin !== window.location.origin;
+    } catch {
+      return true;
+    }
+  };
   const handleDownload = (doc: DocumentItem) => {
     if (!doc.fileUrl) { toast.error('ဤစာရွက်စာတမ်းတွင် ဖိုင် လင့်ခ် မရှိပါ'); return; }
-    if (isDriveViewerLink(doc.fileUrl)) { window.open(doc.fileUrl, '_blank'); return; }
+    if (isDriveViewerLink(doc.fileUrl) || isCrossOrigin(doc.fileUrl)) {
+      window.open(doc.fileUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    const extMatch = doc.fileUrl.match(/\.([a-zA-Z0-9]{2,5})(?:[?#]|$)/);
+    const ext = extMatch ? `.${extMatch[1].toLowerCase()}` : '';
+    const base = (doc.title || 'document').trim() || 'document';
+    const filename = base.toLowerCase().endsWith(ext) || !ext ? base : `${base}${ext}`;
     const a = document.createElement('a');
     a.href = doc.fileUrl;
-    a.download = (doc.title || 'document').replace(/[^\w\-. ]+/g, '').trim() || 'document';
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -61,7 +81,7 @@ export default function Documents() {
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-10">
       <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-        <button onClick={() => { if (window.history.length > 1) navigate(-1); else navigate('/'); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-sky-950 font-bold text-xs sm:text-sm transition cursor-pointer shadow-2xs">
+        <button onClick={goBack} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-sky-950 font-bold text-xs sm:text-sm transition cursor-pointer shadow-2xs">
           <ArrowLeft className="w-4 h-4 text-sky-800" /> နောက်သို့
         </button>
         <Link to="/" className="text-xs font-semibold text-slate-600 hover:text-sky-800 px-2.5 py-1 rounded-lg hover:bg-slate-100 transition">ပင်မစာမျက်နှာ ➔</Link>
@@ -120,7 +140,9 @@ export default function Documents() {
                     <div className="flex items-center gap-3 text-xs text-slate-500 mt-1 flex-wrap">
                       <span className="bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">{doc.category}</span>
                       {doc.uploadedAt && (
-                        <span>{new Date(doc.uploadedAt).toLocaleDateString('my-MM')}</span>
+                        // v24.15 P16: guarded Myanmar date — never literal
+                        // 'Invalid Date' for a malformed stored date.
+                        <span>{formatMyanmarDate(parseStoredDate(doc.uploadedAt) ?? new Date(doc.uploadedAt))}</span>
                       )}
                       {doc.fileSize && <span>{doc.fileSize}</span>}
                     </div>

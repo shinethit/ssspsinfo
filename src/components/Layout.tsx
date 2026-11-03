@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, Link, useLocation } from 'react-router-dom';
+import { useInAppBack } from '../hooks/useInAppBack';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../lib/firebase';
 import { Toaster } from 'sonner';
@@ -59,7 +60,9 @@ export default function Layout() {
     return () => { document.body.style.overflow = 'unset'; };
   }, [sidebarOpen]);
   const location = useLocation();
-  const navigate = useNavigate();
+  // v24.15 (P15): back goes -1 only when in-app navigation happened since
+  // load, else '/' — window.history.length counts the whole tab session.
+  const goBack = useInAppBack();
 
   const navLinks = [
     { to: '/', label: 'ပင်မစာမျက်နှာ', labelEn: 'Home', icon: Home, exact: true },
@@ -101,13 +104,7 @@ export default function Layout() {
             {location.pathname !== '/' && (
               <button
                 type="button"
-                onClick={() => {
-                  if (window.history.length > 1) {
-                    navigate(-1);
-                  } else {
-                    navigate('/');
-                  }
-                }}
+                onClick={goBack}
                 aria-label="Go Back"
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-950 font-bold text-xs transition cursor-pointer shadow-2xs shrink-0"
                 title="နောက်သို့ (Back)"
@@ -167,7 +164,7 @@ export default function Layout() {
       {sidebarOpen && (
         <div
           onClick={closeSidebar}
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-2xs z-40 lg:hidden transition-opacity"
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-2xs z-40 lg:hidden transition-opacity print:hidden"
           aria-hidden="true"
         />
       )}
@@ -305,7 +302,7 @@ export default function Layout() {
           Admin Console bar could never stick to the page scroll and the
           admin content scrolled underneath it instead. 'clip' still stops
           horizontal overflow but is not a scroll container, so sticky works. */}
-      <div className="pt-16 lg:pl-64 flex flex-col flex-1 w-full max-w-full overflow-x-clip min-h-screen">
+      <div className="pt-16 lg:pl-64 print:pt-0 print:pl-0 flex flex-col flex-1 w-full max-w-full overflow-x-clip min-h-screen">
         {/* Real-time Admin News Ticker (စာတန်းပြေး ကြေညာချက်) — v24.10: hidden on
             /admin so the admin screens keep that vertical space for their own
             content; the ticker is public news, not admin tooling. */}
@@ -336,25 +333,31 @@ export default function Layout() {
       </div>
 
       {/* Offline Connectivity State Indicator */}
-      <OfflineIndicator />
+      <div className="print:hidden">
+        <OfflineIndicator />
+      </div>
 
       {/* In-app confirmation dialog (replaces native confirm()) */}
       <ConfirmModalHost />
 
-      <Toaster
-        position="top-right"
-        richColors
-        closeButton
-        duration={2200}
-        visibleToasts={2}
-        toastOptions={{
-          className: 'text-xs font-medium py-2 px-3 shadow-md rounded-xl max-w-xs',
-          style: {
-            maxWidth: '300px',
-            fontSize: '12px',
-          },
-        }}
-      />
+      {/* v24.15 (P28): toasts must never print — a toast shown when Print is
+          tapped would otherwise appear on the printed receipt. */}
+      <div className="print:hidden">
+        <Toaster
+          position="top-right"
+          richColors
+          closeButton
+          duration={2200}
+          visibleToasts={2}
+          toastOptions={{
+            className: 'text-xs font-medium py-2 px-3 shadow-md rounded-xl max-w-xs',
+            style: {
+              maxWidth: '300px',
+              fontSize: '12px',
+            },
+          }}
+        />
+      </div>
     </div>
   );
 }

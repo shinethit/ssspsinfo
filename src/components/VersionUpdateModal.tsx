@@ -1,15 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, X, ArrowRight, History, Activity, CheckCircle2, RefreshCw, RotateCcw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { VERSIONS } from '../data/versions';
 import { CURRENT_VERSION } from '../constants';
 
 const STORAGE_KEY = 'pss_last_viewed_version';
+// v24.15 re-audit (G5): a dismissed LIVE-version prompt reappears on the
+// next fresh page load unless the dismissed version itself is remembered —
+// handleDismiss used to store CURRENT_VERSION, not the live version being
+// dismissed, and the in-memory set is session-only.
+const DISMISSED_LIVE_KEY = 'pss_dismissed_live_version';
 
 export const VersionUpdateModal: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isForceReloading, setIsForceReloading] = useState(false);
+  // v24.15 (V2): the live version found by main.tsx's /version.json check
+  // (newer than this loaded bundle). Null = the normal changelog open.
+  const [newVersion, setNewVersion] = useState<string | null>(null);
+  // Versions already announced this session — a dismissed prompt must not
+  // pop again on the next 5-minute check.
+  const notifiedVersionsRef = useRef<Set<string>>(new Set());
   const navigate = useNavigate();
   
   const latestVersion = VERSIONS[0];
@@ -24,7 +35,26 @@ export const VersionUpdateModal: React.FC = () => {
 
     const handleOpen = () => setIsOpen(true);
     window.addEventListener('sssps_open_version_modal', handleOpen);
-    return () => window.removeEventListener('sssps_open_version_modal', handleOpen);
+    // v24.15 (V2): main.tsx dispatches this when /version.json is newer
+    // than the loaded bundle — an old bundle finally prompts for the update
+    // instead of only comparing localStorage against itself.
+    const handleNewVersion = (e: Event) => {
+      const v = (e as CustomEvent<{ version: string }>).detail?.version;
+      if (!v || notifiedVersionsRef.current.has(v)) return;
+      // v24.15 re-audit (G5): a live version the user already dismissed on
+      // an earlier visit must not pop again on every fresh load.
+      try {
+        if (localStorage.getItem(DISMISSED_LIVE_KEY) === v) return;
+      } catch {}
+      notifiedVersionsRef.current.add(v);
+      setNewVersion(v);
+      setIsOpen(true);
+    };
+    window.addEventListener('sssps_new_version', handleNewVersion);
+    return () => {
+      window.removeEventListener('sssps_open_version_modal', handleOpen);
+      window.removeEventListener('sssps_new_version', handleNewVersion);
+    };
   }, []);
 
   useEffect(() => {
@@ -86,6 +116,9 @@ export const VersionUpdateModal: React.FC = () => {
   const handleDismiss = () => {
     try {
       localStorage.setItem(STORAGE_KEY, CURRENT_VERSION);
+      // v24.15 re-audit (G5): remember WHICH live version was dismissed, so
+      // the prompt does not reappear for the same version on the next load.
+      if (newVersion) localStorage.setItem(DISMISSED_LIVE_KEY, newVersion);
     } catch {}
     setIsOpen(false);
   };
@@ -107,9 +140,20 @@ export const VersionUpdateModal: React.FC = () => {
             <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-white/20 text-white">
               {CURRENT_VERSION}
             </span>
+            {newVersion && (
+              <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-emerald-500 text-white">
+                → {newVersion.startsWith('v') ? newVersion : `v${newVersion}`}
+              </span>
+            )}
           </div>
-          <h2 className="text-xl font-black leading-snug">ဘာတွေ အသစ်ပါဝင်လာသလဲ?</h2>
-          <p className="text-slate-400 text-xs mt-1">{latestVersion.title}</p>
+          <h2 className="text-xl font-black leading-snug">
+            {newVersion ? 'version အသစ် ရောက်နေပါပြီ' : 'ဘာတွေ အသစ်ပါဝင်လာသလဲ?'}
+          </h2>
+          <p className="text-slate-400 text-xs mt-1">
+            {newVersion
+              ? `version ${newVersion.startsWith('v') ? newVersion : `v${newVersion}`} ရရှိနိုင်ပါပြီ — Update Now ကို နှိပ်၍ အသစ်သို့ ပြောင်းပါ။`
+              : latestVersion.title}
+          </p>
         </div>
 
         <div className="p-6 space-y-3 max-h-[60vh] overflow-y-auto bg-slate-50">

@@ -142,8 +142,10 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
     setWinner(match.winner || '');
     setMedal(match.medal || '');
     setMatchTime(match.matchTime || '');
-    setSecondPlace((match as SportsMatchResult & { secondPlace?: string }).secondPlace || '');
-    setThirdPlace((match as SportsMatchResult & { thirdPlace?: string }).thirdPlace || '');
+    // secondPlace/thirdPlace are declared fields on SportsMatchResult
+    // (since v24.13) — read them directly.
+    setSecondPlace(match.secondPlace || '');
+    setThirdPlace(match.thirdPlace || '');
     setIsIndividual(Boolean(match.playerA || match.playerB));
   };
 
@@ -181,7 +183,23 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
       toast.error('အနိုင်ရသူ ရွေးပေးပါ');
       return;
     }
-    if (winner !== 'သရေ' && !medal) {
+    const isDraw = winner === 'သရေ' || winner === 'Draw';
+    // v24.15 P8: a Draw has no 2nd/3rd place — refuse the save.
+    if (isDraw && (secondPlace || thirdPlace)) {
+      toast.error('သရေပွဲမှာ ဒုတိယ/တတိယ မရှိပါ');
+      return;
+    }
+    // v24.15 P8: 3rd place needs a 2nd place first.
+    if (thirdPlace && !secondPlace) {
+      toast.error('တတိယထည့်မယ်ဆို ဒုတိယ အရင်ရွေးပါ');
+      return;
+    }
+    // v24.15 P8: when 2nd/3rd places are set, the winner's medal is
+    // FORCED to gold (winner = gold, 2nd = silver, 3rd = bronze) — the
+    // medal picker is disabled in that case and the save uses gold.
+    const placesSet = Boolean(secondPlace || thirdPlace);
+    const effectiveMedal = placesSet ? 'gold' : medal;
+    if (!isDraw && !placesSet && !medal) {
       toast.error('ဆုတံဆိပ် ရွေးပေးပါ');
       return;
     }
@@ -218,14 +236,14 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
 
     setIsSubmittingMatch(true);
     try {
-      // secondPlace/thirdPlace are optional extra fields on the match —
-      // SportsMatchResult has no declared fields for them yet, so they are
-      // added via spread (MedalTally reads them the same way).
+      // secondPlace/thirdPlace are declared fields on SportsMatchResult
+      // (since v24.13). When places are set, the winner's medal is forced
+      // to gold (P8) — see effectiveMedal above.
       const newMatch: SportsMatchResult = {
         id: editingMatchId || Date.now().toString(),
         teamA, playerA: isIndividual ? playerA : undefined, scoreA,
         teamB, playerB: isIndividual ? playerB : undefined, scoreB,
-        winner, medal: medal as any,
+        winner, medal: effectiveMedal as any,
         matchTime: matchTime.trim() || undefined,
         ...(secondPlace ? { secondPlace } : {}),
         ...(thirdPlace ? { thirdPlace } : {}),
@@ -393,13 +411,19 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
                         <option value={teamB}>{teamB}</option>
                         <option value="သရေ">သရေ</option>
                       </select>
-                      <select value={medal} onChange={e => setMedal(e.target.value as any)} className="w-full p-2 border rounded-lg text-xs">
+                      <select value={secondPlace || thirdPlace ? 'gold' : medal} onChange={e => setMedal(e.target.value as any)} disabled={Boolean(secondPlace || thirdPlace)} className="w-full p-2 border rounded-lg text-xs disabled:bg-slate-100 disabled:text-slate-500">
                         <option value="">- ဆုတံဆိပ် -</option>
                         <option value="gold">🥇 ရွှေ</option>
                         <option value="silver">🥈 ငွေ</option>
                         <option value="bronze">🥉 ကြေး</option>
                       </select>
                     </div>
+                    {/* v24.15 P8: places force the winner's medal to gold. */}
+                    {(secondPlace || thirdPlace) ? (
+                      <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">
+                        အနိုင်ရသူ = ရွှေ၊ ဒုတိယ = ငွေ၊ တတိယ = ကြေး — ဒုတိယ/တတိယ ရွေးထားလို့ ဆုတံဆိပ်ကို ရွှေ အလိုအလျောက် သတ်မှတ်ပါသည်။
+                      </p>
+                    ) : null}
                     <div className="grid grid-cols-2 gap-2">
                       <select value={secondPlace} onChange={e => setSecondPlace(e.target.value)} className="w-full p-2 border rounded-lg text-xs">
                         <option value="">- ဒုတိယနေရာ (ငွေ) — မသတ်မှတ်ရသေး -</option>

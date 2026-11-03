@@ -113,12 +113,43 @@ button:focus-visible {
 /* v24.13 P5: printing (e.g. the Receipt page) prints only the receipt —
    the Layout header/sidebar/ticker/footer carry print:hidden, and these
    rules hide the app chrome even where a class was missed. */
+/* v24.15 (P7/P28, re-audit R2): the visibility technique — whenever
+   window.print() is called from a receipt flow, ONLY the element with class
+   .receipt-print-area prints. The two print flows (AnnualFeeReceipt modal,
+   standalone /receipt/:id page) add the `printing-receipt` class to
+   <body> before printing and remove it on `afterprint`, so the rule below
+   applies ONLY to a receipt print. The old version applied the global
+   `body * { visibility: hidden }` rule to EVERY print — a browser-initiated
+   print (Ctrl+P / menu) on any page printed a blank page, because no
+   .receipt-print-area exists there. The receipt is positioned absolute at
+   the top-left, full width, overflow visible, so a tall receipt flows
+   across pages instead of clipping (the old overflow-hidden clipped the
+   signatures). */
 @media print {
   body {
     background: #fff !important;
   }
   header, aside, footer {
     display: none !important;
+  }
+  body.printing-receipt * {
+    visibility: hidden !important;
+  }
+  body.printing-receipt .receipt-print-area,
+  body.printing-receipt .receipt-print-area * {
+    visibility: visible !important;
+  }
+  body.printing-receipt .receipt-print-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
   }
   @page {
     margin: 12mm;

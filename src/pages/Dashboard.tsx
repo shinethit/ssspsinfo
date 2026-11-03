@@ -1,5 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { useInAppBack } from '../hooks/useInAppBack';
+import { isCurrentYearPaid, getCurrentAcademicYear } from '../lib/academicYear';
+import { formatAnnouncementDate } from '../lib/myanmarDate';
 import { School, STUDENT_RANGE_TIERS, getStudentRangeTier } from '../types';
 import { useData, getAnnouncementTimestamp } from '../context/DataContext';
 import { db } from '../lib/firebase';
@@ -40,9 +43,19 @@ import {
 } from 'lucide-react';
 
 export default function Dashboard() {
-  const navigate = useNavigate();
-  
-  const { schools: allSchools, announcements, schoolLevels, loading } = useData();
+  const goBack = useInAppBack();
+
+  const { schools: allSchools, announcements, schoolLevels, loading, loadError, syncData } = useData();
+
+  // v24.15 (V8/V29, re-audit G1/G2): "collected" means CURRENT-YEAR annual
+  // fees everywhere — one shared definition in academicYear.ts, compared
+  // against the COMPUTED June-start year so every device agrees (the saved
+  // global year is per-browser localStorage and could disagree). The label
+  // below shows the same computed year, so label, counts and money agree.
+  const currentAcademicYear = getCurrentAcademicYear();
+  // v24.15 (V5/V4): while loading, or when the read failed, no count is
+  // trustworthy — everything renders '—' instead of a confident 0.
+  const countsReady = !loading && !loadError;
   const [selectedZone, setSelectedZone] = useState<string>('all');
   const schools = useMemo(() => {
     if (selectedZone === 'all') return allSchools;
@@ -58,39 +71,51 @@ export default function Dashboard() {
   const [financeStats, setFinanceStats] = useState<{ totalCollected: number | null }>({ totalCollected: null });
   const [eventStats, setEventStats] = useState<number | null>(null);
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        // The transactions collection can only be LISTED by admins (Firestore
-        // rules), so guests must never attempt that read — a denied read used
-        // to silently collapse to 0 and show a wrong total as fact.
-        const isAdminUser = !!getAdminSession().isLoggedIn;
-        const [athletesSnap, sportsSnap, eventsSnap] = await Promise.all([
-          getDocs(collection(db, 'athletes')).catch(() => null),
-          getDocs(collection(db, 'sports_events')).catch(() => null),
-          getDocs(collection(db, 'events')).catch(() => null)
-        ]);
+  // v24.15 re-audit (R3): fetchStats reads getAdminSession().isLoggedIn
+  // once — on a fresh load the effect can run before the async admins-doc
+  // read lands, so the admin-only transactions total stayed null forever
+  // (the old P1 fallback used to mask this race by lying). Re-run the
+  // fetch when the session resolves, same event Layout/Admin subscribe to.
+  const fetchStats = async () => {
+    try {
+      // The transactions collection can only be LISTED by admins (Firestore
+      // rules), so guests must never attempt that read — a denied read used
+      // to silently collapse to 0 and show a wrong total as fact.
+      const isAdminUser = !!getAdminSession().isLoggedIn;
+      const [athletesSnap, sportsSnap, eventsSnap] = await Promise.all([
+        getDocs(collection(db, 'athletes')).catch(() => null),
+        getDocs(collection(db, 'sports_events')).catch(() => null),
+        getDocs(collection(db, 'events')).catch(() => null)
+      ]);
 
-        setSportsStats({ athletes: athletesSnap ? athletesSnap.size : null, events: sportsSnap ? sportsSnap.size : null });
-        setEventStats(eventsSnap ? eventsSnap.size : null);
+      setSportsStats({ athletes: athletesSnap ? athletesSnap.size : null, events: sportsSnap ? sportsSnap.size : null });
+      setEventStats(eventsSnap ? eventsSnap.size : null);
 
-        if (!isAdminUser) {
-          setFinanceStats({ totalCollected: null });
-          return;
-        }
-        try {
-          const transSnap = await getDocs(collection(db, 'transactions'));
-          const total = transSnap.docs.reduce((sum: number, d: any) => sum + (Number(d.data().amount) || 0), 0);
-          setFinanceStats({ totalCollected: total });
-        } catch {
-          // Admin, but the list failed (offline / rules): never show a fake 0.
-          setFinanceStats({ totalCollected: null });
-        }
-      } catch (err) {
-        console.error("Stats fetch error:", err);
+      if (!isAdminUser) {
+        setFinanceStats({ totalCollected: null });
+        return;
       }
-    };
+      try {
+        const transSnap = await getDocs(collection(db, 'transactions'));
+        const total = transSnap.docs.reduce((sum: number, d: any) => sum + (Number(d.data().amount) || 0), 0);
+        setFinanceStats({ totalCollected: total });
+      } catch {
+        // Admin, but the list failed (offline / rules): never show a fake 0.
+        setFinanceStats({ totalCollected: null });
+      }
+    } catch (err) {
+      console.error("Stats fetch error:", err);
+    }
+  };
+
+  useEffect(() => {
     fetchStats();
+  }, []);
+
+  useEffect(() => {
+    const h = () => fetchStats();
+    window.addEventListener('sssps_admin_auth_changed', h);
+    return () => window.removeEventListener('sssps_admin_auth_changed', h);
   }, []);
   // ---------------------------
 
@@ -130,10 +155,10 @@ export default function Dashboard() {
     return '0-100'; // Default fallback tier
   };
 
-  // 1. Overall Key Metrics
+  // 1. Overall Key Metrics (current-year paid — see isCurrentYearPaid above)
   const totalSchools = schools.length;
-  const paidSchools = useMemo(() => schools.filter(s => !!s.isAnnualFeePaid), [schools]);
-  const unpaidSchools = useMemo(() => schools.filter(s => !s.isAnnualFeePaid), [schools]);
+  const paidSchools = useMemo(() => schools.filter(isCurrentYearPaid), [schools]);
+  const unpaidSchools = useMemo(() => schools.filter(s => !isCurrentYearPaid(s)), [schools]);
   const paidCount = paidSchools.length;
   const unpaidCount = unpaidSchools.length;
   const paidPercentage = totalSchools > 0 ? Math.round((paidCount / totalSchools) * 100) : 0;
@@ -143,17 +168,16 @@ export default function Dashboard() {
     return paidSchools.filter(s => s.status !== 'inactive').reduce((sum, s) => sum + getSchoolFee(s), 0);
   }, [paidSchools]);
 
-  // Finance figure shown in the overview card ("အခြားရရှိငွေ"):
-  // - Admins: the real sum of the transactions collection.
-  // - Guests: the transactions list is admin-only, so use the already-public
-  //   schools data instead (annual fees of paid schools).
-  // - Never a fabricated 0: while schools are still loading the figure is
-  //   unavailable, and the card shows '—' instead of 0.
+  // Finance figure shown in the overview card: the CURRENT-YEAR annual-fee
+  // total (flag-based, same for admins and guests). The admin transactions
+  // total (ALL years, ALL types) is shown separately, labelled as all-time
+  // (v24.15 V29) — never silently mixed into the current-year figure.
+  // Never a fabricated 0: while schools are still loading (or the read
+  // failed) the figure is unavailable and the card shows '—'.
   const financeTotalForDisplay = useMemo(() => {
-    if (financeStats.totalCollected !== null) return financeStats.totalCollected;
-    if (loading) return null;
+    if (!countsReady) return null;
     return totalCollectedAmount;
-  }, [financeStats.totalCollected, loading, totalCollectedAmount]);
+  }, [countsReady, totalCollectedAmount]);
 
   const totalExpectedAmount = useMemo(() => {
     return financeSchools.reduce((sum, s) => sum + getSchoolFee(s), 0);
@@ -177,8 +201,8 @@ export default function Dashboard() {
 
     return unified.map((item, idx) => {
       const allInLevel = item.schools;
-      const paidInLevel = allInLevel.filter(s => !!s.isAnnualFeePaid);
-      const unpaidInLevel = allInLevel.filter(s => !s.isAnnualFeePaid);
+      const paidInLevel = allInLevel.filter(isCurrentYearPaid);
+      const unpaidInLevel = allInLevel.filter(s => !isCurrentYearPaid(s));
       const collected = paidInLevel.filter(s => s.status !== 'inactive').reduce((sum, s) => sum + getSchoolFee(s), 0);
       const expected = allInLevel.filter(s => s.status !== 'inactive').reduce((sum, s) => sum + getSchoolFee(s), 0);
       const pct = allInLevel.length > 0 ? Math.round((paidInLevel.length / allInLevel.length) * 100) : 0;
@@ -202,8 +226,8 @@ export default function Dashboard() {
   const studentRangeBreakdown = useMemo(() => {
     return STUDENT_RANGE_TIERS.map(tier => {
       const allInRange = schools.filter(s => getSchoolRangeKey(s) === tier.key);
-      const paidInRange = allInRange.filter(s => !!s.isAnnualFeePaid);
-      const unpaidInRange = allInRange.filter(s => !s.isAnnualFeePaid);
+      const paidInRange = allInRange.filter(isCurrentYearPaid);
+      const unpaidInRange = allInRange.filter(s => !isCurrentYearPaid(s));
       const collected = paidInRange.filter(s => s.status !== 'inactive').reduce((sum, s) => sum + getSchoolFee(s), 0);
       const expected = allInRange.filter(s => s.status !== 'inactive').reduce((sum, s) => sum + getSchoolFee(s), 0);
       const pct = allInRange.length > 0 ? Math.round((paidInRange.length / allInRange.length) * 100) : 0;
@@ -226,30 +250,51 @@ export default function Dashboard() {
     });
   }, [schools]);
 
-  // 4. Breakdown By Fee Amount Tiers (ထည့်ဝင်ထားသော ပမာဏအလိုက် - Reference Tiers)
+  // 4. Breakdown By Fee Amount Tiers (ထည့်ဝင်ထားသော ပမာဏအလိုက်)
+  // v24.15 (V8): cards are labelled by AMOUNT only — the old labels named a
+  // student range while grouping was by recorded amount (a 200,000-fee
+  // school with 500 students sat in the "(၀ - ၁၀၀ ဦး)" card). Schools
+  // matching no tier (including fee-0 / unrecorded) now appear in an
+  // "အခြား" bucket instead of vanishing. Paid/collected are current-year.
   const feeAmountBreakdown = useMemo(() => {
     const tiers = [
-      { amount: 1000000, label: '၁,၀၀၀,၀၀၀ ကျပ် နှုန်းထား (၆၀၁ ဦးနှင့်အထက်)' },
-      { amount: 700000, label: '၇၀၀,၀၀၀ ကျပ် နှုန်းထား (၄၀၁ - ၆၀၀ ဦး)' },
-      { amount: 500000, label: '၅၀၀,၀၀၀ ကျပ် နှုန်းထား (၃၀၁ - ၄၀၀ ဦး)' },
-      { amount: 400000, label: '၄၀၀,၀၀၀ ကျပ် နှုန်းထား (၂၅၁ - ၃၀၀ ဦး)' },
-      { amount: 350000, label: '၃၅၀,၀၀၀ ကျပ် နှုန်းထား (၂၀၁ - ၂၅၀ ဦး)' },
-      { amount: 300000, label: '၃၀၀,၀၀၀ ကျပ် နှုန်းထား (၁၅၁ - ၂၀၀ ဦး)' },
-      { amount: 250000, label: '၂၅၀,၀၀၀ ကျပ် နှုန်းထား (၁၀၁ - ၁၅၀ ဦး)' },
-      { amount: 200000, label: '၂၀၀,၀၀၀ ကျပ် နှုန်းထား (၀ - ၁၀၀ ဦး)' },
+      { amount: 1000000 },
+      { amount: 700000 },
+      { amount: 500000 },
+      { amount: 400000 },
+      { amount: 350000 },
+      { amount: 300000 },
+      { amount: 250000 },
+      { amount: 200000 },
     ];
 
-    return tiers.map(t => {
+    const rows: Array<{
+      key: string;
+      amount: number | null;
+      label: string;
+      total: number;
+      paid: number;
+      unpaid: number;
+      collected: number;
+      expected: number;
+      pct: number;
+    }> = tiers.map(t => {
       const matchingSchools = schools.filter(s => getSchoolFee(s) === t.amount);
-      const paid = matchingSchools.filter(s => !!s.isAnnualFeePaid).length;
-      const unpaid = matchingSchools.filter(s => !s.isAnnualFeePaid).length;
+      const paid = matchingSchools.filter(isCurrentYearPaid).length;
+      const unpaid = matchingSchools.filter(s => !isCurrentYearPaid(s)).length;
       const total = matchingSchools.length;
-      const collected = paid * t.amount;
-      const expected = total * t.amount;
+      const collected = matchingSchools
+        .filter(s => isCurrentYearPaid(s) && s.status !== 'inactive')
+        .reduce((sum, s) => sum + getSchoolFee(s), 0);
+      const expected = matchingSchools
+        .filter(s => s.status !== 'inactive')
+        .reduce((sum, s) => sum + getSchoolFee(s), 0);
       const pct = total > 0 ? Math.round((paid / total) * 100) : 0;
 
       return {
-        ...t,
+        key: `amt-${t.amount}`,
+        amount: t.amount,
+        label: `${formatMMK(t.amount)} ကျပ်`,
         total,
         paid,
         unpaid,
@@ -258,6 +303,27 @@ export default function Dashboard() {
         pct,
       };
     });
+
+    const otherSchools = schools.filter(s => !tiers.some(t => getSchoolFee(s) === t.amount));
+    const otherPaid = otherSchools.filter(isCurrentYearPaid).length;
+    const otherTotal = otherSchools.length;
+    rows.push({
+      key: 'other',
+      amount: null as number | null,
+      label: 'အခြား',
+      total: otherTotal,
+      paid: otherPaid,
+      unpaid: otherTotal - otherPaid,
+      collected: otherSchools
+        .filter(s => isCurrentYearPaid(s) && s.status !== 'inactive')
+        .reduce((sum, s) => sum + getSchoolFee(s), 0),
+      expected: otherSchools
+        .filter(s => s.status !== 'inactive')
+        .reduce((sum, s) => sum + getSchoolFee(s), 0),
+      pct: otherTotal > 0 ? Math.round((otherPaid / otherTotal) * 100) : 0,
+    });
+
+    return rows;
   }, [schools]);
 
   // 5. Cross Matrix (ကျောင်းအဆင့် x ကျောင်းသားဦးရေ Range)
@@ -267,9 +333,9 @@ export default function Dashboard() {
         const matching = schools.filter(
           s => isSchoolInLevel(s, lvl.key) && getSchoolRangeKey(s) === tier.key
         );
-        const paid = matching.filter(s => !!s.isAnnualFeePaid).length;
+        const paid = matching.filter(isCurrentYearPaid).length;
         const total = matching.length;
-        const collected = matching.filter(s => !!s.isAnnualFeePaid && s.status !== 'inactive').reduce((sum, s) => sum + getSchoolFee(s), 0);
+        const collected = matching.filter(s => isCurrentYearPaid(s) && s.status !== 'inactive').reduce((sum, s) => sum + getSchoolFee(s), 0);
         return {
           tierKey: tier.key,
           tierLabel: tier.shortLabel,
@@ -340,10 +406,13 @@ export default function Dashboard() {
         const schoolRange = getSchoolRangeKey(school);
         const matchRange = selectedRange === 'all' || selectedRange === schoolRange;
 
+        // v24.15 (V29, parent fix): the fee filter must agree with the summary
+        // count — a flag stamped with last year's feeAcademicYear is stale and
+        // does not count as paid this year (isCurrentYearPaid, not the raw flag).
         const matchFee =
           selectedFeeStatus === 'all' ||
-          (selectedFeeStatus === 'paid' && !!school.isAnnualFeePaid) ||
-          (selectedFeeStatus === 'unpaid' && !school.isAnnualFeePaid);
+          (selectedFeeStatus === 'paid' && isCurrentYearPaid(school)) ||
+          (selectedFeeStatus === 'unpaid' && !isCurrentYearPaid(school));
 
         return matchSearch && matchStatus && matchLevel && matchRange && matchFee;
       })
@@ -361,13 +430,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-between pb-3 border-b border-slate-200">
         <button
           type="button"
-          onClick={() => {
-            if (window.history.length > 1) {
-              navigate(-1);
-            } else {
-              navigate('/');
-            }
-          }}
+          onClick={goBack}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-sky-950 font-bold text-xs sm:text-sm transition cursor-pointer shadow-2xs"
           title="နောက်သို့ (Back)"
         >
@@ -382,6 +445,25 @@ export default function Dashboard() {
           ပင်မစာမျက်နှာ ➔
         </Link>
       </div>
+
+      {/* v24.15 (V4): an honest error state — a failed read must never look
+          like "0 / 0 ကျောင်း" + "0%". While loadError is set every count on
+          this page renders '—'. */}
+      {loadError && (
+        <section className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="font-bold text-rose-800 text-sm">ဒေတာ ဖတ်မရပါ — ပြန်စမ်းကြည့်ပါ</p>
+            <p className="text-xs text-rose-600 mt-0.5">အင်တာနက် (သို့) ခွင့်ပြုချက်ကို စစ်ဆေးပြီး ပြန်စမ်းပါ။</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => syncData(true)}
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+          >
+            ပြန်စမ်းမည်
+          </button>
+        </section>
+      )}
 
       {/* 1. HERO BANNER */}
       <section className="relative overflow-hidden bg-gradient-to-br from-sky-950 via-sky-900 to-indigo-950 text-white rounded-3xl p-5 sm:p-7 shadow-xl border border-sky-800">
@@ -438,7 +520,7 @@ export default function Dashboard() {
                   (selectedZone === opt.value ? 'bg-indigo-700 text-white border-indigo-700 shadow-sm' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100')}>
                 <span>{opt.label}</span>
                 <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ` +
-                  (selectedZone === opt.value ? 'bg-indigo-500 text-white' : 'bg-white text-slate-500 border border-slate-200')}>{count}</span>
+                  (selectedZone === opt.value ? 'bg-indigo-500 text-white' : 'bg-white text-slate-500 border border-slate-200')}>{countsReady ? count : '—'}</span>
               </button>
             );
           })}
@@ -466,12 +548,14 @@ export default function Dashboard() {
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
           <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0"><Receipt className="w-5 h-5" /></div>
           <div className="min-w-0">
-            {/* v24.7: the label used to say "အခြားရရှိငွေ (အားကစားကြေး စသဖြင့်)"
-                while the figure was the annual-fee total for guests (and the
-                all-transactions total for admins). The label now says what
-                the figure actually is. */}
-            <p className="text-sm text-slate-500 font-semibold">{financeStats.totalCollected !== null ? 'စုစုပေါင်း ကောက်ခံရရှိငွေ' : 'ကောက်ခံရရှိငွေ (နှစ်စဉ်ကြေး)'}</p>
+            {/* v24.15 (V29): the headline figure is the CURRENT-YEAR annual
+                fees. The admin all-transactions total (all years, all types)
+                is shown underneath, labelled as all-time — never mixed in. */}
+            <p className="text-sm text-slate-500 font-semibold">ကောက်ခံရရှိငွေ (ယခု ပညာသင်နှစ်)</p>
             <p className="text-xl font-black text-amber-950 truncate">{financeTotalForDisplay !== null ? (<>{formatMMK(financeTotalForDisplay)} <span className="text-xs font-normal text-slate-500">ကျပ်</span></>) : '—'}</p>
+            {financeStats.totalCollected !== null && (
+              <p className="text-xs text-slate-400 truncate">သမိုင်းတစ်လျှောက် စုစုပေါင်း: {formatMMK(financeStats.totalCollected)} ကျပ်</p>
+            )}
           </div>
         </div>
 
@@ -495,17 +579,17 @@ export default function Dashboard() {
             </span>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-emerald-700">{paidCount}</span>
-            <span className="text-xs text-slate-500 font-medium">/ {totalSchools} ကျောင်း</span>
+            <span className="text-2xl font-black text-emerald-700">{countsReady ? paidCount : '—'}</span>
+            <span className="text-xs text-slate-500 font-medium">/ {countsReady ? totalSchools : '—'} ကျောင်း</span>
           </div>
           <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
             <div
               className="bg-emerald-500 h-full rounded-full transition-all duration-500"
-              style={{ width: `${paidPercentage}%` }}
+              style={{ width: `${countsReady ? paidPercentage : 0}%` }}
             />
           </div>
           <p className="text-sm text-emerald-700 font-bold">
-            ပေးသွင်းမှု နှုန်းထား: {paidPercentage}%
+            ပေးသွင်းမှု နှုန်းထား: {countsReady ? `${paidPercentage}%` : '—'}
           </p>
         </div>
 
@@ -518,17 +602,17 @@ export default function Dashboard() {
             </span>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-rose-600">{unpaidCount}</span>
+            <span className="text-2xl font-black text-rose-600">{countsReady ? unpaidCount : '—'}</span>
             <span className="text-xs text-slate-500 font-medium">ကျောင်း</span>
           </div>
           <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
             <div
               className="bg-rose-400 h-full rounded-full transition-all duration-500"
-              style={{ width: `${totalSchools > 0 ? (unpaidCount / totalSchools) * 100 : 0}%` }}
+              style={{ width: `${countsReady && totalSchools > 0 ? (unpaidCount / totalSchools) * 100 : 0}%` }}
             />
           </div>
           <p className="text-sm text-rose-600 font-semibold">
-            {totalSchools > 0 ? Math.round((unpaidCount / totalSchools) * 100) : 0}% ဆိုင်းငံ့ဆဲ
+            {countsReady ? `${totalSchools > 0 ? Math.round((unpaidCount / totalSchools) * 100) : 0}% ဆိုင်းငံ့ဆဲ` : '—'}
           </p>
         </div>
 
@@ -542,14 +626,14 @@ export default function Dashboard() {
           </div>
           <div>
             <div className="text-xl sm:text-2xl font-black text-sky-950 truncate">
-              {formatMMK(totalCollectedAmount)}
+              {countsReady ? formatMMK(totalCollectedAmount) : '—'}
             </div>
             <div className="text-sm text-sky-700 font-bold">
-              ကျပ် ({formatLakhs(totalCollectedAmount)})
+              ကျပ် ({countsReady ? formatLakhs(totalCollectedAmount) : '—'})
             </div>
           </div>
           <p className="text-xs text-slate-400 pt-1">
-            လက်ရှိ ဘဏ္ဍာနှစ်အတွင်း ရရှိငွေ
+            လက်ရှိ ဘဏ္ဍာနှစ် ({currentAcademicYear}) အတွင်း ရရှိငွေ
           </p>
         </div>
 
@@ -563,14 +647,14 @@ export default function Dashboard() {
           </div>
           <div>
             <div className="text-xl sm:text-2xl font-black text-indigo-950 truncate">
-              {formatMMK(totalExpectedAmount)}
+              {countsReady ? formatMMK(totalExpectedAmount) : '—'}
             </div>
             <div className="text-sm text-indigo-700 font-bold">
-              ကျပ် ({formatLakhs(totalExpectedAmount)})
+              ကျပ် ({countsReady ? formatLakhs(totalExpectedAmount) : '—'})
             </div>
           </div>
           <p className="text-xs text-slate-500">
-            ကျန်: <strong className="text-rose-600 font-bold">{formatMMK(remainingAmountToCollect)}</strong> ကျပ်
+            ကျန်: <strong className="text-rose-600 font-bold">{countsReady ? formatMMK(remainingAmountToCollect) : '—'}</strong> ကျပ်
           </p>
         </div>
       </section>
@@ -588,6 +672,14 @@ export default function Dashboard() {
       {/* The original breakdown section, conditionally rendered */}
       {showDetailedBreakdown && (
         <div className="animate-in fade-in slide-in-from-top-4 duration-300">
+          {/* v24.15 (V5/V4): while loading (or on a failed read) the breakdown
+              numbers would all be 0 — show a loading/error note instead. */}
+          {!countsReady ? (
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-10 text-center text-sm text-slate-400">
+              {loadError ? 'ဒေတာ ဖတ်မရပါ — ပြန်စမ်းကြည့်ပါ' : 'ဒေတာ ဖတ်နေသည်…'}
+            </div>
+          ) : (
+          <>
           {/* 3. CORE ANNUAL FEE BREAKDOWN SECTION (ကျောင်းအဆင့် / ကျောင်းသားဦးရေ / ထည့်ဝင်ထားသော ပမာဏ အလိုက်) */}
       <section className="bg-white rounded-3xl border border-slate-200 shadow-sm p-4 sm:p-6 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
@@ -785,12 +877,12 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             {feeAmountBreakdown.map((t) => (
               <div
-                key={t.amount}
+                key={t.key}
                 className="p-4 rounded-2xl border border-slate-200 bg-white space-y-2.5 shadow-2xs"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-black text-sky-950 block">
-                    {formatMMK(t.amount)} ကျပ်
+                    {t.label}
                   </span>
                   <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-800 border border-sky-200">
                     {t.total} ကျောင်း
@@ -915,7 +1007,7 @@ export default function Dashboard() {
                     <td className="p-3">စုစုပေါင်းအားလုံး</td>
                     {STUDENT_RANGE_TIERS.map(tier => {
                       const tierTotal = schools.filter(s => getSchoolRangeKey(s) === tier.key);
-                      const tierPaid = tierTotal.filter(s => !!s.isAnnualFeePaid).length;
+                      const tierPaid = tierTotal.filter(isCurrentYearPaid).length;
                       return (
                         <td key={tier.key} className="p-3 text-center text-sky-950">
                           {tierPaid} / {tierTotal.length}
@@ -936,7 +1028,8 @@ export default function Dashboard() {
         )}
       </section>
 
-      
+          </>
+          )}
         </div>
       )}
 
@@ -968,7 +1061,11 @@ export default function Dashboard() {
                 </span>
                 <span className="text-xs text-slate-500 font-medium">
                   <Calendar className="w-3 h-3 inline mr-1 text-sky-600" />
-                  {a.eventDate || (a.publishedAt ? new Date(a.publishedAt).toLocaleDateString('my-MM') : '...')}
+                  {/* v24.15 re-audit (G3): the shared formatter — the old
+                      inline pattern echoed a raw eventDate, fell back to
+                      English via Intl 'my-MM', showed 'Invalid Date', and
+                      '...' when no date existed. */}
+                  {formatAnnouncementDate(a.eventDate || a.publishedAt)}
                 </span>
               </div>
               <h3 className="font-bold text-xs sm:text-sm text-sky-950 group-hover:text-sky-700 line-clamp-2">
@@ -992,7 +1089,7 @@ export default function Dashboard() {
             </p>
           </div>
           <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full self-start sm:self-auto">
-            တွေ့ရှိမှု: {filteredSchools.length} ကျောင်း
+            တွေ့ရှိမှု: {countsReady ? filteredSchools.length : '—'} ကျောင်း
           </span>
         </div>
 
@@ -1118,12 +1215,15 @@ export default function Dashboard() {
                   </span>
                   <span
                     className={`text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                      school.isAnnualFeePaid
+                      isCurrentYearPaid(school)
                         ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                         : 'bg-rose-50 text-rose-800 border border-rose-200'
                     }`}
                   >
-                    {school.isAnnualFeePaid ? 'နှစ်စဉ်ကြေး သွင်းပြီး ✓' : 'နှစ်စဉ်ကြေး မသွင်းရသေး ✗'}
+                    {/* v24.15 (V29, parent fix): the badge must agree with the summary
+                        count — a flag stamped with last year's feeAcademicYear is
+                        stale and does not count as paid this year. */}
+                    {isCurrentYearPaid(school) ? 'နှစ်စဉ်ကြေး သွင်းပြီး ✓' : 'နှစ်စဉ်ကြေး မသွင်းရသေး ✗'}
                   </span>
                 </div>
               </Link>

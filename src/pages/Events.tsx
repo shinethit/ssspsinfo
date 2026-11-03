@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, query, where } from 'firebase/firestore';
+import { useState, useEffect, useRef } from 'react';
+import { collection, getDocs, addDoc, query, where, doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { EventItem } from '../types';
 import { toast } from 'sonner';
 import { Calendar, MapPin, CheckCircle2, Ticket, ArrowLeft, Loader2 } from 'lucide-react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { useInAppBack } from '../hooks/useInAppBack';
 
 // v24.13 A3(b): compare phones by digits only — Myanmar digits are
 // converted to Latin FIRST, then non-digits are stripped.
@@ -22,13 +23,16 @@ function formatEventDate(dateStr?: string): string {
 }
 
 export default function Events() {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const goBack = useInAppBack();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // v24.15 P10: remember which ?register= id was already handled, so the
+  // "not found" toast fires once instead of on every re-render.
+  const handledRegIdRef = useRef<string | null>(null);
 
   // Form State
   const [schoolName, setSchoolName] = useState('');
@@ -60,16 +64,58 @@ export default function Events() {
     fetchEvents();
   }, []);
 
-  // v24.13 P6: Calendar links here with ?register=<eventId> — open the
-  // registration modal for that event once the list has loaded.
+  // v24.15 P10: Calendar links here with ?register=<eventId> — open the
+  // registration modal for that event once the list has loaded. The
+  // upcoming list hides past/inactive events, so an event missing from it
+  // is fetched directly by id to say the REAL reason (past / closed /
+  // doesn't exist) instead of the wrong "ဤပွဲကို ရှာမတွေ့ပါ". An empty
+  // list is an honest message, not a silent nothing.
   useEffect(() => {
     const regId = searchParams.get('register');
-    if (regId && !loading && events.length > 0) {
-      const ev = events.find(x => x.id === regId);
-      if (ev) setSelectedEvent(ev);
-      else toast.error('ဤပွဲကို ရှာမတွေ့ပါ');
+    if (!regId) { handledRegIdRef.current = null; return; }
+    if (loading || handledRegIdRef.current === regId) return;
+    handledRegIdRef.current = regId;
+    const ev = events.find(x => x.id === regId);
+    if (ev) { setSelectedEvent(ev); return; }
+    if (loadError) {
+      toast.error('ပွဲစာရင်း ဖတ်မရပါ — အင်တာနက် စစ်ပြီး စာမျက်နှာကို ပြန်ဖွင့်ပါ');
+      return;
     }
-  }, [searchParams, loading, events]);
+    if (events.length === 0) {
+      toast.error('လက်ရှိတွင် စာရင်းသွင်းနိုင်သော ပွဲ/အခမ်းအနား မရှိသေးပါ');
+      return;
+    }
+    // Not in the upcoming list — fetch directly to find out why.
+    getDoc(doc(db, 'events', regId)).then(snap => {
+      if (!snap.exists()) {
+        toast.error('ဤပွဲကို ရှာမတွေ့ပါ — ဖျက်လိုက်ပြီ ဖြစ်နိုင်ပါသည်');
+        return;
+      }
+      const direct = { id: snap.id, ...snap.data() } as EventItem;
+      const n = new Date();
+      const todayStr = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+      if (direct.isActive === false) {
+        toast.error('ဤပွဲကို ပိတ်ထားပါသည် — စာရင်းသွင်း၍ မရပါ');
+      } else if (direct.date && direct.date < todayStr) {
+        toast.error('ဤပွဲ ပြီးသွားပါပြီ — စာရင်းသွင်း၍ မရပါ');
+      } else {
+        setSelectedEvent(direct);
+      }
+    }).catch(() => {
+      toast.error('ဤပွဲ၏ အချက်အလက် ဖတ်မရပါ — ပြန်စမ်းကြည့်ပါ');
+    });
+  }, [searchParams, loading, events, loadError]);
+
+  // v24.15 P10: clear ?register= when the modal closes, so a refresh
+  // does not reopen it.
+  const closeModal = () => {
+    setSelectedEvent(null);
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.delete('register');
+      return next;
+    }, { replace: true });
+  };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,16 +142,29 @@ export default function Events() {
 
     setIsSubmitting(true);
     try {
-      // v24.13 A3(b): duplicate check — same event + same school name or
-      // phone (digits compared, so Myanmar/Latin digits match).
-      const existingSnap = await getDocs(query(collection(db, 'event_registrations'), where('eventId', '==', selectedEvent.id)));
-      const normPhone = normPhoneForDupCheck(contactPhone.trim());
-      const isDup = existingSnap.docs.some(d => {
-        const r = d.data() as { schoolName?: string; contactPhone?: string };
-        const sameName = (r.schoolName || '').trim().toLowerCase() === schoolName.trim().toLowerCase();
-        const samePhone = normPhone.length > 0 && normPhoneForDupCheck(r.contactPhone || '') === normPhone;
-        return sameName || samePhone;
-      });
+      // v24.15 V1: the duplicate check is BEST-EFFORT. Guests (and school
+      // users) may not read event_registrations — the rules allow read only
+      // to moderators — so a denied/failed read used to abort EVERY public
+      // registration. On read failure, proceed to create anyway (the
+      // duplicate/cap protection that depends on that read is skipped);
+      // when the read succeeds, the protection below still applies.
+      // Do NOT open public read on event_registrations (names + phones
+      // would leak).
+      let isDup = false;
+      try {
+        // v24.13 A3(b): duplicate check — same event + same school name or
+        // phone (digits compared, so Myanmar/Latin digits match).
+        const existingSnap = await getDocs(query(collection(db, 'event_registrations'), where('eventId', '==', selectedEvent.id)));
+        const normPhone = normPhoneForDupCheck(contactPhone.trim());
+        isDup = existingSnap.docs.some(d => {
+          const r = d.data() as { schoolName?: string; contactPhone?: string };
+          const sameName = (r.schoolName || '').trim().toLowerCase() === schoolName.trim().toLowerCase();
+          const samePhone = normPhone.length > 0 && normPhoneForDupCheck(r.contactPhone || '') === normPhone;
+          return sameName || samePhone;
+        });
+      } catch (readErr) {
+        console.warn('Duplicate check unavailable — proceeding with registration:', readErr);
+      }
       if (isDup) { toast.error('စာရင်းသွင်းပြီးသား ဖြစ်ပါသည်'); return; }
       await addDoc(collection(db, 'event_registrations'), {
         eventId: selectedEvent.id,
@@ -115,7 +174,7 @@ export default function Events() {
         registeredAt: new Date().toISOString()
       });
       toast.success('ပွဲ/အခမ်းအနားအတွက် စာရင်းသွင်းမှု အောင်မြင်ပါသည်!');
-      setSelectedEvent(null);
+      closeModal();
       setSchoolName('');
       setContactPhone('');
       setAttendeesCount(1);
@@ -129,7 +188,7 @@ export default function Events() {
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-10">
       <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-        <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-sky-950 font-bold text-xs sm:text-sm transition cursor-pointer">
+        <button onClick={goBack} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-sky-950 font-bold text-xs sm:text-sm transition cursor-pointer">
           <ArrowLeft className="w-4 h-4 text-sky-800" /> နောက်သို့
         </button>
         <Link to="/" className="text-xs font-semibold text-slate-600 hover:text-sky-800">ပင်မစာမျက်နှာ ➔</Link>
@@ -202,7 +261,7 @@ export default function Events() {
                 <p className="text-xs text-slate-400 mt-1">အများဆုံး ၂၀၀ ဦးအထိသာ စာရင်းသွင်းနိုင်ပါသည်</p>
               </div>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setSelectedEvent(null)} className="flex-1 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-xl text-sm">မလုပ်တော့ပါ</button>
+                <button type="button" onClick={closeModal} className="flex-1 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-xl text-sm">မလုပ်တော့ပါ</button>
                 <button type="submit" disabled={isSubmitting} className="flex-1 py-2.5 bg-sky-900 text-white font-bold rounded-xl text-sm disabled:opacity-50">
                   {isSubmitting ? 'ပို့နေပါသည်...' : 'အတည်ပြုမည်'}
                 </button>

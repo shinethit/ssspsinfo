@@ -1,16 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { TransactionRecord } from '../types';
 import { Printer, ArrowLeft, CheckCircle2, Loader2, Download } from 'lucide-react';
+import { useInAppBack } from '../hooks/useInAppBack';
+import { parseStoredDate, formatMyanmarDate } from '../lib/myanmarDate';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { toast } from 'sonner';
 
 export default function Receipt() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+  const goBack = useInAppBack();
   const [transaction, setTransaction] = useState<TransactionRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const receiptRef = useRef<HTMLDivElement>(null);
@@ -52,12 +54,29 @@ export default function Receipt() {
   // v24.7: an old transaction doc missing paidDate used to crash this page
   // (paidDate.replace on undefined), and a missing amount crashed the
   // total rows. Both now fall back safely.
-  const displayVoucherNo = transaction.voucherNo || (transaction.paidDate
+  // v24.15 re-audit (F7): derive the fallback voucher only from a VALID
+  // paid date — a malformed date used to produce 'SSSPSFV-abc-XXXX'. A
+  // present-but-invalid date shows 'N/A' (matching AnnualFeeReceipt); no
+  // date at all keeps the id-derived fallback.
+  const parsedPaidDate = parseStoredDate(transaction.paidDate);
+  const displayVoucherNo = transaction.voucherNo || (parsedPaidDate
     ? `SSSPSFV-${transaction.paidDate.replace(/-/g, '')}-${transaction.id.substring(0, 4).toUpperCase()}`
-    : `SSSPSFV-${transaction.id.substring(0, 4).toUpperCase()}`);
+    : transaction.paidDate ? 'N/A' : `SSSPSFV-${transaction.id.substring(0, 4).toUpperCase()}`);
   const displayAmount = Number(transaction.amount) || 0;
+  // v24.15: guarded date — an invalid stored paidDate shows the guarded
+  // label (never 'Invalid Date', never the Intl 'my-MM' fallback).
+  const displayPaidDate = parsedPaidDate;
 
+  // v24.15 re-audit (R2): the global print rule only applies while the
+  // `printing-receipt` class is on <body> — add it for this print, remove
+  // it when the print dialog closes (afterprint fires on cancel too).
   const handlePrint = () => {
+    document.body.classList.add('printing-receipt');
+    const cleanup = () => {
+      document.body.classList.remove('printing-receipt');
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
     window.print();
   };
 
@@ -93,10 +112,7 @@ export default function Receipt() {
             admin-only /admin?tab=finance. Guarded history-back, fallback '/'. */}
         <button
           type="button"
-          onClick={() => {
-            if (window.history.length > 1) navigate(-1);
-            else navigate('/');
-          }}
+          onClick={goBack}
           className="inline-flex items-center gap-2 text-sm font-bold text-sky-800 hover:text-sky-950 cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" /> နောက်သို့
@@ -114,7 +130,7 @@ export default function Receipt() {
         </div>
       </div>
 
-      <div ref={receiptRef} className="bg-white p-4 sm:p-12 rounded-3xl shadow-sm border border-slate-200 relative overflow-hidden print:shadow-none print:border-none print:p-0">
+      <div ref={receiptRef} className="receipt-print-area bg-white p-4 sm:p-12 rounded-3xl shadow-sm border border-slate-200 relative overflow-hidden print:shadow-none print:border-none print:p-0 print:overflow-visible">
         
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-5 pointer-events-none">
           <CheckCircle2 className="w-96 h-96 text-emerald-600" />
@@ -140,7 +156,7 @@ export default function Receipt() {
             </div>
             <div className="text-right">
               <span className="text-slate-500 font-semibold block mb-1">ရက်စွဲ (Date):</span>
-              <span className="font-bold text-slate-900">{transaction.paidDate ? new Date(transaction.paidDate).toLocaleDateString('my-MM', { year: 'numeric', month: 'long', day: 'numeric' }) : 'ရက်စွဲ မရှိပါ'}</span>
+              <span className="font-bold text-slate-900">{displayPaidDate ? formatMyanmarDate(displayPaidDate) : 'ရက်စွဲ မဖော်ပြထားပါ'}</span>
             </div>
           </div>
 

@@ -5,6 +5,7 @@ import { db } from '../lib/firebase';
 import { Announcement } from '../types';
 import { getCategoryBadge } from './Announcements';
 import { Calendar, ArrowLeft, Paperclip, FileText } from 'lucide-react';
+import { formatAnnouncementDate } from '../lib/myanmarDate';
 
 export default function AnnouncementDetail() {
   const { id } = useParams<{ id: string }>();
@@ -61,18 +62,9 @@ export default function AnnouncementDetail() {
   }
 
   const badge = getCategoryBadge(announcement.category);
-  const rawDate = announcement.eventDate || (announcement.publishedAt ? announcement.publishedAt.split('T')[0] : '');
-  let dateFormatted = rawDate;
-  if (rawDate) {
-    const d = new Date(rawDate.includes('T') ? rawDate : `${rawDate}T12:00:00`);
-    if (!isNaN(d.getTime())) {
-      dateFormatted = d.toLocaleDateString('my-MM', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      });
-    }
-  }
+  // v24.15 P31: one shared formatter — missing/malformed dates get the
+  // guarded label, never a raw echo.
+  const dateFormatted = formatAnnouncementDate(announcement.eventDate || announcement.publishedAt);
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -90,7 +82,7 @@ export default function AnnouncementDetail() {
           </span>
           <div className="flex items-center gap-1.5 text-xs text-slate-400">
             <Calendar className="w-4 h-4" />
-            <span>{dateFormatted || announcement.publishedAt}</span>
+            <span>{dateFormatted}</span>
           </div>
         </div>
 

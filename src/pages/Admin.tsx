@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { collection, getDocs, doc, updateDoc, deleteField, query, orderBy } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, auth } from '../lib/firebase';
 import { toast } from 'sonner';
 import { confirmDialog } from '../components/ConfirmModal';
 import * as XLSX from 'xlsx';
-import { Association, NewsTicker, AdminUser, School, TransactionRecord } from '../types';
+import { Association, NewsTicker, AdminUser, School } from '../types';
 import { useData, sortAnnouncementsByEventDate } from '../context/DataContext';
 import { getUnifiedSchoolLevels } from '../lib/schoolLevels';
 import {
@@ -16,8 +16,8 @@ import {
 } from 'lucide-react';
 import { createSchoolAccount } from '../lib/schoolAuth';
 import { getAdminSession, clearAdminSession, changeAdminPassword, sendAdminPasswordReset, mapFirebaseAuthError } from '../lib/adminAuth';
-import { getGlobalAcademicYear } from '../lib/academicYear';
-import { recordAnnualFeePayment, findAnnualFeeTransaction } from '../lib/finance';
+import { getGlobalAcademicYear, normalizeAcademicYear, isCurrentYearPaid, getCurrentAcademicYear } from '../lib/academicYear';
+import { recordAnnualFeePayment } from '../lib/finance';
 import { recordAuditLog } from '../lib/audit';
 import { canAccessTab } from '../lib/roles';
 import { normalizeSchoolRow, exportSchoolsToExcel } from '../lib/excel';
@@ -68,6 +68,15 @@ export default function Admin() {
   // Legacy roles are already normalized to these two in adminAuth.normalizeRole().
   const role = adminSession?.role || 'moderator';
   const isModOrAdmin = role === 'moderator' || role === 'admin';
+  // v24.15 (P12): the role is only trustworthy once the cached session was
+  // computed FOR the currently signed-in user. On a fresh load the cache
+  // still says 'moderator' until the async admins-doc read lands — acting
+  // on that placeholder redirected a true admin off a deep link and showed
+  // a moderator the admin-only tabs for one paint. The cache is resolved
+  // when its uid matches the current user (the listener always stamps the
+  // uid, even for non-admins); with no signed-in user there is nothing to
+  // resolve (ProtectedRoute handles that case).
+  const sessionResolved = !auth.currentUser || adminSession.uid === auth.currentUser.uid;
 
   const canAccess: Record<string, boolean> = {
     dashboard: canAccessTab(role, 'dashboard'),
@@ -87,12 +96,15 @@ export default function Admin() {
     requests: canAccessTab(role, 'requests'),
   };
 
+  // v24.15 (P12): never redirect while the role is still resolving — the
+  // redirect below must not act on the 'moderator' placeholder.
   useEffect(() => {
+    if (!sessionResolved) return;
     if (canAccess[activeTab] === false) {
       const firstAccessible = Object.keys(canAccess).find(key => canAccess[key]);
       if (firstAccessible) setActiveTab(firstAccessible as any);
     }
-  }, [activeTab, role]);
+  }, [activeTab, role, sessionResolved]);
 
   // Shared data state (tabs receive what they need via props)
   const [schools, setSchools] = useState<any[]>([]);
@@ -121,7 +133,16 @@ export default function Admin() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const handleLogout = () => { clearAdminSession(); toast.info('အကောင့်မှ ထွက်ပြီးပါပြီ'); navigate('/login'); };
+  // v24.15 (P33): await the sign-out BEFORE navigating — and if it fails,
+  // say so honestly and STAY on the page. Before, a failed sign-out still
+  // navigated to /login while the Firebase session persisted, so /admin
+  // re-admitted the "logged out" user.
+  const handleLogout = async () => {
+    const ok = await clearAdminSession();
+    if (!ok) { toast.error('အကောင့်မှ ထွက်ရာတွင် အမှားဖြစ်ပွားပါသည် — ပြန်လည်ကြိုးစားပါ'); return; }
+    toast.info('အကောင့်မှ ထွက်ပြီးပါပြီ');
+    navigate('/login');
+  };
 
   useEffect(() => { if (globalSchools) setSchools(globalSchools); }, [globalSchools]);
   useEffect(() => { if (globalAnnouncements) setAnnouncements(globalAnnouncements); }, [globalAnnouncements]);
@@ -235,48 +256,55 @@ export default function Admin() {
     // dialog lists exactly what goes with the school. A failed count read
     // must not block the delete — the dialog then shows no counts, but
     // still warns about the login account.
-    let impact: { transactionCount: number; eventCount: number; athleteCount: number; registrationCount: number } | null = null;
+    let impact: { transactionCount: number; eventCount: number; athleteCount: number; registrationCount: number; requestCount: number } | null = null;
     try {
       impact = await getSchoolDeleteImpact(id);
     } catch (e) {
       console.error('Could not load school delete impact:', e);
     }
     const impactText = impact
-      ? ` ဤကျောင်းနှင့် ဆက်စပ်နေသော မှတ်တမ်းများလည်း အတူတကွ ဖျက်ပါမည် — ငွေသွင်းမှတ်တမ်း (${impact.transactionCount}) ခု၊ ပွဲစဉ် (${impact.eventCount}) ခု၊ အားကစားသမား (${impact.athleteCount}) ခု၊ စာရင်းသွင်းမှု (${impact.registrationCount}) ခု။`
+      ? ` ဤကျောင်းနှင့် ဆက်စပ်နေသော မှတ်တမ်းများလည်း အတူတကွ ဖျက်ပါမည် — ငွေသွင်းမှတ်တမ်း (${impact.transactionCount}) ခု၊ ပွဲစဉ် (${impact.eventCount}) ခု၊ အားကစားသမား (${impact.athleteCount}) ခု၊ စာရင်းသွင်းမှု (${impact.registrationCount}) ခု၊ တောင်းဆိုချက် (${impact.requestCount}) ခု။`
       : '';
     if (!(await confirmDialog(`"${name || 'ဤကျောင်း'}" ကို ဖျက်ရန် သေချာပါသလား?${impactText} ကျောင်း၏ Login အကောင့်ကိုတော့ Firebase Console တွင် သီးခြား ဖျက်ရပါမည်။`))) return;
-    try { await deleteSchoolFromContext(id); await recordAuditLog({ action: 'delete', entityType: 'school', entityId: id, entityName: name, details: `ကျောင်း ဖျက်ခြင်း${impact ? ` (ငွေသွင်းမှတ်တမ်း ${impact.transactionCount} ခု၊ ပွဲစဉ် ${impact.eventCount} ခု၊ အားကစားသမား ${impact.athleteCount} ခု၊ စာရင်းသွင်းမှု ${impact.registrationCount} ခု အတူဖျက်ခြင်း)` : ''}` }); toast.success('ဖျက်ပြီးပါပြီ — ကျောင်း၏ Login အကောင့်ကို Firebase Console တွင် သီးခြား ဖျက်ပေးပါ'); fetchSchools(); } catch (e) { toast.error('ဖျက်၍မရပါ'); }
+    try { await deleteSchoolFromContext(id); await recordAuditLog({ action: 'delete', entityType: 'school', entityId: id, entityName: name, details: `ကျောင်း ဖျက်ခြင်း${impact ? ` (ငွေသွင်းမှတ်တမ်း ${impact.transactionCount} ခု၊ ပွဲစဉ် ${impact.eventCount} ခု၊ အားကစားသမား ${impact.athleteCount} ခု၊ စာရင်းသွင်းမှု ${impact.registrationCount} ခု၊ တောင်းဆိုချက် ${impact.requestCount} ခု အတူဖျက်ခြင်း)` : ''}` }); toast.success('ဖျက်ပြီးပါပြီ — ကျောင်း၏ Login အကောင့်ကို Firebase Console တွင် သီးခြား ဖျက်ပေးပါ'); fetchSchools(); } catch (e) { toast.error('ဖျက်၍မရပါ'); }
   };
 
   const handleToggleSchoolFee = async (school: School) => {
-    if (school.isAnnualFeePaid && !(await confirmDialog(`"${school.name}" ၏ နှစ်စဉ်ကြေးပေးသွင်းပြီးမှုကို ပယ်ဖျက်မည်လား?`))) return;
+    // v24.15 re-audit (G1): the toggle means "paid THIS year" — same
+    // year-aware branch and current-year default as SchoolDetail's toggle.
+    if (isCurrentYearPaid(school) && !(await confirmDialog(`"${school.name}" ၏ နှစ်စဉ်ကြေးပေးသွင်းပြီးမှုကို ပယ်ဖျက်မည်လား?`))) return;
     try {
-      if (!school.isAnnualFeePaid) {
+      if (!isCurrentYearPaid(school)) {
         // v24.7: marking paid now records the payment properly — one
         // transaction + the flag, via the shared write path.
         const amount = Number(school.feeAmount) || 0;
         if (!amount || amount <= 0) { toast.error('ဤကျောင်း၏ နှစ်စဉ်ကြေး ပမာဏ မရှိသေးပါ — ကျောင်းအချက်အလက်တွင် ပမာဏ ထည့်ပြီးမှ အမှတ်အသားလုပ်ပါ'); return; }
-        const academicYear = school.feeAcademicYear || getGlobalAcademicYear();
-        // v24.13 (F5b): if this school+year already has an annual-fee
-        // transaction, just set the flag and reuse it — never write a
-        // second transaction for the same payment.
-        const txSnap = await getDocs(collection(db, 'transactions'));
-        const existingTx = findAnnualFeeTransaction(txSnap.docs.map(d => ({ id: d.id, ...d.data() }) as TransactionRecord), school.id, academicYear);
-        if (existingTx) {
-          await updateDoc(doc(db, 'schools', school.id), { isAnnualFeePaid: true, feePaidDate: existingTx.paidDate || new Date().toISOString().split('T')[0], feeAmount: amount, feeAcademicYear: academicYear, updatedAt: new Date().toISOString() });
-          await recordAuditLog({ action: 'update', entityType: 'school', entityId: school.id, entityName: school.name, details: `နှစ်စဉ်ကြေး ပေးပြီးအဖြစ် အမှတ်အသားလုပ်ခြင်း — ရှိပြီးသား မှတ်တမ်း ပြန်သုံးခြင်း (${existingTx.voucherNo || 'voucher မရှိ'})` });
+        // v24.15 re-audit (G1): the toggle marks THIS year's payment — the
+        // old default reused the stale stored year (see SchoolDetail).
+        const academicYear = getCurrentAcademicYear();
+        // v24.15 (V15/V30): recordAnnualFeePayment reports reuse — when this
+        // school+year already has a transaction, the flag mirrors the
+        // EXISTING transaction (no new money moves) and the UI must warn
+        // instead of toasting "မှတ်တမ်းတင်ပြီးပါပြီ" as if money moved;
+        // the audit log says 'update' on reuse, 'create' on new.
+        const result = await recordAnnualFeePayment({ school, amount, paidDate: new Date().toISOString().split('T')[0], academicYear });
+        if (result.reused) {
+          await recordAuditLog({ action: 'update', entityType: 'transaction', entityId: school.id, entityName: school.name, details: `နှစ်စဉ်ကြေး ပေးပြီးအဖြစ် အမှတ်အသားလုပ်ခြင်း — ရှိပြီးသား မှတ်တမ်း ပြန်သုံးခြင်း (${result.voucherNo || 'voucher မရှိ'}) — ငွေအသစ် မသွင်းပါ` });
+          toast.warning(`"${school.name}" အတွက် ဤပညာသင်နှစ်၏ ငွေသွင်းမှတ်တမ်း ရှိပြီးသားပါ — ငွေအသစ် မသွင်းပါ (မှတ်တမ်း ပြန်သုံးခြင်း)`);
         } else {
-          const { voucherNo } = await recordAnnualFeePayment({ school, amount, paidDate: new Date().toISOString().split('T')[0], academicYear });
-          await recordAuditLog({ action: 'create', entityType: 'transaction', entityId: school.id, entityName: school.name, details: `နှစ်စဉ်ကြေး ${amount.toLocaleString('my-MM')} ကျပ် ပေးပြီးအဖြစ် အမှတ်အသားလုပ်ခြင်း (${voucherNo})` });
+          await recordAuditLog({ action: 'create', entityType: 'transaction', entityId: school.id, entityName: school.name, details: `နှစ်စဉ်ကြေး ${amount.toLocaleString('my-MM')} ကျပ် ပေးပြီးအဖြစ် အမှတ်အသားလုပ်ခြင်း (${result.voucherNo})` });
+          toast.success('နှစ်စဉ်ကြေးအခြေအနေ ပြောင်းလဲပြီးပါပြီ');
         }
       } else {
         // Un-marking only clears the flag. The transaction record stays in
         // Finance (money history is never silently deleted) — delete it
         // there if the payment was recorded by mistake.
-        await updateDoc(doc(db, 'schools', school.id), { isAnnualFeePaid: false, updatedAt: new Date().toISOString() });
+        // v24.15 (V32): also clear the stale fee amount / paid date / year
+        // from the school doc, so no stale date feeds a receipt fallback.
+        await updateDoc(doc(db, 'schools', school.id), { isAnnualFeePaid: false, feeAmount: deleteField(), feePaidDate: deleteField(), feeAcademicYear: deleteField(), updatedAt: new Date().toISOString() });
         await recordAuditLog({ action: 'update', entityType: 'school', entityId: school.id, entityName: school.name, details: 'နှစ်စဉ်ကြေး ပေးပြီးအမှတ် ပယ်ဖျက်ခြင်း (ငွေသွင်းမှတ်တမ်းကိုတော့ Finance တွင် ဆက်ထားပါသည်)' });
+        toast.success('နှစ်စဉ်ကြေးအခြေအနေ ပြောင်းလဲပြီးပါပြီ');
       }
-      toast.success('နှစ်စဉ်ကြေးအခြေအနေ ပြောင်းလဲပြီးပါပြီ');
       fetchSchools();
     } catch (e) { toast.error('ပြောင်းလဲ၍မရပါ'); }
   };
@@ -363,7 +391,12 @@ export default function Admin() {
             if (feeAmount && feeAmount > 0) {
               try {
                 const importDate = new Date().toISOString().split('T')[0];
-                const year = getGlobalAcademicYear();
+                // v24.15 (V21): use the row's own feeAcademicYear when it
+                // has one (normalized) — the global year is only the
+                // fallback when the row has none. (normalizeSchoolRow
+                // already normalizes the row's year; re-normalizing here
+                // is a no-op for a valid year and guards the fallback.)
+                const year = normalized.feeAcademicYear ? normalizeAcademicYear(normalized.feeAcademicYear) : getGlobalAcademicYear();
                 const { voucherNo } = await recordAnnualFeePayment({ school: { id: newId, name: normalized.name } as School, amount: feeAmount, paidDate: importDate, academicYear: year });
                 await recordAuditLog({ action: 'create', entityType: 'transaction', entityId: newId, entityName: normalized.name, details: `Excel တင်သွင်းမှု — နှစ်စဉ်ကြေး ${feeAmount.toLocaleString('my-MM')} ကျပ် (${year}, ${voucherNo})` });
               } catch (err) {
@@ -490,8 +523,18 @@ export default function Admin() {
               <AdminTickersTab tickers={tickers} onRefresh={fetchTickers} />
             )}
 
-            {/* TAB 7: ACCOUNTS */}
-            {activeTab === 'accounts' && (
+            {/* v24.15 re-audit (P12): while the role is still resolving, a
+                true admin on a deep link saw an empty content area — show a
+                loading state instead of nothing. */}
+            {['accounts', 'audit_logs', 'backup'].includes(activeTab) && !sessionResolved && (
+              <div className="p-10 text-center text-slate-500 text-sm font-semibold">စစ်ဆေးနေပါသည်…</div>
+            )}
+
+            {/* TAB 7: ACCOUNTS — v24.15 (P12): admin-only tab content is
+                not rendered at all until the role is known to be admin
+                (this also covers the one-paint exposure without touching
+                the tab component's internals). */}
+            {activeTab === 'accounts' && sessionResolved && role === 'admin' && (
               <AdminAccountsTab
                 admins={admins}
                 schools={schools}
@@ -502,13 +545,13 @@ export default function Admin() {
               />
             )}
 
-            {/* TAB 8: AUDIT LOGS */}
-            {activeTab === 'audit_logs' && (
+            {/* TAB 8: AUDIT LOGS — v24.15 (P12): see accounts tab. */}
+            {activeTab === 'audit_logs' && sessionResolved && role === 'admin' && (
               <AdminAuditLogsTab />
             )}
 
-            {/* TAB 9: BACKUP & CLOUD */}
-            {activeTab === 'backup' && (
+            {/* TAB 9: BACKUP & CLOUD — v24.15 (P12): see accounts tab. */}
+            {activeTab === 'backup' && sessionResolved && role === 'admin' && (
               <AdminBackupTab
                 schools={schools}
                 announcements={announcements}

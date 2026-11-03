@@ -9,11 +9,22 @@ describe('normalizeRole', () => {
     ['editor', 'moderator'],
     ['sports_moderator', 'moderator'],
     ['news_editor', 'moderator'],
-    [undefined, 'moderator'],
-    [null, 'moderator'],
-    ['', 'moderator'],
-    [123, 'moderator'],
   ] as const)('normalizeRole(%s) -> %s', (input, expected) => {
+    expect(normalizeRole(input)).toBe(expected);
+  });
+
+  // v24.15 (P34): any role the Firestore rules do not admit — including
+  // 'user', 'guest', a missing role, or any other value — normalizes to
+  // null (non-admin) instead of silently becoming 'moderator'.
+  it.each([
+    ['user', null],
+    ['guest', null],
+    [undefined, null],
+    [null, null],
+    ['', null],
+    [123, null],
+    ['superuser', null],
+  ] as const)('normalizeRole(%s) -> null (not an admitted role)', (input, expected) => {
     expect(normalizeRole(input)).toBe(expected);
   });
 });

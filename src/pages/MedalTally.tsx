@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { SportsEvent, SportsMatchResult } from '../types';
+import { SportsEvent } from '../types';
 import { Trophy, ArrowLeft, Loader2, Award } from 'lucide-react';
+import { useInAppBack } from '../hooks/useInAppBack';
 
 interface MedalCount {
   schoolName: string;
@@ -14,7 +15,7 @@ interface MedalCount {
 }
 
 export default function MedalTally() {
-  const navigate = useNavigate();
+  const goBack = useInAppBack();
   const [events, setEvents] = useState<SportsEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -39,48 +40,46 @@ export default function MedalTally() {
     events.forEach(event => {
       if (event.status !== 'finished') return;
       event.results?.forEach(match => {
+        // v24.15 P8: medals are DERIVED from places when 2nd/3rd places
+        // exist (winner = gold, 2nd = silver, 3rd = bronze) and the stored
+        // medal field is IGNORED — so a match can never double-count
+        // (winner's silver + 2nd's silver). With no places, the stored
+        // medal counts as before (legacy data). A Draw never counts
+        // anything — the admin form refuses 2nd/3rd places on a Draw, and
+        // any legacy Draw carrying places is ignored here.
         // v24.6: only an explicitly recorded winner counts — never guess
-        // from scores (a tie/blank used to credit teamB), and only a real
-        // medal (gold/silver/bronze) creates a tally row (a blank medal
-        // used to create 0-medal rows).
+        // from scores (a tie/blank used to credit teamB).
         const winningTeam = match.winner;
-
         if (!winningTeam || winningTeam === 'သရေ' || winningTeam === 'Draw') return;
-        if (match.medal !== 'gold' && match.medal !== 'silver' && match.medal !== 'bronze') return;
 
-        if (!tallyMap.has(winningTeam)) {
-          tallyMap.set(winningTeam, { schoolName: winningTeam, gold: 0, silver: 0, bronze: 0, total: 0 });
-        }
-
-        const record = tallyMap.get(winningTeam)!;
-        if (match.medal === 'gold') record.gold += 1;
-        else if (match.medal === 'silver') record.silver += 1;
-        else if (match.medal === 'bronze') record.bronze += 1;
-
-        record.total = record.gold + record.silver + record.bronze;
-
-        // v24.13: a match can also carry optional 2nd-place (silver) and
-        // 3rd-place (bronze) schools — one winner + one medal per match used
-        // to make silver/bronze structurally almost unreachable. These are
-        // extra fields on the match (not in SportsMatchResult yet), so read
-        // via a cast. They only count for a valid match (real winner +
-        // medal, as above), never for the winner itself, and never
-        // double-count the winner's own medal.
-        const extra = match as SportsMatchResult & { secondPlace?: string; thirdPlace?: string };
-        const places: Array<{ school: string | undefined; medal: 'silver' | 'bronze' }> = [
-          { school: extra.secondPlace, medal: 'silver' },
-          { school: extra.thirdPlace, medal: 'bronze' },
-        ];
-        places.forEach(({ school, medal }) => {
-          if (!school || school === winningTeam) return;
+        const addMedal = (school: string | undefined, medal: 'gold' | 'silver' | 'bronze') => {
+          if (!school) return;
           if (!tallyMap.has(school)) {
             tallyMap.set(school, { schoolName: school, gold: 0, silver: 0, bronze: 0, total: 0 });
           }
-          const placeRecord = tallyMap.get(school)!;
-          if (medal === 'silver') placeRecord.silver += 1;
-          else placeRecord.bronze += 1;
-          placeRecord.total = placeRecord.gold + placeRecord.silver + placeRecord.bronze;
-        });
+          const record = tallyMap.get(school)!;
+          if (medal === 'gold') record.gold += 1;
+          else if (medal === 'silver') record.silver += 1;
+          else record.bronze += 1;
+          record.total = record.gold + record.silver + record.bronze;
+        };
+
+        // secondPlace/thirdPlace are declared fields on SportsMatchResult
+        // (since v24.13) — read them directly, no cast needed.
+        if (match.secondPlace || match.thirdPlace) {
+          addMedal(winningTeam, 'gold');
+          if (match.secondPlace && match.secondPlace !== winningTeam) {
+            addMedal(match.secondPlace, 'silver');
+          }
+          if (match.thirdPlace && match.thirdPlace !== winningTeam && match.thirdPlace !== match.secondPlace) {
+            addMedal(match.thirdPlace, 'bronze');
+          }
+          return;
+        }
+
+        // No places — count the stored medal as before.
+        if (match.medal !== 'gold' && match.medal !== 'silver' && match.medal !== 'bronze') return;
+        addMedal(winningTeam, match.medal);
       });
     });
 
@@ -97,7 +96,7 @@ export default function MedalTally() {
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-10">
       <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-        <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-sky-950 font-bold text-xs sm:text-sm transition cursor-pointer shadow-2xs">
+        <button onClick={goBack} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-sky-950 font-bold text-xs sm:text-sm transition cursor-pointer shadow-2xs">
           <ArrowLeft className="w-4 h-4 text-sky-800" /> နောက်သို့
         </button>
         <Link to="/" className="text-xs font-semibold text-slate-600 hover:text-sky-800">ပင်မစာမျက်နှာ ➔</Link>

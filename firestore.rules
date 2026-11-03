@@ -32,7 +32,25 @@ service cloud.firestore {
     match /schools/{id} {
       allow read: if true;
       allow create, delete: if isModerator();
-      allow update: if isModerator() || (isSignedIn() && resource.data.authUid == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['schoolPhone', 'address', 'township', 'zone', 'studentCount', 'updatedAt']));
+      // v24.15 (P2): legacy "adopt" — a signed-in user whose Auth email
+      // matches the school doc's accountEmail may set the doc's authUid to
+      // their own uid ONCE, when the doc has no authUid yet, updating only
+      // authUid + updatedAt. Legacy email-only accounts can log in but
+      // cannot save anything until adopted; after adoption the owner-update
+      // and events rules above work for them. NOTE: this rule must be
+      // published in Firebase Console after deploy, or adoption is denied
+      // and the portal stays read-only for those schools.
+      allow update: if isModerator()
+        || (isSignedIn() && resource.data.authUid == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['schoolPhone', 'address', 'township', 'zone', 'studentCount', 'updatedAt']))
+        || (isSignedIn()
+            // v24.15 re-audit (R4): '' counts as missing too — a doc that
+            // ever carries an empty-string authUid would otherwise be
+            // attempted (and denied) on EVERY portal load.
+            && (resource.data.get('authUid', null) == null || resource.data.get('authUid', null) == '')
+            && request.auth.token.email != null
+            && resource.data.accountEmail == request.auth.token.email
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['authUid', 'updatedAt'])
+            && request.resource.data.authUid == request.auth.uid);
     }
     match /announcements/{id}  { allow read: if true; allow write: if isModerator(); }
     match /tickers/{id}        { allow read: if true; allow write: if isModerator(); }
