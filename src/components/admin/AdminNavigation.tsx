@@ -29,7 +29,7 @@ export default function AdminNavigation({ navItems, activeTab, onSelectTab, role
             </div>
             <div>
               <h2 className="text-lg font-extrabold tracking-tight">Admin Console</h2>
-              <span className="text-[11px] uppercase tracking-wider font-bold text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded-md">{role}</span>
+              <span className="text-sm uppercase tracking-wider font-bold text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded-md">{role}</span>
             </div>
           </div>
           <p className="text-xs text-sky-200/90 mt-3 truncate font-medium">{email || 'admin@ssspsinfo'}</p>

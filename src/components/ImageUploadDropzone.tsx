@@ -76,7 +76,7 @@ export default function ImageUploadDropzone({
               <button
                 type="button"
                 onClick={onOpenSettings}
-                className="text-[11px] text-amber-700 hover:text-amber-900 font-bold flex items-center gap-1 cursor-pointer bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200"
+                className="text-sm text-amber-700 hover:text-amber-900 font-bold flex items-center gap-1 cursor-pointer bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200"
               >
                 <Settings className="w-3 h-3" />
                 <span>Cloudinary Setup</span>
@@ -85,7 +85,7 @@ export default function ImageUploadDropzone({
             <button
               type="button"
               onClick={() => setShowUrlInput(!showUrlInput)}
-              className="text-[11px] text-sky-700 hover:text-sky-900 font-semibold flex items-center gap-1 cursor-pointer"
+              className="text-sm text-sky-700 hover:text-sky-900 font-semibold flex items-center gap-1 cursor-pointer"
             >
               <LinkIcon className="w-3 h-3" />
               <span>{showUrlInput ? 'ဖိုင်တင်ရန် ပြောင်းမည်' : 'URL ရိုက်ထည့်မည်'}</span>
@@ -189,7 +189,7 @@ export default function ImageUploadDropzone({
             </div>
           )}
 
-          <p className="text-[11px] text-slate-500">
+          <p className="text-sm text-slate-500">
             {helperText}
           </p>
         </div>

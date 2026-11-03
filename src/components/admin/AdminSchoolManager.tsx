@@ -295,7 +295,7 @@ export default function AdminSchoolManager({
                               <select
                                 value={school.status || 'active'}
                                 onChange={(e) => onUpdateStatus(school, e.target.value as any)}
-                                className={`text-[11px] font-bold px-2 py-0.5 rounded-md border outline-none cursor-pointer ${
+                                className={`text-sm font-bold px-2 py-0.5 rounded-md border outline-none cursor-pointer ${
                                   school.status === 'under_review' ? 'bg-amber-50 text-amber-700 border-amber-200' :
                                   school.status === 'inactive' ? 'bg-slate-100 text-slate-600 border-slate-200' :
                                   'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -307,12 +307,12 @@ export default function AdminSchoolManager({
                               </select>
                               {(school.township || school.city) && <span className="text-xs font-medium text-slate-500">• {school.township || school.city}</span>}
                               {school.zone && (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
+                                <span className="inline-flex items-center gap-1 text-sm font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
                                   <MapPin className="w-3 h-3" />{school.zone}
                                 </span>
                               )}
                               {school.accountEmail && (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200">
+                                <span className="inline-flex items-center gap-1 text-sm font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200">
                                   ✓ {school.accountEmail}
                                 </span>
                               )}

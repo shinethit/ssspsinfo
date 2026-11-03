@@ -46,7 +46,7 @@ export default function GlobalSearch() {
       >
         <Search className="w-4 h-4" />
         <span className="w-16 text-left">ရှာဖွေရန်...</span>
-        <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-white px-1.5 font-mono text-[10px] font-medium text-slate-400">
+        <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-white px-1.5 font-mono text-xs font-medium text-slate-400">
           <span className="text-xs">⌘</span>K
         </kbd>
       </button>
@@ -179,7 +179,7 @@ export default function GlobalSearch() {
         
         {/* Footer — v24.6: removed the ↑↓/Enter hints; keyboard selection
             does not exist, only Esc closes the search */}
-        <div className="bg-slate-50 border-t border-slate-100 px-4 py-2 flex items-center justify-between text-[11px] text-slate-500">
+        <div className="bg-slate-50 border-t border-slate-100 px-4 py-2 flex items-center justify-between text-sm text-slate-500">
           <span className="text-slate-400">ရိုက်ထည့်ပြီး ရွေးချယ်ပါ</span>
           <span className="flex items-center gap-1"><kbd className="bg-white border border-slate-200 rounded px-1">Esc</kbd> ပိတ်ရန်</span>
         </div>

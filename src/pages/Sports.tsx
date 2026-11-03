@@ -195,7 +195,7 @@ export default function Sports() {
                               {match.scoreA} - {match.scoreB}
                             </div>
                             {match.matchTime && (
-                              <span className="text-[10px] text-sky-700 font-bold mt-1 bg-sky-50 px-2 py-0.5 rounded border border-sky-200 inline-flex items-center gap-1">
+                              <span className="text-xs text-sky-700 font-bold mt-1 bg-sky-50 px-2 py-0.5 rounded border border-sky-200 inline-flex items-center gap-1">
                                 <Clock className="w-2.5 h-2.5" />{match.matchTime}
                               </span>
                             )}

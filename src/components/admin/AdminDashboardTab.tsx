@@ -36,7 +36,7 @@ export default function AdminDashboardTab({ schools, announcements, tickers, ass
             <div className="p-2 bg-sky-50 text-sky-600 rounded-xl"><SchoolIcon className="w-5 h-5" /></div>
           </div>
           <p className="text-3xl font-extrabold text-slate-900 mt-3">{schools.length}</p>
-          <p className="text-[11px] font-semibold text-emerald-600 mt-1">လည်ပတ်ဆဲ {schools.filter(s => (s.status || 'active') === 'active').length} ကျောင်း</p>
+          <p className="text-sm font-semibold text-emerald-600 mt-1">လည်ပတ်ဆဲ {schools.filter(s => (s.status || 'active') === 'active').length} ကျောင်း</p>
         </div>
 
         <div onClick={() => onGoToTab('schools')} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs hover:border-emerald-300 transition cursor-pointer">
@@ -45,7 +45,7 @@ export default function AdminDashboardTab({ schools, announcements, tickers, ass
             <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><CheckCircle2 className="w-5 h-5" /></div>
           </div>
           <p className="text-3xl font-extrabold text-emerald-700 mt-3">{schools.filter(s => s.isAnnualFeePaid).length}</p>
-          <p className="text-[11px] font-semibold text-rose-600 mt-1">ကျန်ရှိ {schools.filter(s => !s.isAnnualFeePaid).length} ကျောင်း</p>
+          <p className="text-sm font-semibold text-rose-600 mt-1">ကျန်ရှိ {schools.filter(s => !s.isAnnualFeePaid).length} ကျောင်း</p>
         </div>
 
         <div onClick={() => onGoToTab('announcements')} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs hover:border-indigo-300 transition cursor-pointer">
@@ -54,7 +54,7 @@ export default function AdminDashboardTab({ schools, announcements, tickers, ass
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><FileText className="w-5 h-5" /></div>
           </div>
           <p className="text-3xl font-extrabold text-slate-900 mt-3">{announcements.length}</p>
-          <p className="text-[11px] font-semibold text-slate-500 mt-1">စာတန်းပြေး {tickers.filter(t => t.isActive).length} ခု လွှင့်ထားဆဲ</p>
+          <p className="text-sm font-semibold text-slate-500 mt-1">စာတန်းပြေး {tickers.filter(t => t.isActive).length} ခု လွှင့်ထားဆဲ</p>
         </div>
 
         <div onClick={() => onGoToTab('associations')} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs hover:border-amber-300 transition cursor-pointer">
@@ -63,7 +63,7 @@ export default function AdminDashboardTab({ schools, announcements, tickers, ass
             <div className="p-2 bg-amber-50 text-amber-600 rounded-xl"><Users className="w-5 h-5" /></div>
           </div>
           <p className="text-3xl font-extrabold text-slate-900 mt-3">{associations.length}</p>
-          <p className="text-[11px] font-semibold text-slate-500 mt-1">Admin အကောင့် {admins.length} ခု</p>
+          <p className="text-sm font-semibold text-slate-500 mt-1">Admin အကောင့် {admins.length} ခု</p>
         </div>
       </div>
     </div>

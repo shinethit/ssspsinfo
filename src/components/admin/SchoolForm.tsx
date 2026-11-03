@@ -125,11 +125,11 @@ export default function SchoolForm({ initialData, isEditing, onCancel, onSubmit,
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">ပညာသင်နှစ် (Academic Year)</label>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">ပညာသင်နှစ် (Academic Year)</label>
                   <input type="text" {...schoolForm.register('feeAcademicYear')} placeholder="ဥပမာ - ၂၀၂၄-၂၀၂၅" className="w-full p-2 border rounded-lg text-sm bg-white" />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">သွင်းသည့် ရက်စွဲ (Payment Date)</label>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">သွင်းသည့် ရက်စွဲ (Payment Date)</label>
                   <input type="date" {...schoolForm.register('feePaidDate')} className="w-full p-2 border rounded-lg text-sm bg-white" />
                 </div>
               </div>

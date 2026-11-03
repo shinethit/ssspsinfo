@@ -139,7 +139,7 @@ export default function Login() {
           <p className="text-xs text-sky-200/80 mt-1">
             ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း
           </p>
-          <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-0.5 rounded-full text-[10px] bg-sky-800/80 border border-sky-400/30 text-sky-100">
+          <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-0.5 rounded-full text-xs bg-sky-800/80 border border-sky-400/30 text-sky-100">
             <Lock className="w-3 h-3 text-emerald-400" />
             <span>လုံခြုံစိတ်ချရသော စကားဝှက်ဖြင့် စစ်ဆေးခြင်း</span>
           </div>
@@ -156,7 +156,7 @@ export default function Login() {
                     <p className="font-semibold">{loginError}</p>
 
                     {notAdminInfo && notAdminInfo.uid && (
-                      <div className="p-3 bg-amber-50/90 border border-amber-300 rounded-xl text-amber-900 text-[11px] space-y-2 mt-2">
+                      <div className="p-3 bg-amber-50/90 border border-amber-300 rounded-xl text-amber-900 text-sm space-y-2 mt-2">
                         <div className="font-bold flex items-center gap-1.5 text-amber-900">
                           <HelpCircle className="w-3.5 h-3.5 text-amber-700 shrink-0" />
                           <span>Firestore Admin ခွင့်ပြုချက် သတ်မှတ်နည်း</span>
@@ -164,7 +164,7 @@ export default function Login() {
                         <p className="text-amber-800 leading-relaxed">
                           Firebase Console &gt; Firestore Database &gt; <code className="bg-amber-100 font-bold px-1 rounded">admins</code> collection ထဲတွင် Document ID အဖြစ် အောက်ပါ UID ဖြင့် Document အသစ် ဖန်တီးပေးပါ-
                         </p>
-                        <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-amber-300 font-mono text-[10px] break-all select-all shadow-2xs">
+                        <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-amber-300 font-mono text-xs break-all select-all shadow-2xs">
                           <span className="flex-1 font-bold text-slate-900">{notAdminInfo.uid}</span>
                           <button
                             type="button"
@@ -172,18 +172,18 @@ export default function Login() {
                               navigator.clipboard.writeText(notAdminInfo.uid);
                               toast.success('UID ကို ကူးယူပြီးပါပြီ');
                             }}
-                            className="px-2.5 py-1 bg-amber-600 text-white rounded-md text-[10px] font-sans font-bold hover:bg-amber-700 shrink-0 cursor-pointer transition shadow-2xs"
+                            className="px-2.5 py-1 bg-amber-600 text-white rounded-md text-xs font-sans font-bold hover:bg-amber-700 shrink-0 cursor-pointer transition shadow-2xs"
                           >
                             Copy UID
                           </button>
                         </div>
-                        <p className="text-[10px] text-amber-700 font-medium">
+                        <p className="text-xs text-amber-700 font-medium">
                           Fields: <code className="bg-amber-100 px-1 py-0.5 rounded font-mono">role: "admin"</code> (သို့မဟုတ် <code className="bg-amber-100 px-1 py-0.5 rounded font-mono">"moderator"</code>)
                         </p>
                       </div>
                     )}
 
-                    <p className="text-[11px] text-rose-600">
+                    <p className="text-sm text-rose-600">
                       စကားဝှက် မေ့နေပါက အောက်ရှိ{' '}
                       <button
                         type="button"
@@ -282,10 +282,10 @@ export default function Login() {
                   <HelpCircle className="w-4 h-4 text-sky-700" />
                   <span>စကားဝှက် အကူအညီ (Password Assistance)</span>
                 </div>
-                <p className="leading-relaxed text-[11px] text-slate-600">
+                <p className="leading-relaxed text-sm text-slate-600">
                   • စနစ်တွင် ခွင့်ပြုထားသော Admin အကောင့်၏ Email နှင့် စကားဝှက်ဖြင့် လုံခြုံစွာ Login ဝင်ရောက်နိုင်ပါသည်။
                 </p>
-                <p className="leading-relaxed text-[11px] text-slate-600">
+                <p className="leading-relaxed text-sm text-slate-600">
                   • စကားဝှက် မေ့လျော့နေပါက သို့မဟုတ် အသစ်ပြောင်းလိုပါက အောက်ရှိ ခလုတ်ဖြင့် စကားဝှက် ပြန်လည်ရယူရန် လင့်ခ်ကို အီးမေးလ်သို့ ပေးပို့နိုင်ပါသည်။
                 </p>
 

@@ -102,15 +102,15 @@ export default function VersionHistory() {
               {item.changes.map((change, cIdx) => (
                 <li key={cIdx} className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-700 leading-relaxed">
                   {change.type === 'feat' ? (
-                    <span className="shrink-0 mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-200">
+                    <span className="shrink-0 mt-0.5 px-2 py-0.5 rounded text-xs font-bold bg-sky-100 text-sky-800 border border-sky-200">
                       NEW
                     </span>
                   ) : change.type === 'improve' ? (
-                    <span className="shrink-0 mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                    <span className="shrink-0 mt-0.5 px-2 py-0.5 rounded text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
                       UPDATE
                     </span>
                   ) : (
-                    <span className="shrink-0 mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                    <span className="shrink-0 mt-0.5 px-2 py-0.5 rounded text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200">
                       FIX
                     </span>
                   )}

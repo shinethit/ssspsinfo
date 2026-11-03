@@ -119,7 +119,7 @@ export const VersionUpdateModal: React.FC = () => {
                 <CheckCircle2 className="w-4 h-4" />
               </div>
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5 block">{change.type}</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-0.5 block">{change.type}</span>
                 <p className="text-slate-700 text-xs leading-relaxed font-medium">{change.text}</p>
               </div>
             </div>

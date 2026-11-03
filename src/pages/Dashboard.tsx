@@ -422,11 +422,11 @@ export default function Dashboard() {
             <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200"><MapPin className="w-3.5 h-3.5" /></div>
             <div>
               <h4 className="font-bold text-xs sm:text-sm text-slate-900">ဇုန်အလိုက် စစ်ထုတ်ခြင်း (Zone Filter)</h4>
-              <p className="text-[10px] text-slate-500">ဤစာမျက်နှာရှိ ကျောင်းစာရင်းနှင့် စာရင်းအင်းများတွင် သက်ရောက်ပါမည်</p>
+              <p className="text-xs text-slate-500">ဤစာမျက်နှာရှိ ကျောင်းစာရင်းနှင့် စာရင်းအင်းများတွင် သက်ရောက်ပါမည်</p>
             </div>
           </div>
           {selectedZone !== 'all' && (
-            <button type="button" onClick={() => setSelectedZone('all')} className="text-[10px] font-semibold text-sky-700 hover:underline cursor-pointer px-2 py-1 bg-sky-50 rounded-lg border border-sky-200">✕ ဖယ်ရှားမည်</button>
+            <button type="button" onClick={() => setSelectedZone('all')} className="text-xs font-semibold text-sky-700 hover:underline cursor-pointer px-2 py-1 bg-sky-50 rounded-lg border border-sky-200">✕ ဖယ်ရှားမည်</button>
           )}
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -434,10 +434,10 @@ export default function Dashboard() {
             const count = opt.value === 'all' ? allSchools.length : allSchools.filter(s => isSchoolInZone(s.zone, opt.value)).length;
             return (
               <button key={opt.value} type="button" onClick={() => setSelectedZone(opt.value)}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold transition flex items-center gap-1.5 border cursor-pointer ` +
+                className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 border cursor-pointer ` +
                   (selectedZone === opt.value ? 'bg-indigo-700 text-white border-indigo-700 shadow-sm' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100')}>
                 <span>{opt.label}</span>
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ` +
+                <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ` +
                   (selectedZone === opt.value ? 'bg-indigo-500 text-white' : 'bg-white text-slate-500 border border-slate-200')}>{count}</span>
               </button>
             );
@@ -450,7 +450,7 @@ export default function Dashboard() {
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
           <div className="p-3 bg-sky-50 text-sky-600 rounded-xl shrink-0"><UserCheck className="w-5 h-5" /></div>
           <div>
-            <p className="text-[11px] text-slate-500 font-semibold">အားကစားသမား စုစုပေါင်း</p>
+            <p className="text-sm text-slate-500 font-semibold">အားကစားသမား စုစုပေါင်း</p>
             <p className="text-xl font-black text-sky-950">{sportsStats.athletes !== null ? (<>{sportsStats.athletes} <span className="text-xs font-normal text-slate-500">ဦး</span></>) : '—'}</p>
           </div>
         </div>
@@ -458,7 +458,7 @@ export default function Dashboard() {
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
           <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0"><Trophy className="w-5 h-5" /></div>
           <div>
-            <p className="text-[11px] text-slate-500 font-semibold">အားကစားပွဲစဉ်</p>
+            <p className="text-sm text-slate-500 font-semibold">အားကစားပွဲစဉ်</p>
             <p className="text-xl font-black text-emerald-950">{sportsStats.events !== null ? (<>{sportsStats.events} <span className="text-xs font-normal text-slate-500">ခု</span></>) : '—'}</p>
           </div>
         </div>
@@ -470,7 +470,7 @@ export default function Dashboard() {
                 while the figure was the annual-fee total for guests (and the
                 all-transactions total for admins). The label now says what
                 the figure actually is. */}
-            <p className="text-[11px] text-slate-500 font-semibold">{financeStats.totalCollected !== null ? 'စုစုပေါင်း ကောက်ခံရရှိငွေ' : 'ကောက်ခံရရှိငွေ (နှစ်စဉ်ကြေး)'}</p>
+            <p className="text-sm text-slate-500 font-semibold">{financeStats.totalCollected !== null ? 'စုစုပေါင်း ကောက်ခံရရှိငွေ' : 'ကောက်ခံရရှိငွေ (နှစ်စဉ်ကြေး)'}</p>
             <p className="text-xl font-black text-amber-950 truncate">{financeTotalForDisplay !== null ? (<>{formatMMK(financeTotalForDisplay)} <span className="text-xs font-normal text-slate-500">ကျပ်</span></>) : '—'}</p>
           </div>
         </div>
@@ -478,7 +478,7 @@ export default function Dashboard() {
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
           <div className="p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0"><Ticket className="w-5 h-5" /></div>
           <div>
-            <p className="text-[11px] text-slate-500 font-semibold">စာရင်းသွင်းနိုင်သော ပွဲစဉ်များ</p>
+            <p className="text-sm text-slate-500 font-semibold">စာရင်းသွင်းနိုင်သော ပွဲစဉ်များ</p>
             <p className="text-xl font-black text-purple-950">{eventStats !== null ? (<>{eventStats} <span className="text-xs font-normal text-slate-500">ခု</span></>) : '—'}</p>
           </div>
         </div>
@@ -504,7 +504,7 @@ export default function Dashboard() {
               style={{ width: `${paidPercentage}%` }}
             />
           </div>
-          <p className="text-[11px] text-emerald-700 font-bold">
+          <p className="text-sm text-emerald-700 font-bold">
             ပေးသွင်းမှု နှုန်းထား: {paidPercentage}%
           </p>
         </div>
@@ -527,7 +527,7 @@ export default function Dashboard() {
               style={{ width: `${totalSchools > 0 ? (unpaidCount / totalSchools) * 100 : 0}%` }}
             />
           </div>
-          <p className="text-[11px] text-rose-600 font-semibold">
+          <p className="text-sm text-rose-600 font-semibold">
             {totalSchools > 0 ? Math.round((unpaidCount / totalSchools) * 100) : 0}% ဆိုင်းငံ့ဆဲ
           </p>
         </div>
@@ -544,11 +544,11 @@ export default function Dashboard() {
             <div className="text-xl sm:text-2xl font-black text-sky-950 truncate">
               {formatMMK(totalCollectedAmount)}
             </div>
-            <div className="text-[11px] text-sky-700 font-bold">
+            <div className="text-sm text-sky-700 font-bold">
               ကျပ် ({formatLakhs(totalCollectedAmount)})
             </div>
           </div>
-          <p className="text-[10px] text-slate-400 pt-1">
+          <p className="text-xs text-slate-400 pt-1">
             လက်ရှိ ဘဏ္ဍာနှစ်အတွင်း ရရှိငွေ
           </p>
         </div>
@@ -565,11 +565,11 @@ export default function Dashboard() {
             <div className="text-xl sm:text-2xl font-black text-indigo-950 truncate">
               {formatMMK(totalExpectedAmount)}
             </div>
-            <div className="text-[11px] text-indigo-700 font-bold">
+            <div className="text-sm text-indigo-700 font-bold">
               ကျပ် ({formatLakhs(totalExpectedAmount)})
             </div>
           </div>
-          <p className="text-[10px] text-slate-500">
+          <p className="text-xs text-slate-500">
             ကျန်: <strong className="text-rose-600 font-bold">{formatMMK(remainingAmountToCollect)}</strong> ကျပ်
           </p>
         </div>
@@ -669,7 +669,7 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-extrabold text-sm text-slate-900">{item.label}</h3>
-                    <span className="text-[10px] text-slate-400 font-semibold">{item.sub}</span>
+                    <span className="text-xs text-slate-400 font-semibold">{item.sub}</span>
                   </div>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-white border border-slate-200 font-bold text-slate-700">
                     {item.total} ကျောင်း
@@ -680,7 +680,7 @@ export default function Dashboard() {
                   <div className="flex items-baseline justify-between text-xs">
                     <span className="text-slate-600 font-medium">နှစ်စဉ်ကြေး ပေးသွင်းပြီး:</span>
                     <span className="font-black text-emerald-700">
-                      {item.paid} <span className="text-[10px] font-normal text-slate-400">({item.pct}%)</span>
+                      {item.paid} <span className="text-xs font-normal text-slate-400">({item.pct}%)</span>
                     </span>
                   </div>
 
@@ -691,13 +691,13 @@ export default function Dashboard() {
                     />
                   </div>
 
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                  <div className="flex items-center justify-between text-sm text-slate-500 pt-1">
                     <span>မပေးရသေး: <strong className="text-rose-600">{item.unpaid}</strong></span>
                     <span>ရရှိငွေ: <strong className="text-sky-950 font-bold">{formatMMK(item.collected)}</strong></span>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px] font-semibold text-sky-800">
+                <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-sm font-semibold text-sky-800">
                   <span className="flex items-center gap-1">
                     <span>စစ်ထုတ်မည်</span>
                     <ChevronRight className="w-3.5 h-3.5" />
@@ -705,7 +705,7 @@ export default function Dashboard() {
                   <Link
                     to={`/contacts?level=${encodeURIComponent(item.key)}`}
                     onClick={(e) => e.stopPropagation()}
-                    className="text-[10px] text-sky-600 hover:text-sky-900 hover:underline font-bold"
+                    className="text-xs text-sky-600 hover:text-sky-900 hover:underline font-bold"
                   >
                     ကျောင်းစာရင်း &rarr;
                   </Link>
@@ -732,23 +732,23 @@ export default function Dashboard() {
                   <div className="flex items-start justify-between gap-1">
                     <div>
                       <span className="text-xs font-black text-slate-900 block">{tier.label}</span>
-                      <span className="text-[10px] text-slate-400 block line-clamp-1">
+                      <span className="text-xs text-slate-400 block line-clamp-1">
                         {tier.description}
                       </span>
                     </div>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-slate-100 text-slate-700 shrink-0">
+                    <span className="text-xs px-1.5 py-0.5 rounded-md font-bold bg-slate-100 text-slate-700 shrink-0">
                       {tier.total} ကျောင်း
                     </span>
                   </div>
 
                   <div className="bg-slate-50 p-2 rounded-xl border border-slate-100 space-y-1">
-                    <div className="text-[10px] text-slate-500 flex items-center justify-between">
+                    <div className="text-xs text-slate-500 flex items-center justify-between">
                       <span>သတ်မှတ်နှုန်း:</span>
                       <strong className="text-sky-900 font-bold">
                         {formatMMK(tier.defaultFee)} ကျပ်
                       </strong>
                     </div>
-                    <div className="text-[10px] text-slate-500 flex items-center justify-between">
+                    <div className="text-xs text-slate-500 flex items-center justify-between">
                       <span>ပေးသွင်းပြီး:</span>
                       <strong className="text-emerald-700 font-bold">
                         {tier.paid} ကျောင်း ({tier.pct}%)
@@ -763,7 +763,7 @@ export default function Dashboard() {
                     />
                   </div>
 
-                  <div className="flex items-center justify-between text-[10px] pt-1 border-t border-slate-100">
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
                     <span className="text-slate-400">စုစုပေါင်းရရှိငွေ:</span>
                     <strong className="text-sky-950 font-bold">{formatMMK(tier.collected)}</strong>
                   </div>
@@ -792,7 +792,7 @@ export default function Dashboard() {
                   <span className="text-xs font-black text-sky-950 block">
                     {formatMMK(t.amount)} ကျပ်
                   </span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-800 border border-sky-200">
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-800 border border-sky-200">
                     {t.total} ကျောင်း
                   </span>
                 </div>
@@ -815,7 +815,7 @@ export default function Dashboard() {
                   />
                 </div>
 
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-sm">
                   <span className="text-slate-400">ကောက်ခံရရှိငွေ:</span>
                   <strong className="text-sky-950 font-black">{formatMMK(t.collected)}</strong>
                 </div>
@@ -840,14 +840,14 @@ export default function Dashboard() {
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     {row.ranges.map(cell => (
                       <div key={cell.tierKey} className="p-2 bg-slate-50 rounded-lg border border-slate-150 space-y-0.5">
-                        <span className="text-[10px] text-slate-500 block truncate">{cell.tierLabel}</span>
+                        <span className="text-xs text-slate-500 block truncate">{cell.tierLabel}</span>
                         {cell.total > 0 ? (
                           <div>
                             <div className="font-bold text-slate-800">
                               <span className="text-emerald-700">{cell.paid}</span>
                               <span className="text-slate-400 font-normal"> / {cell.total}</span>
                             </div>
-                            <span className="text-[10px] text-slate-400 font-medium block">
+                            <span className="text-xs text-slate-400 font-medium block">
                               {formatMMK(cell.collected)}
                             </span>
                           </div>
@@ -870,7 +870,7 @@ export default function Dashboard() {
                     {STUDENT_RANGE_TIERS.map(tier => (
                       <th key={tier.key} className="p-3 text-center">
                         <div>{tier.shortLabel} ဦး</div>
-                        <span className="text-[10px] font-normal text-slate-400">
+                        <span className="text-xs font-normal text-slate-400">
                           ({formatMMK(tier.defaultFee)})
                         </span>
                       </th>
@@ -894,7 +894,7 @@ export default function Dashboard() {
                                 {cell.paid}
                               </span>
                               <span className="text-slate-400 font-medium"> / {cell.total}</span>
-                              <div className="text-[10px] text-slate-400 font-semibold">
+                              <div className="text-xs text-slate-400 font-semibold">
                                 {formatMMK(cell.collected)}
                               </div>
                             </div>
@@ -905,7 +905,7 @@ export default function Dashboard() {
                       ))}
                       <td className="p-3 text-right font-black text-sky-950 bg-sky-50/30">
                         <div>{row.rowPaid} / {row.rowTotal} ကျောင်း</div>
-                        <div className="text-[10px] text-sky-700 font-bold">{formatMMK(row.rowCollected)} ကျပ်</div>
+                        <div className="text-xs text-sky-700 font-bold">{formatMMK(row.rowCollected)} ကျပ်</div>
                       </td>
                     </tr>
                   ))}
@@ -929,7 +929,7 @@ export default function Dashboard() {
                 </tfoot>
               </table>
             </div>
-            <p className="text-[11px] text-slate-500 italic text-right">
+            <p className="text-sm text-slate-500 italic text-right">
               * အကွက်တစ်ခုစီရှိ ဂဏန်းမှာ (နှစ်စဉ်ကြေး ပေးသွင်းပြီး ကျောင်းအရေအတွက် / အဆင့်တူ အသင်းဝင် စုစုပေါင်း) ဖြစ်ပါသည်။
             </p>
           </div>
@@ -960,13 +960,13 @@ export default function Dashboard() {
             >
               <div className="flex items-center justify-between gap-1">
                 <span
-                  className={`text-[9px] px-2 py-0.5 rounded-full font-semibold border ${
+                  className={`text-xs px-2 py-0.5 rounded-full font-semibold border ${
                     getCategoryBadge(a.category).className
                   }`}
                 >
                   {getCategoryBadge(a.category).label}
                 </span>
-                <span className="text-[10px] text-slate-500 font-medium">
+                <span className="text-xs text-slate-500 font-medium">
                   <Calendar className="w-3 h-3 inline mr-1 text-sky-600" />
                   {a.eventDate || (a.publishedAt ? new Date(a.publishedAt).toLocaleDateString('my-MM') : '...')}
                 </span>
@@ -1087,20 +1087,20 @@ export default function Dashboard() {
                         {school.name}
                       </span>
                       {school.level && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold border border-slate-200">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold border border-slate-200">
                           {school.level}
                         </span>
                       )}
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-50 text-sky-800 font-medium border border-sky-100">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-sky-50 text-sky-800 font-medium border border-sky-100">
                         ကျောင်းသား: {school.studentRange || '1-100'} ဦး
                       </span>
                       {school.zone && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-800 font-semibold border border-indigo-200 inline-flex items-center gap-1 ml-1">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-800 font-semibold border border-indigo-200 inline-flex items-center gap-1 ml-1">
                           <MapPin className="w-2.5 h-2.5" />{school.zone}
                         </span>
                       )}
                     </div>
-                    <div className="text-[11px] text-slate-500 flex flex-wrap gap-x-3">
+                    <div className="text-sm text-slate-500 flex flex-wrap gap-x-3">
                       {school.founderName && <span>တည်ထောင်သူ: {school.founderName}</span>}
                       {school.adminName && <span>စီမံအုပ်ချုပ်သူ: {school.adminName}</span>}
                       {school.contactName && <span>တာဝန်ခံ (၁): {school.contactName}</span>}
@@ -1117,7 +1117,7 @@ export default function Dashboard() {
                     {formatMMK(getSchoolFee(school))} ကျပ်
                   </span>
                   <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                    className={`text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
                       school.isAnnualFeePaid
                         ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                         : 'bg-rose-50 text-rose-800 border border-rose-200'

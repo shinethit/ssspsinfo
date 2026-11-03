@@ -28,7 +28,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
             <Download className="w-4 h-4 text-sky-200 shrink-0" />
             <span className="truncate">ဖုန်း/ကွန်ပျူတာတွင် အက်ပ်သွင်းမည်</span>
           </div>
-          <span className="text-[10px] bg-sky-800 px-1.5 py-0.5 rounded text-sky-100">
+          <span className="text-xs bg-sky-800 px-1.5 py-0.5 rounded text-sky-100">
             Install
           </span>
         </button>
@@ -63,7 +63,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
               <Smartphone className="w-4 h-4 text-sky-700 shrink-0" />
               <span>iPhone/iPad တွင် သွင်းရန်</span>
             </div>
-            <span className="text-[10px] text-slate-500">iOS</span>
+            <span className="text-xs text-slate-500">iOS</span>
           </button>
         ) : (
           <button
@@ -95,7 +95,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
                     <h3 className="font-bold text-base text-slate-900">
                       iPhone / iPad တွင် ထည့်သွင်းနည်း
                     </h3>
-                    <p className="text-[11px] text-slate-500">Safari Browser ဖြင့် အလွယ်တကူ သွင်းနိုင်ပါသည်</p>
+                    <p className="text-sm text-slate-500">Safari Browser ဖြင့် အလွယ်တကူ သွင်းနိုင်ပါသည်</p>
                   </div>
                 </div>
                 <button
@@ -109,7 +109,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
 
               <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200/80 text-xs text-slate-700 leading-relaxed">
                 <div className="flex items-start gap-2.5">
-                  <span className="w-5 h-5 rounded-full bg-sky-900 text-white flex items-center justify-center font-bold text-[11px] shrink-0 mt-0.5">
+                  <span className="w-5 h-5 rounded-full bg-sky-900 text-white flex items-center justify-center font-bold text-sm shrink-0 mt-0.5">
                     ၁
                   </span>
                   <div>
@@ -118,7 +118,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
                 </div>
 
                 <div className="flex items-start gap-2.5">
-                  <span className="w-5 h-5 rounded-full bg-sky-900 text-white flex items-center justify-center font-bold text-[11px] shrink-0 mt-0.5">
+                  <span className="w-5 h-5 rounded-full bg-sky-900 text-white flex items-center justify-center font-bold text-sm shrink-0 mt-0.5">
                     ၂
                   </span>
                   <div>
@@ -127,7 +127,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
                 </div>
 
                 <div className="flex items-start gap-2.5">
-                  <span className="w-5 h-5 rounded-full bg-sky-900 text-white flex items-center justify-center font-bold text-[11px] shrink-0 mt-0.5">
+                  <span className="w-5 h-5 rounded-full bg-sky-900 text-white flex items-center justify-center font-bold text-sm shrink-0 mt-0.5">
                     ၃
                   </span>
                   <div>

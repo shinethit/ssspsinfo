@@ -109,7 +109,7 @@ export default function Layout() {
                 <span className="block font-bold text-xs sm:text-base text-sky-950 truncate leading-normal">
                   သတင်းနှင့် ပြန်ကြားရေးဌာန
                 </span>
-                <span className="hidden sm:block text-[11px] text-slate-500 truncate leading-normal">
+                <span className="hidden sm:block text-sm text-slate-500 truncate leading-normal">
                   ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း
                 </span>
               </div>
@@ -152,7 +152,7 @@ export default function Layout() {
         <div className="p-4 space-y-6">
           {/* Main Navigation Section */}
           <div className="space-y-1">
-            <p className="px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+            <p className="px-3 text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">
               ပင်မကဏ္ဍများ (Menu)
             </p>
             {navLinks.map(link => {
@@ -187,7 +187,7 @@ export default function Layout() {
 
           {/* Tools & Management Section */}
           <div className="space-y-1 pt-4 border-t border-slate-100">
-            <p className="px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+            <p className="px-3 text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">
               စီမံခန့်ခွဲမှုနှင့် မှတ်တမ်း (System)
             </p>
 
@@ -216,7 +216,7 @@ export default function Layout() {
                   </div>
                   {link.badge && (
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                         isActive
                           ? 'bg-sky-800 text-sky-100'
                           : 'bg-slate-100 text-slate-600 group-hover:bg-sky-100 group-hover:text-sky-800'
@@ -257,11 +257,11 @@ export default function Layout() {
           <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1 shadow-2xs">
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-sky-950">System Version</span>
-              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+              <span className="text-xs font-mono font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
                 {CURRENT_VERSION}
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 leading-normal">
+            <p className="text-sm text-slate-500 leading-normal">
               ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း
             </p>
           </div>

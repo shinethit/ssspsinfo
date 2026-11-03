@@ -299,8 +299,8 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
               ) : filteredSchools.map(s => (
                 <div key={s.id} onClick={() => setSelectedSchoolId(s.id)} className={`p-3 cursor-pointer transition ${selectedSchoolId === s.id ? 'bg-emerald-50 border-l-4 border-emerald-500' : 'hover:bg-slate-50'}`}>
                   <p className="font-bold text-sm text-slate-900">{s.name}</p>
-                  {s.zone && (<span className="inline-flex items-center gap-1 mt-1 text-[10px] font-semibold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200"><MapPin className="w-2.5 h-2.5" />{s.zone}</span>)}
-                  {s.isAnnualFeePaid && <span className="inline-flex items-center gap-1 mt-1 ml-2 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">✓ နှစ်စဉ်ကြေးသွင်းပြီး</span>}
+                  {s.zone && (<span className="inline-flex items-center gap-1 mt-1 text-xs font-semibold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200"><MapPin className="w-2.5 h-2.5" />{s.zone}</span>)}
+                  {s.isAnnualFeePaid && <span className="inline-flex items-center gap-1 mt-1 ml-2 text-xs font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">✓ နှစ်စဉ်ကြေးသွင်းပြီး</span>}
                 </div>
               ))}
             </div>
@@ -404,7 +404,7 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
                         <span>•</span>
                         <span className="font-mono text-emerald-700 font-bold">{t.amount.toLocaleString('my-MM')} ကျပ်</span>
                       </div>
-                      {t.note && <p className="text-[11px] text-slate-400 mt-1">({t.note})</p>}
+                      {t.note && <p className="text-sm text-slate-400 mt-1">({t.note})</p>}
                     </div>
                     <div className="flex gap-1">
                       <Link to={`/receipt/${t.id}`} className="p-1.5 text-sky-600 hover:bg-sky-50 rounded-lg transition" title="ဖြတ်ပိုင်းထုတ်ရန်">

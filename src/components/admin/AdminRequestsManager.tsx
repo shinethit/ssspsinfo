@@ -121,7 +121,7 @@ export default function AdminRequestsManager() {
                       ? 'bg-indigo-700 text-white border-indigo-700 shadow-xs'
                       : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100')}>
                   <span>{opt.label}</span>
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ` +
+                  <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ` +
                     (zoneFilter === opt.value ? 'bg-indigo-500 text-white' : 'bg-white text-slate-500 border border-slate-200')}>{count}</span>
                 </button>
               );
@@ -149,11 +149,11 @@ export default function AdminRequestsManager() {
                     <div className="flex items-center gap-2">
                       <h4 className="font-bold text-slate-900 text-base">{req.schoolName}</h4>
                       {getSchoolZone(req.schoolId) && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-indigo-50 text-indigo-800 border border-indigo-200 inline-flex items-center gap-1">
+                        <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-indigo-50 text-indigo-800 border border-indigo-200 inline-flex items-center gap-1">
                           <MapPin className="w-2.5 h-2.5" />{getSchoolZone(req.schoolId)}
                         </span>
                       )}
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 ${
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-1 ${
                         req.status === 'pending' ? 'bg-amber-100 text-amber-800' : 
                         req.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
                       }`}>

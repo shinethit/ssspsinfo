@@ -290,21 +290,21 @@ export default function SchoolDetail() {
           {/* Student Range & Fee Amount Details Sub-card */}
           <div className="pt-3 border-t border-slate-200/60 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
             <div className="bg-white/80 p-2.5 rounded-xl border border-slate-200/60">
-              <span className="text-[10px] text-slate-500 block">ကျောင်းသားဦးရေ Range</span>
+              <span className="text-xs text-slate-500 block">ကျောင်းသားဦးရေ Range</span>
               <strong className="text-slate-900 font-bold text-xs sm:text-sm">
                 {school.studentRange ? `${school.studentRange} ဦး` : 'မဖော်ပြထားပါ'}
               </strong>
             </div>
 
             <div className="bg-white/80 p-2.5 rounded-xl border border-slate-200/60">
-              <span className="text-[10px] text-slate-500 block">တိကျသော ကျောင်းသားဦးရေ</span>
+              <span className="text-xs text-slate-500 block">တိကျသော ကျောင်းသားဦးရေ</span>
               <strong className="text-slate-900 font-bold text-xs sm:text-sm">
                 {school.studentCount ? `${Number(school.studentCount).toLocaleString('my-MM')} ဦး` : 'မဖော်ပြထားပါ'}
               </strong>
             </div>
 
             <div className="bg-white/80 p-2.5 rounded-xl border border-slate-200/60">
-              <span className="text-[10px] text-slate-500 block">နှစ်စဉ်ကြေး ပမာဏ</span>
+              <span className="text-xs text-slate-500 block">နှစ်စဉ်ကြေး ပမာဏ</span>
               <strong className="text-sky-950 font-extrabold text-xs sm:text-sm">
                 {/* v24.6: never invent a fee — a missing amount used to show 50,000 ကျပ် as fact */}
                 {school.feeAmount ? `${Number(school.feeAmount).toLocaleString('my-MM')} ကျပ်` : 'မဖော်ပြထားပါ'}
@@ -312,7 +312,7 @@ export default function SchoolDetail() {
             </div>
 
             <div className="bg-white/80 p-2.5 rounded-xl border border-slate-200/60">
-              <span className="text-[10px] text-slate-500 block">ပညာသင်နှစ်</span>
+              <span className="text-xs text-slate-500 block">ပညာသင်နှစ်</span>
               <strong className="text-slate-800 font-bold text-xs sm:text-sm">
                 {school.feeAcademicYear || 'မဖော်ပြထားပါ'}
               </strong>
@@ -330,25 +330,25 @@ export default function SchoolDetail() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
               {school.address && (
                 <div className="sm:col-span-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  <span className="text-[11px] text-slate-500 font-medium block">ကျောင်းလိပ်စာ</span>
+                  <span className="text-sm text-slate-500 font-medium block">ကျောင်းလိပ်စာ</span>
                   <span className="font-bold text-slate-800 text-sm mt-0.5 block">{school.address}</span>
                 </div>
               )}
               {school.township && (
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  <span className="text-[11px] text-slate-500 font-medium block">မြို့နယ်</span>
+                  <span className="text-sm text-slate-500 font-medium block">မြို့နယ်</span>
                   <span className="font-bold text-slate-800 text-sm mt-0.5 block">{school.township}</span>
                 </div>
               )}
               {school.city && (
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  <span className="text-[11px] text-slate-500 font-medium block">မြို့</span>
+                  <span className="text-sm text-slate-500 font-medium block">မြို့</span>
                   <span className="font-bold text-slate-800 text-sm mt-0.5 block">{school.city}</span>
                 </div>
               )}
               {school.zone && (
                 <div className="bg-sky-50 p-3 rounded-xl border border-sky-100">
-                  <span className="text-[11px] text-sky-800 font-medium block">ဇုန် (Zone)</span>
+                  <span className="text-sm text-sky-800 font-medium block">ဇုန် (Zone)</span>
                   <span className="font-extrabold text-sky-950 text-sm mt-0.5 block">{school.zone}</span>
                 </div>
               )}

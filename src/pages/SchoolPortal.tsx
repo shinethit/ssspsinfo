@@ -310,7 +310,7 @@ export default function SchoolPortal() {
                       <p className="text-xs text-slate-500">အတန်း: {a.grade} | အသက်: {a.age}</p>
                       <div className="flex gap-1 mt-1">
                         {a.sports.map(s => (
-                          <span key={s} className="text-[10px] bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded border border-sky-200">{s}</span>
+                          <span key={s} className="text-xs bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded border border-sky-200">{s}</span>
                         ))}
                       </div>
                     </div>
@@ -352,7 +352,7 @@ export default function SchoolPortal() {
               {myRequests.map(r => (
                 <div key={r.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap items-center gap-2 text-sm">
                   <span className="font-bold text-slate-800">{r.changes.map(c => `${REQUESTABLE_FIELDS.find(f => f.value === c.field)?.label || c.field}: ${c.oldValue || '(အလွတ်)'} → ${c.newValue}`).join(', ')}</span>
-                  <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full font-bold ${r.status === 'pending' ? 'bg-amber-100 text-amber-800' : r.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'}`}>
+                  <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-bold ${r.status === 'pending' ? 'bg-amber-100 text-amber-800' : r.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'}`}>
                     {r.status === 'pending' ? 'စစ်ဆေးရန် ကျန်' : r.status === 'approved' ? 'အတည်ပြုပြီး' : 'ပယ်ဖျက်ပြီး'}
                   </span>
                 </div>
@@ -399,7 +399,7 @@ export default function SchoolPortal() {
                     <div className="min-w-0 flex-1">
                       <p className="font-bold text-sm text-slate-900">{act.title}</p>
                       <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5"><Calendar className="w-3 h-3"/> {act.date} {act.time && `• ${act.time}`}</p>
-                      {act.location && <p className="text-[10px] text-slate-400 mt-1"><MapPin className="w-2.5 h-2.5 inline"/> {act.location}</p>}
+                      {act.location && <p className="text-xs text-slate-400 mt-1"><MapPin className="w-2.5 h-2.5 inline"/> {act.location}</p>}
                     </div>
                     <button onClick={() => handleDeleteActivity(act.id)} className="self-start p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition shrink-0" title="ဖျက်ရန်">
                       <Trash2 className="w-4 h-4" />

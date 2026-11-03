@@ -91,7 +91,7 @@ export default function AdminTickersTab({ tickers, onRefresh }: AdminTickersTabP
               <div key={t.id} className="p-4 flex items-center justify-between gap-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${t.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'}`}>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${t.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'}`}>
                       {t.isActive ? 'လွှင့်ထားဆဲ' : 'ပိတ်ထားသည်'}
                     </span>
                     <span className="text-xs text-slate-400">{t.displayDateTime}</span>

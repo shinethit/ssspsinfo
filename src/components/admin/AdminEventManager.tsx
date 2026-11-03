@@ -103,7 +103,7 @@ export default function AdminEventManager() {
           <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200"><MapPin className="w-3.5 h-3.5" /></div>
           <div>
             <h4 className="font-bold text-xs sm:text-sm text-slate-900">ဇုန်အလိုက် စစ်ထုတ်ခြင်း (Zone Filter)</h4>
-            <p className="text-[10px] text-slate-500">ပွဲ/အခမ်းအနားများကို ဇုန်အလိုက် စစ်ထုတ်နိုင်ပါသည်</p>
+            <p className="text-xs text-slate-500">ပွဲ/အခမ်းအနားများကို ဇုန်အလိုက် စစ်ထုတ်နိုင်ပါသည်</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -111,10 +111,10 @@ export default function AdminEventManager() {
             const count = opt.value === 'all' ? events.length : events.filter(e => isSchoolInZone((e as any).zone, opt.value)).length;
             return (
               <button key={opt.value} type="button" onClick={() => setZoneFilter(opt.value)}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold transition flex items-center gap-1.5 border cursor-pointer ` +
+                className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 border cursor-pointer ` +
                   (zoneFilter === opt.value ? 'bg-indigo-700 text-white border-indigo-700 shadow-sm' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100')}>
                 <span>{opt.label}</span>
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ` +
+                <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ` +
                   (zoneFilter === opt.value ? 'bg-indigo-500 text-white' : 'bg-white text-slate-500 border border-slate-200')}>{count}</span>
               </button>
             );
@@ -151,7 +151,7 @@ export default function AdminEventManager() {
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <span className="text-[10px] text-slate-500 font-bold block">စာရင်းသွင်းမှု</span>
+                    <span className="text-xs text-slate-500 font-bold block">စာရင်းသွင်းမှု</span>
                     <span className="font-bold text-sky-700 flex items-center gap-1"><Users className="w-3.5 h-3.5" /> {regCount} ကျောင်း ({totalAttendees} ဦး)</span>
                   </div>
                   <div className="flex gap-2">

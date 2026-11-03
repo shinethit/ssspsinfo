@@ -177,7 +177,7 @@ export const AuditNotificationBell: React.FC = () => {
 
         {/* Unread badge or green dot */}
         {unreadCount > 0 ? (
-          <span className="absolute -top-1 -right-1 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-black text-white shadow-xs animate-pulse ring-2 ring-white">
+          <span className="absolute -top-1 -right-1 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-rose-600 px-1 text-xs font-black text-white shadow-xs animate-pulse ring-2 ring-white">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         ) : (
@@ -206,7 +206,7 @@ export const AuditNotificationBell: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="text-xs font-bold leading-tight">စနစ်အသိပေးချက်များ</h4>
-                  <p className="text-[10px] text-slate-300">
+                  <p className="text-xs text-slate-300">
                     {unreadCount > 0 ? `မဖတ်ရသေးသော အသိပေးချက် (${unreadCount}) ခု` : 'အသိပေးချက်အားလုံး ဖတ်ပြီးပါပြီ'}
                   </p>
                 </div>
@@ -217,7 +217,7 @@ export const AuditNotificationBell: React.FC = () => {
                   <button
                     type="button"
                     onClick={markAllAsRead}
-                    className="text-[10px] px-2 py-0.5 rounded-md bg-white/15 hover:bg-white/25 text-white transition flex items-center gap-1 font-semibold cursor-pointer"
+                    className="text-xs px-2 py-0.5 rounded-md bg-white/15 hover:bg-white/25 text-white transition flex items-center gap-1 font-semibold cursor-pointer"
                     title="အားလုံးဖတ်ပြီးအဖြစ် သတ်မှတ်ရန်"
                   >
                     <Check className="w-3 h-3" />
@@ -238,10 +238,10 @@ export const AuditNotificationBell: React.FC = () => {
             {/* Compact Black Version Update Strip */}
             <div className="px-3 py-1.5 bg-neutral-950 text-white flex items-center justify-between border-b border-neutral-800 shrink-0 text-xs">
               <div className="flex items-center gap-1.5 min-w-0">
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-neutral-800 text-amber-300 text-[10px] font-mono font-bold border border-neutral-700 shrink-0">
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-neutral-800 text-amber-300 text-xs font-mono font-bold border border-neutral-700 shrink-0">
                   <Sparkles className="w-2.5 h-2.5 text-amber-400" /> v2.9
                 </span>
-                <span className="text-neutral-200 font-medium truncate text-[11px]">
+                <span className="text-neutral-200 font-medium truncate text-sm">
                   Version Update (အမဲ) စနစ်သစ်
                 </span>
               </div>
@@ -251,7 +251,7 @@ export const AuditNotificationBell: React.FC = () => {
                   setIsOpen(false);
                   window.dispatchEvent(new CustomEvent('sssps_open_version_modal'));
                 }}
-                className="text-[11px] text-amber-300 hover:text-white font-bold ml-2 shrink-0 cursor-pointer flex items-center gap-0.5 hover:underline"
+                className="text-sm text-amber-300 hover:text-white font-bold ml-2 shrink-0 cursor-pointer flex items-center gap-0.5 hover:underline"
               >
                 <span>ကြည့်ရန်</span>
                 <ExternalLink className="w-3 h-3" />
@@ -266,7 +266,7 @@ export const AuditNotificationBell: React.FC = () => {
                     <Bell className="w-5 h-5 stroke-[1.5]" />
                   </div>
                   <p className="text-xs font-bold text-slate-700">အသိပေးချက် အသစ် မရှိသေးပါ</p>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-sm text-slate-400">
                     ကျောင်းစာရင်း အသစ်ထည့်/ပြင်/ဖျက်ပါက ဤနေရာတွင် အလိုအလျောက် ပေါ်မည်ဖြစ်ပါသည်
                   </p>
                 </div>
@@ -302,15 +302,15 @@ export const AuditNotificationBell: React.FC = () => {
                       {/* Top row: Badges + Timestamp */}
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <span className={`text-[9px] font-black px-1.5 py-0.2 rounded border ${actionBadge.bg}`}>
+                          <span className={`text-xs font-black px-1.5 py-0.2 rounded border ${actionBadge.bg}`}>
                             {actionBadge.label}
                           </span>
-                          <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                          <span className="text-xs font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
                             {entityText}
                           </span>
                         </div>
 
-                        <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1 shrink-0">
+                        <span className="text-xs text-slate-400 font-medium flex items-center gap-1 shrink-0">
                           <Clock className="w-2.5 h-2.5" />
                           {formatTimeAgo(log.createdAt)}
                         </span>
@@ -329,12 +329,12 @@ export const AuditNotificationBell: React.FC = () => {
                       </p>
 
                       {/* Bottom line: Admin & unread marker */}
-                      <div className="flex items-center justify-between text-[10px] text-slate-400">
+                      <div className="flex items-center justify-between text-xs text-slate-400">
                         <span className="truncate max-w-[200px]">
                           အက်ဒမင်: <span className="text-slate-600">{log.adminEmail || 'Admin'}</span>
                         </span>
                         {isUnread && (
-                          <span className="flex items-center gap-1 text-[10px] text-sky-600 font-bold">
+                          <span className="flex items-center gap-1 text-xs text-sky-600 font-bold">
                             <span className="w-1.5 h-1.5 rounded-full bg-sky-600" /> အသစ်
                           </span>
                         )}
@@ -350,7 +350,7 @@ export const AuditNotificationBell: React.FC = () => {
               <Link
                 to="/versions"
                 onClick={() => setIsOpen(false)}
-                className="text-sky-800 font-bold hover:underline flex items-center gap-1 text-[11px]"
+                className="text-sky-800 font-bold hover:underline flex items-center gap-1 text-sm"
               >
                 <History className="w-3.5 h-3.5" />
                 <span>ဗားရှင်းမှတ်တမ်း &rarr;</span>
@@ -360,7 +360,7 @@ export const AuditNotificationBell: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleViewAll}
-                  className="text-slate-600 hover:text-slate-900 font-bold hover:underline flex items-center gap-1 cursor-pointer text-[11px]"
+                  className="text-slate-600 hover:text-slate-900 font-bold hover:underline flex items-center gap-1 cursor-pointer text-sm"
                 >
                   <span>Admin Logs &rarr;</span>
                 </button>

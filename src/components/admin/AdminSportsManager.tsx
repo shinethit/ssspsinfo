@@ -124,7 +124,7 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
           <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200"><MapPin className="w-3.5 h-3.5" /></div>
           <div>
             <h4 className="font-bold text-xs sm:text-sm text-slate-900">ဇုန်အလိုက် ကျောင်း စစ်ထုတ်ခြင်း (Zone Filter)</h4>
-            <p className="text-[10px] text-slate-500">ပြိုင်ပွဲအတွက် ကျောင်း ရွေးချယ်ရာတွင် ဤဇုန်ကို စစ်ထုတ်ပါမည်</p>
+            <p className="text-xs text-slate-500">ပြိုင်ပွဲအတွက် ကျောင်း ရွေးချယ်ရာတွင် ဤဇုန်ကို စစ်ထုတ်ပါမည်</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -132,10 +132,10 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
             const count = opt.value === 'all' ? schools.length : schools.filter(s => isSchoolInZone(s.zone, opt.value)).length;
             return (
               <button key={opt.value} type="button" onClick={() => setZoneFilter(opt.value)}
-                className={`px-2.5 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold transition flex items-center gap-1.5 border cursor-pointer ` +
+                className={`px-2.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 border cursor-pointer ` +
                   (zoneFilter === opt.value ? 'bg-indigo-700 text-white border-indigo-700 shadow-sm' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100')}>
                 <span>{opt.label}</span>
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ` +
+                <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ` +
                   (zoneFilter === opt.value ? 'bg-indigo-500 text-white' : 'bg-white text-slate-500 border border-slate-200')}>{count}</span>
               </button>
             );
@@ -181,7 +181,7 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
                   <div key={ev.id} onClick={() => setSelectedEventId(ev.id)} className={`p-3 cursor-pointer transition flex justify-between items-start ${selectedEventId === ev.id ? 'bg-sky-50 border-l-4 border-sky-500' : 'hover:bg-slate-50'}`}>
                     <div>
                       <h4 className="font-bold text-sm text-slate-900">{ev.title}</h4>
-                      <div className="text-[10px] text-slate-500 mt-1">{ev.startDate} • {ev.location}</div>
+                      <div className="text-xs text-slate-500 mt-1">{ev.startDate} • {ev.location}</div>
                     </div>
                     <button onClick={async (e) => { e.stopPropagation(); if (await confirmDialog('ဖျက်ရန် သေချာပါသလား?')) { try { await deleteDoc(doc(db, 'sports_events', ev.id)); fetchEvents(); } catch (err) { toast.error('ဖျက်၍ မရပါ'); } } }} className="text-rose-500 p-1 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4" /></button>
                   </div>
@@ -280,7 +280,7 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
                         <span>{match.teamB}</span> 
                         <span className="text-slate-400 font-normal ml-1">{match.playerB && `(${match.playerB})`}</span>
                         {match.matchTime && (
-                          <span className="ml-2 text-[10px] bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded border border-sky-200 font-semibold">
+                          <span className="ml-2 text-xs bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded border border-sky-200 font-semibold">
                             {match.matchTime}
                           </span>
                         )}

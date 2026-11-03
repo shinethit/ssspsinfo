@@ -120,7 +120,7 @@ export default function Gallery() {
               <div className="p-3">
                 <h3 className="font-bold text-slate-900 text-xs sm:text-sm truncate">{photo.title}</h3>
                 {photo.album && (
-                  <span className="inline-block mt-1 bg-sky-50 text-sky-800 px-2 py-0.5 rounded-md border border-sky-100 text-[11px] font-semibold">
+                  <span className="inline-block mt-1 bg-sky-50 text-sky-800 px-2 py-0.5 rounded-md border border-sky-100 text-sm font-semibold">
                     {photo.album}
                   </span>
                 )}

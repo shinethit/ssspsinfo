@@ -28,7 +28,7 @@ export const OfflineSyncStatusBadge: React.FC<{ compact?: boolean }> = ({ compac
         onClick={handleManualSync}
         disabled={isSyncing}
         title={`Offline Sync အခြေအနေ: ${isOffline ? 'Offline Mode' : 'Online Sync'} (နောက်ဆုံး Sync: ${formatLastSync(lastSyncTime)})`}
-        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition cursor-pointer select-none ${
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-semibold border transition cursor-pointer select-none ${
           isOffline
             ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
             : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
@@ -63,7 +63,7 @@ export const OfflineSyncStatusBadge: React.FC<{ compact?: boolean }> = ({ compac
         </span>
       </div>
 
-      <span className="text-[11px] text-slate-500 hidden sm:inline">
+      <span className="text-sm text-slate-500 hidden sm:inline">
         • {formatLastSync(lastSyncTime)}
       </span>
 
@@ -72,7 +72,7 @@ export const OfflineSyncStatusBadge: React.FC<{ compact?: boolean }> = ({ compac
         onClick={handleManualSync}
         disabled={isSyncing}
         title="ဒေတာ အချက်အလက်များ အသစ်စစ်ဆေးရန် နှိပ်ပါ (Sync Now)"
-        className="p-1 rounded-lg hover:bg-black/5 text-slate-600 hover:text-slate-900 transition cursor-pointer flex items-center gap-1 text-[11px] font-bold"
+        className="p-1 rounded-lg hover:bg-black/5 text-slate-600 hover:text-slate-900 transition cursor-pointer flex items-center gap-1 text-sm font-bold"
       >
         <RefreshCw className={`w-3 h-3 text-sky-700 ${isSyncing ? 'animate-spin' : ''}`} />
         <span className="hidden md:inline">{isSyncing ? 'စစ်ဆေးနေဆဲ...' : 'Sync လုပ်မည်'}</span>

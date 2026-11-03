@@ -215,7 +215,7 @@ export default function AdminAthleteManager({ activeSport, schools }: { activeSp
                       )}
                       <div>
                         <p className="font-bold text-slate-900">{a.name}</p>
-                        <p className="text-[10px] text-slate-500">အဖ: {a.fatherName}</p>
+                        <p className="text-xs text-slate-500">အဖ: {a.fatherName}</p>
                       </div>
                     </div>
                   </td>
@@ -225,7 +225,7 @@ export default function AdminAthleteManager({ activeSport, schools }: { activeSp
                   <td className="p-3">
                     <div className="flex flex-wrap gap-1">
                       {a.sports.map(s => (
-                        <span key={s} className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border">{s}</span>
+                        <span key={s} className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border">{s}</span>
                       ))}
                     </div>
                   </td>

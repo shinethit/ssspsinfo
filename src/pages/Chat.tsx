@@ -114,7 +114,7 @@ export default function Chat() {
                   key={msg.id}
                   className={`flex flex-col w-full ${isMine ? 'items-end' : 'items-start'}`}
                 >
-                  <span className="text-[11px] text-slate-400 px-1 mb-1 font-medium">
+                  <span className="text-sm text-slate-400 px-1 mb-1 font-medium">
                     {msg.senderName || 'အသင်းဝင်'}
                   </span>
                   <div

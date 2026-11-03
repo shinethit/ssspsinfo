@@ -379,7 +379,7 @@ export default function Contacts() {
           <h2 className="text-base sm:text-xl font-extrabold text-sky-950 truncate">
             အသင်းဝင်ကျောင်းများ စာရင်း
           </h2>
-          <span className="text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 shrink-0">
+          <span className="text-xs sm:text-sm font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 shrink-0">
             {toBurmeseNumber(schools.length)} ကျောင်း
           </span>
         </div>
@@ -505,7 +505,7 @@ export default function Contacts() {
               <button
                 type="button"
                 onClick={() => handleSelectCategory('all')}
-                className="text-[11px] font-bold text-sky-700 hover:text-sky-900 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200 cursor-pointer"
+                className="text-sm font-bold text-sky-700 hover:text-sky-900 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200 cursor-pointer"
               >
                 အားလုံးပြန်ကြည့် ✕
               </button>
@@ -526,7 +526,7 @@ export default function Contacts() {
               <SlidersHorizontal className="w-3 h-3 text-sky-600" />
               <span>Filter</span>
               {activeFilterCount > 0 && (
-                <span className="w-3.5 h-3.5 rounded-full bg-sky-600 text-white text-[9px] font-bold flex items-center justify-center">
+                <span className="w-3.5 h-3.5 rounded-full bg-sky-600 text-white text-xs font-bold flex items-center justify-center">
                   {activeFilterCount}
                 </span>
               )}
@@ -723,7 +723,7 @@ export default function Contacts() {
                 <button
                   type="button"
                   onClick={() => handleSelectCategory('all')}
-                  className="ml-1 text-[11px] text-sky-700 hover:text-sky-900 font-bold underline cursor-pointer"
+                  className="ml-1 text-sm text-sky-700 hover:text-sky-900 font-bold underline cursor-pointer"
                 >
                   (အားလုံးပြ)
                 </button>
@@ -795,18 +795,18 @@ export default function Contacts() {
                     <div className="min-w-0 flex-1">
                       <h3 className="text-sm sm:text-lg font-bold flex flex-wrap items-center gap-1.5 sm:gap-2 leading-snug min-w-0">
                         <span className="truncate">{config.title}</span>
-                        <span className="text-[11px] sm:text-xs font-extrabold px-2 py-0.5 rounded-full bg-white/20 text-white border border-white/30 shrink-0">
+                        <span className="text-xs sm:text-sm font-extrabold px-2 py-0.5 rounded-full bg-white/20 text-white border border-white/30 shrink-0">
                           {toBurmeseNumber(catSchools.length)} ကျောင်း
                         </span>
                       </h3>
-                      <p className="text-[11px] sm:text-xs text-white/80 line-clamp-1 font-normal">
+                      <p className="text-xs sm:text-sm text-white/80 line-clamp-1 font-normal">
                         {config.description}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                    <span className="text-[11px] font-medium text-white/80 hidden sm:inline">
+                    <span className="text-sm font-medium text-white/80 hidden sm:inline">
                       {isCollapsed ? 'ဖွင့်ရန်' : 'ခေါက်ရန်'}
                     </span>
                     <button
@@ -899,7 +899,7 @@ export default function Contacts() {
                               </div>
 
                               {/* Badges */}
-                              <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
+                              <div className="flex flex-wrap items-center gap-1.5 text-sm text-slate-500">
                                 {/* Level badge */}
                                 {school.level && (
                                   <span className={`inline-block px-2 py-0.5 rounded-md border font-semibold shrink-0 ${config.color.tagBadge}`}>
@@ -976,7 +976,7 @@ export default function Contacts() {
                                     <button
                                       type="button"
                                       onClick={() => togglePhoneDropdown(school.id)}
-                                      className="text-[11px] text-slate-500 hover:text-slate-800 font-bold px-2 py-0.5 rounded-md bg-white border border-slate-200 cursor-pointer"
+                                      className="text-sm text-slate-500 hover:text-slate-800 font-bold px-2 py-0.5 rounded-md bg-white border border-slate-200 cursor-pointer"
                                     >
                                       ခေါက်သိမ်းမည် ✕
                                     </button>
@@ -1000,7 +1000,7 @@ export default function Contacts() {
                                                 </span>
                                               )}
                                               {cp.personRole && (
-                                                <span className="text-sky-900 font-semibold bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200 text-[11px]">
+                                                <span className="text-sky-900 font-semibold bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200 text-sm">
                                                   {cp.personRole}
                                                 </span>
                                               )}
@@ -1111,7 +1111,7 @@ export default function Contacts() {
                     </div>
 
                     {/* Badges */}
-                    <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                    <div className="flex flex-wrap items-center gap-1.5 text-sm">
                       {/* Category Badge */}
                       <span className={`px-2.5 py-0.5 rounded-full border font-bold shrink-0 ${cat.color.badge}`}>
                         {cat.shortLabel}
@@ -1193,7 +1193,7 @@ export default function Contacts() {
                           <button
                             type="button"
                             onClick={() => togglePhoneDropdown(s.id)}
-                            className="text-[11px] text-slate-500 hover:text-slate-800 font-bold px-2 py-0.5 rounded-md bg-white border border-slate-200 cursor-pointer"
+                            className="text-sm text-slate-500 hover:text-slate-800 font-bold px-2 py-0.5 rounded-md bg-white border border-slate-200 cursor-pointer"
                           >
                             ခေါက်သိမ်းမည် ✕
                           </button>
@@ -1217,7 +1217,7 @@ export default function Contacts() {
                                       </span>
                                     )}
                                     {cp.personRole && (
-                                      <span className="text-sky-900 font-semibold bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200 text-[11px]">
+                                      <span className="text-sky-900 font-semibold bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200 text-sm">
                                         {cp.personRole}
                                       </span>
                                     )}

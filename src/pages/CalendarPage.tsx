@@ -128,7 +128,7 @@ export default function CalendarPage() {
               <h3 className="font-bold text-lg text-sky-950">{currentMonth.toLocaleDateString('my-MM', { month: 'long', year: 'numeric' })}</h3>
               <button onClick={nextMonth} className="p-2 rounded-lg hover:bg-slate-100 cursor-pointer"><ChevronRight className="w-5 h-5" /></button>
             </div>
-            <div className="grid grid-cols-7 gap-1 text-center font-bold text-[10px] sm:text-xs text-slate-500 mb-1">
+            <div className="grid grid-cols-7 gap-1 text-center font-bold text-xs sm:text-sm text-slate-500 mb-1">
               <div>တနင်္ဂနွေ</div><div>တနင်္လာ</div><div>အင်္ဂါ</div><div>ဗုဒ္ဓဟူး</div><div>ကြာသပတေး</div><div>သောကြာ</div><div>စနေ</div>
             </div>
             <div className="grid grid-cols-7 gap-1">
@@ -145,13 +145,13 @@ export default function CalendarPage() {
                     onClick={() => setSelectedDate(dateStr)}
                     className={`h-14 sm:h-20 rounded-lg border flex flex-col items-center justify-start p-1 cursor-pointer transition ${isSelected ? 'border-sky-600 bg-sky-50 ring-2 ring-sky-200' : isToday ? 'border-sky-300 bg-sky-50/50' : 'border-slate-100 hover:bg-slate-50'}`}
                   >
-                    <span className={`text-[10px] sm:text-xs font-bold ${isToday ? 'text-sky-700' : 'text-slate-700'}`}>{day}</span>
+                    <span className={`text-xs sm:text-sm font-bold ${isToday ? 'text-sky-700' : 'text-slate-700'}`}>{day}</span>
                     {dayEvents.length > 0 && (
                       <div className="flex gap-0.5 mt-1 flex-wrap justify-center">
                         {dayEvents.slice(0, 3).map((e, i) => (
                           <div key={i} className={`w-1.5 h-1.5 rounded-full ${e.eventType === 'school_activity' ? 'bg-amber-500' : e.eventType === 'festival' ? 'bg-rose-500' : 'bg-sky-500'}`} />
                         ))}
-                        {dayEvents.length > 3 && <span className="text-[8px] font-bold text-slate-500">+{dayEvents.length - 3}</span>}
+                        {dayEvents.length > 3 && <span className="text-[11px] font-bold text-slate-500">+{dayEvents.length - 3}</span>}
                       </div>
                     )}
                   </div>
@@ -173,10 +173,10 @@ export default function CalendarPage() {
                 {selectedEvents.map(ev => (
                   <div key={ev.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${ev.eventType === 'school_activity' ? 'bg-amber-50 text-amber-800 border-amber-200' : ev.eventType === 'festival' ? 'bg-rose-50 text-rose-800 border-rose-200' : 'bg-sky-50 text-sky-800 border-sky-200'}`}>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded border ${ev.eventType === 'school_activity' ? 'bg-amber-50 text-amber-800 border-amber-200' : ev.eventType === 'festival' ? 'bg-rose-50 text-rose-800 border-rose-200' : 'bg-sky-50 text-sky-800 border-sky-200'}`}>
                         {ev.eventType === 'school_activity' ? 'ကျောင်း' : ev.eventType === 'festival' ? 'ပွဲ/အခမ်းအနား' : ev.eventType === 'sport' ? 'အားကစား' : 'အထွေထွေ'}
                       </span>
-                      {ev.time && <span className="text-[10px] text-slate-500 font-bold flex items-center gap-1"><Clock className="w-3 h-3"/>{ev.time}</span>}
+                      {ev.time && <span className="text-xs text-slate-500 font-bold flex items-center gap-1"><Clock className="w-3 h-3"/>{ev.time}</span>}
                     </div>
                     <h4 className="font-bold text-sm text-slate-900">{ev.title}</h4>
                     {ev.imageUrl && <img src={ev.imageUrl} alt={ev.title} className="w-full h-32 object-cover rounded-lg border" />}
@@ -211,7 +211,7 @@ export default function CalendarPage() {
                   {ev.imageUrl && <img src={ev.imageUrl} alt={ev.title} className="w-full sm:w-24 h-32 sm:h-24 object-cover rounded-lg border shrink-0" />}
                   <div className="space-y-1.5 flex-1">
                     <div className="flex items-center justify-between">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${ev.eventType === 'school_activity' ? 'bg-amber-50 text-amber-800 border-amber-200' : ev.eventType === 'festival' ? 'bg-rose-50 text-rose-800 border-rose-200' : 'bg-sky-50 text-sky-800 border-sky-200'}`}>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded border ${ev.eventType === 'school_activity' ? 'bg-amber-50 text-amber-800 border-amber-200' : ev.eventType === 'festival' ? 'bg-rose-50 text-rose-800 border-rose-200' : 'bg-sky-50 text-sky-800 border-sky-200'}`}>
                         {ev.eventType === 'school_activity' ? 'ကျောင်း' : ev.eventType === 'festival' ? 'ပွဲ/အခမ်းအနား' : ev.eventType === 'sport' ? 'အားကစား' : 'အထွေထွေ'}
                       </span>
                       <span className="text-xs font-bold text-sky-900">{ev.date} {ev.time && `• ${ev.time}`}</span>

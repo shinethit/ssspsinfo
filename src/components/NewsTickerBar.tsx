@@ -88,7 +88,7 @@ export default function NewsTickerBar() {
         {/* Left Badge: Icon + Label + Live Pulse */}
         <div className="flex items-center gap-1.5 shrink-0 z-10 bg-inherit pr-2">
           <div
-            className={`flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[11px] shadow-2xs ${badgeConfig.bg} ${badgeConfig.text}`}
+            className={`flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-sm shadow-2xs ${badgeConfig.bg} ${badgeConfig.text}`}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
             <Icon className="w-3.5 h-3.5 shrink-0" />
@@ -97,7 +97,7 @@ export default function NewsTickerBar() {
 
           {/* Auto-assigned timestamp badge of the newest ticker */}
           {tickers[0]?.displayDateTime && (
-            <div className="hidden md:flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/80 border border-slate-200/60 text-slate-600 text-[10px] font-medium shrink-0">
+            <div className="hidden md:flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/80 border border-slate-200/60 text-slate-600 text-xs font-medium shrink-0">
               <Clock className="w-3 h-3 text-slate-400" />
               <span>{tickers[0].displayDateTime}</span>
             </div>
@@ -120,7 +120,7 @@ export default function NewsTickerBar() {
               <span key={item.id} className="inline-flex items-center gap-3 shrink-0">
                 {/* Individual item date/time if available */}
                 {item.displayDateTime && (
-                  <span className="text-[11px] font-normal px-1.5 py-0.2 rounded bg-white/70 border border-slate-200 text-slate-500">
+                  <span className="text-sm font-normal px-1.5 py-0.2 rounded bg-white/70 border border-slate-200 text-slate-500">
                     {item.displayDateTime}
                   </span>
                 )}
