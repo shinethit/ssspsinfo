@@ -65,7 +65,7 @@ export default function AdminNavigation({ navItems, activeTab, onSelectTab, role
       </aside>
 
       {/* Mobile Header */}
-      <header className="lg:hidden bg-sky-950 text-white p-4 flex items-center justify-between sticky top-0 z-20 shadow-md">
+      <header className="lg:hidden bg-sky-950 text-white p-4 flex items-center justify-between sticky top-16 z-30 shadow-md">
         <h2 className="font-extrabold flex items-center gap-2 text-base">
           <ShieldCheck className="w-5 h-5 text-emerald-400" /> Admin Console
         </h2>

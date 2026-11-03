@@ -402,8 +402,8 @@ export default function AdminSchoolManager({
 
       {/* 6. Fee Payment Modal */}
       {feeModalSchool && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-xl border border-slate-100 animate-in zoom-in-95">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-xl border border-slate-100 animate-in zoom-in-95 my-auto">
             <h3 className="font-extrabold text-lg text-slate-900 mb-1">နှစ်စဉ်ကြေး ပေးသွင်းမှု မှတ်တမ်းတင်ရန်</h3>
             <p className="text-sm font-semibold text-sky-700 mb-4">{feeModalSchool.name}</p>
             <form onSubmit={handleConfirmFeePayment} className="space-y-4">

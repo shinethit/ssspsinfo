@@ -347,12 +347,12 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[600px]">
-          <div className="p-4 border-b bg-slate-50 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                <History className="w-4 h-4 text-sky-600" /> 
-                {selectedSchool ? `${selectedSchool.name} ၏ မှတ်တမ်းများ` : 'ကျောင်းတစ်ခုကို ရွေးချယ်ပါ'}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[420px] sm:h-[600px]">
+          <div className="p-4 border-b bg-slate-50 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2 min-w-0">
+                <History className="w-4 h-4 text-sky-600 shrink-0" /> 
+                <span className="truncate">{selectedSchool ? `${selectedSchool.name} ၏ မှတ်တမ်းများ` : 'ကျောင်းတစ်ခုကို ရွေးချယ်ပါ'}</span>
               </h3>
               <button onClick={handleExportAllTransactions} className="bg-sky-600 hover:bg-sky-700 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer" title="မှတ်တမ်းအားလုံးကို Excel ဖြင့် ထုတ်ယူရန်">
                 <Download className="w-3.5 h-3.5" /> Export All

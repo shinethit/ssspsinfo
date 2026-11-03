@@ -449,7 +449,7 @@ export default function Dashboard() {
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 animate-in fade-in slide-in-from-bottom-2">
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
           <div className="p-3 bg-sky-50 text-sky-600 rounded-xl shrink-0"><UserCheck className="w-5 h-5" /></div>
-          <div>
+          <div className="min-w-0">
             <p className="text-sm text-slate-500 font-semibold">အားကစားသမား စုစုပေါင်း</p>
             <p className="text-xl font-black text-sky-950">{sportsStats.athletes !== null ? (<>{sportsStats.athletes} <span className="text-xs font-normal text-slate-500">ဦး</span></>) : '—'}</p>
           </div>
@@ -457,7 +457,7 @@ export default function Dashboard() {
 
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
           <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0"><Trophy className="w-5 h-5" /></div>
-          <div>
+          <div className="min-w-0">
             <p className="text-sm text-slate-500 font-semibold">အားကစားပွဲစဉ်</p>
             <p className="text-xl font-black text-emerald-950">{sportsStats.events !== null ? (<>{sportsStats.events} <span className="text-xs font-normal text-slate-500">ခု</span></>) : '—'}</p>
           </div>
@@ -465,7 +465,7 @@ export default function Dashboard() {
 
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
           <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0"><Receipt className="w-5 h-5" /></div>
-          <div>
+          <div className="min-w-0">
             {/* v24.7: the label used to say "အခြားရရှိငွေ (အားကစားကြေး စသဖြင့်)"
                 while the figure was the annual-fee total for guests (and the
                 all-transactions total for admins). The label now says what
@@ -477,7 +477,7 @@ export default function Dashboard() {
 
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
           <div className="p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0"><Ticket className="w-5 h-5" /></div>
-          <div>
+          <div className="min-w-0">
             <p className="text-sm text-slate-500 font-semibold">စာရင်းသွင်းနိုင်သော ပွဲစဉ်များ</p>
             <p className="text-xl font-black text-purple-950">{eventStats !== null ? (<>{eventStats} <span className="text-xs font-normal text-slate-500">ခု</span></>) : '—'}</p>
           </div>

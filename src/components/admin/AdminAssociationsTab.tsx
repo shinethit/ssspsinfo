@@ -88,7 +88,7 @@ export default function AdminAssociationsTab({ associations, onRefresh }: AdminA
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">ဖုန်းနံပါတ်</label>
-            <input {...associationForm.register('phone')} placeholder="09..." className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none" />
+            <input type="tel" inputMode="tel" {...associationForm.register('phone')} placeholder="09..." className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none" />
           </div>
           <div className="sm:col-span-2">
             <label className="block text-xs font-bold text-slate-700 mb-1">လိပ်စာနှင့် ဖော်ပြချက်</label>
@@ -113,7 +113,7 @@ export default function AdminAssociationsTab({ associations, onRefresh }: AdminA
                 <input {...associationForm.register(`members.${index}.name` as const)} placeholder="အမည် *" className="p-2 bg-white border border-slate-200 rounded-lg text-xs outline-none" />
                 <input {...associationForm.register(`members.${index}.role` as const)} placeholder="ရာထူး *" className="p-2 bg-white border border-slate-200 rounded-lg text-xs outline-none" />
                 <input {...associationForm.register(`members.${index}.school` as const)} placeholder="ကိုယ်စားပြုကျောင်း" className="p-2 bg-white border border-slate-200 rounded-lg text-xs outline-none" />
-                <input {...associationForm.register(`members.${index}.phone` as const)} placeholder="ဖုန်းနံပါတ်" className="p-2 bg-white border border-slate-200 rounded-lg text-xs outline-none" />
+                <input type="tel" inputMode="tel" {...associationForm.register(`members.${index}.phone` as const)} placeholder="ဖုန်းနံပါတ်" className="p-2 bg-white border border-slate-200 rounded-lg text-xs outline-none" />
                 <div className="flex items-center gap-1.5">
                   <input {...associationForm.register(`members.${index}.photoUrl` as const)} placeholder="ပုံ Link" className="flex-1 p-2 bg-white border border-slate-200 rounded-lg text-xs outline-none" />
                   {memberFields.length > 1 && (

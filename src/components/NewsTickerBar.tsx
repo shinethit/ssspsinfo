@@ -92,7 +92,7 @@ export default function NewsTickerBar() {
           >
             <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
             <Icon className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden xs:inline whitespace-nowrap">{badgeConfig.label}</span>
+            <span className="hidden sm:inline whitespace-nowrap">{badgeConfig.label}</span>
           </div>
 
           {/* Auto-assigned timestamp badge of the newest ticker */}

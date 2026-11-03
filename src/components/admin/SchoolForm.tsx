@@ -207,11 +207,11 @@ export default function SchoolForm({ initialData, isEditing, onCancel, onSubmit,
                 <h4 className="font-bold text-sm text-slate-800 flex items-center gap-1.5"><Phone className="w-4 h-4 text-sky-600"/> ကျောင်း ဖုန်း</h4>
                 <button type="button" onClick={() => setExtraSchoolPhones(prev => [...prev, ''])} className="text-xs text-sky-700 font-bold cursor-pointer hover:underline">+ ထပ်ထည့်</button>
               </div>
-              <input {...schoolForm.register('schoolPhone')} placeholder="ဖုန်း (၁)" className="w-full p-2.5 border rounded-lg text-sm" />
-              <input {...schoolForm.register('schoolPhone2')} placeholder="ဖုန်း (၂)" className="w-full p-2.5 border rounded-lg text-sm" />
+              <input type="tel" inputMode="tel" {...schoolForm.register('schoolPhone')} placeholder="ဖုန်း (၁)" className="w-full p-2.5 border rounded-lg text-sm" />
+              <input type="tel" inputMode="tel" {...schoolForm.register('schoolPhone2')} placeholder="ဖုန်း (၂)" className="w-full p-2.5 border rounded-lg text-sm" />
               {extraSchoolPhones.map((ph, idx) => (
                 <div key={idx} className="flex gap-2">
-                  <input type="text" value={ph} onChange={(e) => { const n = [...extraSchoolPhones]; n[idx] = e.target.value; setExtraSchoolPhones(n); }} placeholder="ဖုန်းနံပါတ်" className="flex-1 p-2 border rounded-lg text-sm" />
+                  <input type="tel" inputMode="tel" value={ph} onChange={(e) => { const n = [...extraSchoolPhones]; n[idx] = e.target.value; setExtraSchoolPhones(n); }} placeholder="ဖုန်းနံပါတ်" className="flex-1 p-2 border rounded-lg text-sm" />
                   <button type="button" onClick={() => setExtraSchoolPhones(extraSchoolPhones.filter((_, i) => i !== idx))} className="px-3 text-xs text-rose-600 border border-rose-200 rounded-lg hover:bg-rose-50">ဖယ်</button>
                 </div>
               ))}
@@ -223,11 +223,11 @@ export default function SchoolForm({ initialData, isEditing, onCancel, onSubmit,
                 <button type="button" onClick={() => setExtraFounderPhones(prev => [...prev, ''])} className="text-xs text-sky-700 font-bold cursor-pointer hover:underline">+ ထပ်ထည့်</button>
               </div>
               <input {...schoolForm.register('founderName')} placeholder="အမည်" className="w-full p-2.5 border rounded-lg text-sm bg-slate-50" />
-              <input {...schoolForm.register('founderPhone')} placeholder="ဖုန်း (၁)" className="w-full p-2.5 border rounded-lg text-sm" />
-              <input {...schoolForm.register('founderPhone2')} placeholder="ဖုန်း (၂)" className="w-full p-2.5 border rounded-lg text-sm" />
+              <input type="tel" inputMode="tel" {...schoolForm.register('founderPhone')} placeholder="ဖုန်း (၁)" className="w-full p-2.5 border rounded-lg text-sm" />
+              <input type="tel" inputMode="tel" {...schoolForm.register('founderPhone2')} placeholder="ဖုန်း (၂)" className="w-full p-2.5 border rounded-lg text-sm" />
               {extraFounderPhones.map((ph, idx) => (
                 <div key={idx} className="flex gap-2">
-                  <input type="text" value={ph} onChange={(e) => { const n = [...extraFounderPhones]; n[idx] = e.target.value; setExtraFounderPhones(n); }} placeholder="ဖုန်းနံပါတ်" className="flex-1 p-2 border rounded-lg text-sm" />
+                  <input type="tel" inputMode="tel" value={ph} onChange={(e) => { const n = [...extraFounderPhones]; n[idx] = e.target.value; setExtraFounderPhones(n); }} placeholder="ဖုန်းနံပါတ်" className="flex-1 p-2 border rounded-lg text-sm" />
                   <button type="button" onClick={() => setExtraFounderPhones(extraFounderPhones.filter((_, i) => i !== idx))} className="px-3 text-xs text-rose-600 border border-rose-200 rounded-lg hover:bg-rose-50">ဖယ်</button>
                 </div>
               ))}
@@ -239,11 +239,11 @@ export default function SchoolForm({ initialData, isEditing, onCancel, onSubmit,
                 <button type="button" onClick={() => setExtraAdminPhones(prev => [...prev, ''])} className="text-xs text-sky-700 font-bold cursor-pointer hover:underline">+ ထပ်ထည့်</button>
               </div>
               <input {...schoolForm.register('adminName')} placeholder="အမည်" className="w-full p-2.5 border rounded-lg text-sm bg-slate-50" />
-              <input {...schoolForm.register('adminPhone')} placeholder="ဖုန်း (၁)" className="w-full p-2.5 border rounded-lg text-sm" />
-              <input {...schoolForm.register('adminPhone2')} placeholder="ဖုန်း (၂)" className="w-full p-2.5 border rounded-lg text-sm" />
+              <input type="tel" inputMode="tel" {...schoolForm.register('adminPhone')} placeholder="ဖုန်း (၁)" className="w-full p-2.5 border rounded-lg text-sm" />
+              <input type="tel" inputMode="tel" {...schoolForm.register('adminPhone2')} placeholder="ဖုန်း (၂)" className="w-full p-2.5 border rounded-lg text-sm" />
               {extraAdminPhones.map((ph, idx) => (
                 <div key={idx} className="flex gap-2">
-                  <input type="text" value={ph} onChange={(e) => { const n = [...extraAdminPhones]; n[idx] = e.target.value; setExtraAdminPhones(n); }} placeholder="ဖုန်းနံပါတ်" className="flex-1 p-2 border rounded-lg text-sm" />
+                  <input type="tel" inputMode="tel" value={ph} onChange={(e) => { const n = [...extraAdminPhones]; n[idx] = e.target.value; setExtraAdminPhones(n); }} placeholder="ဖုန်းနံပါတ်" className="flex-1 p-2 border rounded-lg text-sm" />
                   <button type="button" onClick={() => setExtraAdminPhones(extraAdminPhones.filter((_, i) => i !== idx))} className="px-3 text-xs text-rose-600 border border-rose-200 rounded-lg hover:bg-rose-50">ဖယ်</button>
                 </div>
               ))}
@@ -261,10 +261,10 @@ export default function SchoolForm({ initialData, isEditing, onCancel, onSubmit,
               </div>
               <input {...schoolForm.register('contactName')} placeholder="အမည်" className="w-full p-2.5 border rounded-lg text-sm" />
               <input {...schoolForm.register('contactRole')} placeholder="ရာထူး" className="w-full p-2.5 border rounded-lg text-sm" />
-              <input {...schoolForm.register('contactPhone')} placeholder="ဖုန်း (၁)" className="w-full p-2.5 border rounded-lg text-sm" />
+              <input type="tel" inputMode="tel" {...schoolForm.register('contactPhone')} placeholder="ဖုန်း (၁)" className="w-full p-2.5 border rounded-lg text-sm" />
               {extraCoord1Phones.map((ph, idx) => (
                 <div key={idx} className="flex gap-2">
-                  <input type="text" value={ph} onChange={(e) => { const n = [...extraCoord1Phones]; n[idx] = e.target.value; setExtraCoord1Phones(n); }} placeholder="ဖုန်းနံပါတ်" className="flex-1 p-2 border rounded-lg text-sm" />
+                  <input type="tel" inputMode="tel" value={ph} onChange={(e) => { const n = [...extraCoord1Phones]; n[idx] = e.target.value; setExtraCoord1Phones(n); }} placeholder="ဖုန်းနံပါတ်" className="flex-1 p-2 border rounded-lg text-sm" />
                   <button type="button" onClick={() => setExtraCoord1Phones(extraCoord1Phones.filter((_, i) => i !== idx))} className="px-3 text-xs text-rose-600 border border-rose-200 rounded-lg hover:bg-rose-50">ဖယ်</button>
                 </div>
               ))}
@@ -277,10 +277,10 @@ export default function SchoolForm({ initialData, isEditing, onCancel, onSubmit,
               </div>
               <input {...schoolForm.register('contact2Name')} placeholder="အမည်" className="w-full p-2.5 border rounded-lg text-sm" />
               <input {...schoolForm.register('contact2Role')} placeholder="ရာထူး" className="w-full p-2.5 border rounded-lg text-sm" />
-              <input {...schoolForm.register('contact2Phone')} placeholder="ဖုန်း (၁)" className="w-full p-2.5 border rounded-lg text-sm" />
+              <input type="tel" inputMode="tel" {...schoolForm.register('contact2Phone')} placeholder="ဖုန်း (၁)" className="w-full p-2.5 border rounded-lg text-sm" />
               {extraCoord2Phones.map((ph, idx) => (
                 <div key={idx} className="flex gap-2">
-                  <input type="text" value={ph} onChange={(e) => { const n = [...extraCoord2Phones]; n[idx] = e.target.value; setExtraCoord2Phones(n); }} placeholder="ဖုန်းနံပါတ်" className="flex-1 p-2 border rounded-lg text-sm" />
+                  <input type="tel" inputMode="tel" value={ph} onChange={(e) => { const n = [...extraCoord2Phones]; n[idx] = e.target.value; setExtraCoord2Phones(n); }} placeholder="ဖုန်းနံပါတ်" className="flex-1 p-2 border rounded-lg text-sm" />
                   <button type="button" onClick={() => setExtraCoord2Phones(extraCoord2Phones.filter((_, i) => i !== idx))} className="px-3 text-xs text-rose-600 border border-rose-200 rounded-lg hover:bg-rose-50">ဖယ်</button>
                 </div>
               ))}

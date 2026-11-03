@@ -82,7 +82,7 @@ export function ConfirmModalHost() {
             type="button"
             onClick={() => close(false)}
             aria-label="ပိတ်မည်"
-            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition"
+            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition"
           >
             <X className="w-5 h-5" />
           </button>

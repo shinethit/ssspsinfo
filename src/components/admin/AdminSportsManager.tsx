@@ -151,7 +151,7 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
         ))}
       </div>
 
-      <div className="flex gap-2 mb-4 bg-slate-100 p-1 rounded-xl w-max">
+      <div className="flex flex-wrap gap-2 mb-4 bg-slate-100 p-1 rounded-xl">
         <button onClick={() => setViewMode('results')} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition ${viewMode === 'results' ? 'bg-white text-sky-900 shadow-sm' : 'text-slate-500'}`}>ရလဒ်များ</button>
         <button onClick={() => setViewMode('athletes')} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition ${viewMode === 'athletes' ? 'bg-white text-sky-900 shadow-sm' : 'text-slate-500'}`}>အားကစားသမားများ</button>
         <button onClick={() => setViewMode('info')} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition ${viewMode === 'info' ? 'bg-white text-sky-900 shadow-sm' : 'text-slate-500'}`}>စည်းမျဉ်းနှင့် ဒိုင်များ</button>

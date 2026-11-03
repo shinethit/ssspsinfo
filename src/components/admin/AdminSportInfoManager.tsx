@@ -95,7 +95,7 @@ export default function AdminSportInfoManager({ activeSport }: { activeSport: st
               <div key={o.id} className="flex flex-wrap sm:flex-nowrap gap-2 items-center bg-slate-50 p-2 rounded-xl border">
                 <input value={o.name} onChange={e => updateOfficial(o.id, 'name', e.target.value)} placeholder="အမည်" className="flex-1 p-2 border rounded-lg text-xs" />
                 <input value={o.role} onChange={e => updateOfficial(o.id, 'role', e.target.value)} placeholder="ရာထူး" className="flex-1 p-2 border rounded-lg text-xs" />
-                <input value={o.phone} onChange={e => updateOfficial(o.id, 'phone', e.target.value)} placeholder="ဖုန်း" className="flex-1 p-2 border rounded-lg text-xs" />
+                <input type="tel" inputMode="tel" value={o.phone} onChange={e => updateOfficial(o.id, 'phone', e.target.value)} placeholder="ဖုန်း" className="flex-1 p-2 border rounded-lg text-xs" />
                 <button onClick={() => removeOfficial(o.id)} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
               </div>
             ))}

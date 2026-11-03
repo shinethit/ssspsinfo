@@ -42,11 +42,11 @@ export default function GlobalSearch() {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-500 transition-colors text-sm mr-2"
+        aria-label="\u101b\u103e\u102c\u101b\u103d\u1031\u101b\u1014\u103a" className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-500 transition-colors text-sm mr-2"
       >
         <Search className="w-4 h-4" />
-        <span className="w-16 text-left">ရှာဖွေရန်...</span>
-        <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-white px-1.5 font-mono text-xs font-medium text-slate-400">
+        <span className="hidden sm:block w-16 text-left">ရှာဖွေရန်...</span>
+        <kbd className="pointer-events-none hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-white px-1.5 font-mono text-xs font-medium text-slate-400">
           <span className="text-xs">⌘</span>K
         </kbd>
       </button>
@@ -84,7 +84,7 @@ export default function GlobalSearch() {
             onChange={(e) => setQuery(e.target.value)}
             className="flex-1 bg-transparent text-slate-900 outline-none placeholder:text-slate-400 text-base"
           />
-          <button onClick={() => setIsOpen(false)} className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 ml-2">
+          <button onClick={() => setIsOpen(false)} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 ml-2">
             <X className="w-5 h-5" />
           </button>
         </div>

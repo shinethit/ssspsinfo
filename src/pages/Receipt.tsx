@@ -104,7 +104,7 @@ export default function Receipt() {
         </div>
       </div>
 
-      <div ref={receiptRef} className="bg-white p-8 sm:p-12 rounded-3xl shadow-sm border border-slate-200 relative overflow-hidden print:shadow-none print:border-none print:p-0">
+      <div ref={receiptRef} className="bg-white p-4 sm:p-12 rounded-3xl shadow-sm border border-slate-200 relative overflow-hidden print:shadow-none print:border-none print:p-0">
         
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-5 pointer-events-none">
           <CheckCircle2 className="w-96 h-96 text-emerald-600" />
@@ -121,7 +121,7 @@ export default function Receipt() {
         </div>
 
         <div className="space-y-6 relative z-10">
-          <div className="flex justify-between text-sm">
+          <div className="flex flex-wrap gap-3 justify-between text-sm">
             <div>
               <span className="text-slate-500 font-semibold block mb-1">ဖြတ်ပိုင်းအမှတ် (Receipt No):</span>
               <span className="font-mono font-bold text-slate-900 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">
@@ -179,13 +179,13 @@ export default function Receipt() {
           </div>
         </div>
 
-        <div className="mt-16 pt-8 flex justify-between items-end relative z-10">
+        <div className="mt-16 pt-8 flex flex-wrap gap-6 justify-between items-end relative z-10">
           <div className="text-center">
-            <div className="w-32 border-b border-slate-400 mb-2"></div>
+            <div className="w-28 sm:w-32 border-b border-slate-400 mb-2"></div>
             <span className="text-xs text-slate-500 font-semibold">ဘဏ္ဍာရေးမှူး</span>
           </div>
           <div className="text-center">
-            <div className="w-40 border-b border-slate-400 mb-2"></div>
+            <div className="w-32 sm:w-40 border-b border-slate-400 mb-2"></div>
             <span className="text-xs text-slate-500 font-semibold">အသင်းဥက္ကဋ္ဌ / တာဝန်ခံ</span>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import {
@@ -31,6 +31,16 @@ import { ConfirmModalHost } from './ConfirmModal';
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // v24.9: when the mobile menu is open, stop the page behind it scrolling.
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => { document.body.style.overflow = 'unset'; };
+  }, [sidebarOpen]);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -92,7 +102,7 @@ export default function Layout() {
               type="button"
               onClick={() => setSidebarOpen(prev => !prev)}
               aria-label="Toggle Sidebar Navigation"
-              className="p-2 rounded-xl text-slate-700 hover:bg-slate-100 hover:text-sky-900 transition focus:outline-hidden focus:ring-2 focus:ring-sky-500 cursor-pointer shrink-0"
+              className="p-2.5 rounded-xl text-slate-700 hover:bg-slate-100 hover:text-sky-900 transition focus:outline-hidden focus:ring-2 focus:ring-sky-500 cursor-pointer shrink-0"
             >
               {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -122,7 +132,7 @@ export default function Layout() {
             <Link
               to="/admin"
               onClick={closeSidebar}
-              className="bg-sky-900 text-white px-3 sm:px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 hover:bg-sky-800 transition shadow-xs shrink-0"
+              className="bg-sky-900 text-white px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 hover:bg-sky-800 transition shadow-xs shrink-0"
             >
               <ShieldCheck className="w-4 h-4 shrink-0" />
               <span className="hidden sm:inline">Admin</span>

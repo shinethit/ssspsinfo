@@ -129,8 +129,8 @@ export default function Events() {
 
       {/* Registration Modal */}
       {selectedEvent && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl animate-in zoom-in-95">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl animate-in zoom-in-95 my-auto">
             <h3 className="font-bold text-lg text-slate-900 mb-1">စာရင်းသွင်းခြင်း</h3>
             <p className="text-xs text-sky-700 font-semibold mb-4">{selectedEvent.title}</p>
             

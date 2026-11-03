@@ -86,12 +86,13 @@ button, [role="button"], input[type="submit"], input[type="button"] {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* နှိပ်လိုက်ရင် ခဏလေး ကျုံ့ဝင်သွားမည် (Tactile Feedback) */
+/* နှိပ်လိုက်ရင် ခဏလေး မှိန်သွားမည် (Tactile Feedback) — v24.9: the old
+   scale(0.94) shrink made every tap visibly jump on mobile, so only the
+   opacity changes now, nothing moves. */
 button:active:not(:disabled), 
 [role="button"]:active:not(:disabled),
 input[type="submit"]:active:not(:disabled),
 input[type="button"]:active:not(:disabled) {
-  transform: scale(0.94) !important;
   opacity: 0.85 !important;
 }
 
@@ -107,4 +108,13 @@ input[type="submit"]:disabled {
 button:focus-visible {
   outline: 2px solid #0284c7;
   outline-offset: 2px;
+}
+
+/* v24.9: iPhone Safari auto-zooms when a tapped field is under 16px and does
+   not zoom back out when the keyboard closes. Force 16px on all form fields
+   so tapping never zooms — on phones, tablets (including iPad landscape)
+   and desktop alike. Unlayered CSS wins over Tailwind's layered utilities,
+   so this overrides the text-xs/text-sm classes on the fields. */
+input, select, textarea {
+  font-size: 16px;
 }

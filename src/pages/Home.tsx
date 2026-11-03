@@ -291,7 +291,7 @@ export default function Home() {
             <button
               key={opt.value}
               onClick={() => setSelectedZone(opt.value)}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 ${
+              className={`px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 ${
                 selectedZone === opt.value
                   ? 'bg-sky-900 text-white shadow-sm'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'

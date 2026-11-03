@@ -123,7 +123,7 @@ export default function Announcements() {
 
       {/* Header */}
       <div className="border-b border-slate-200 pb-4">
-        <h2 className="text-3xl font-extrabold text-sky-950 flex items-center gap-3">
+        <h2 className="text-2xl sm:text-3xl font-extrabold text-sky-950 flex flex-wrap items-center gap-3">
           <FileText className="w-8 h-8 text-sky-600" />
           ကြေညာချက်များ <span className="text-lg font-normal text-slate-500">(Announcements)</span>
         </h2>

@@ -136,7 +136,7 @@ export default function AdminEventManager() {
               <div key={ev.id} className="p-4 flex flex-col md:flex-row justify-between gap-4 hover:bg-slate-50 transition">
                 <div>
                   <h4 className="font-bold text-slate-900">{ev.title}</h4>
-                  <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
                     <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {ev.date}</span>
                     <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {ev.location}</span>
                     {(ev as any).zone && (

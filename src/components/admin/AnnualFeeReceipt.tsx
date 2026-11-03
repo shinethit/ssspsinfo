@@ -65,7 +65,7 @@ export default function AnnualFeeReceipt({ school, onClose }: { school: School; 
 
         {/* Printable Area */}
         <div className="p-4 sm:p-8 bg-slate-50 overflow-x-auto">
-          <div ref={receiptRef} className="bg-white p-8 sm:p-12 rounded-xl border border-slate-200 relative overflow-hidden w-[700px] mx-auto text-slate-900" style={{ minHeight: '500px' }}>
+          <div ref={receiptRef} className="bg-white p-4 sm:p-12 rounded-xl border border-slate-200 relative overflow-hidden w-full max-w-[700px] mx-auto text-slate-900" style={{ minHeight: '500px' }}>
             
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-5 pointer-events-none">
               <CheckCircle2 className="w-96 h-96 text-emerald-600" />
@@ -80,10 +80,10 @@ export default function AnnualFeeReceipt({ school, onClose }: { school: School; 
             </div>
 
             <div className="space-y-6 relative z-10">
-              <div className="flex justify-between text-sm">
+              <div className="flex flex-wrap gap-3 justify-between text-sm">
                 <div>
                   <span className="text-slate-500 font-semibold block mb-1">ဖြတ်ပိုင်းအမှတ်:</span>
-                  <span className="font-mono font-bold bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">
+                  <span className="font-mono font-bold bg-slate-100 px-3 py-1 rounded-lg border border-slate-200 break-all">
                     {school.feePaidDate ? `SSSPSFV-${new Date(school.feePaidDate).toISOString().slice(0,10).replace(/-/g, '')}-${school.id.substring(0, 4).toUpperCase()}` : 'N/A'}
                   </span>
                 </div>
@@ -94,7 +94,7 @@ export default function AnnualFeeReceipt({ school, onClose }: { school: School; 
               </div>
 
               <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-slate-500 font-semibold block mb-1">ကျောင်းအမည်:</span>
                     <span className="font-bold text-base">{school.name}</span>
@@ -140,13 +140,13 @@ export default function AnnualFeeReceipt({ school, onClose }: { school: School; 
               </div>
             </div>
 
-            <div className="mt-16 pt-8 flex justify-between items-end relative z-10">
+            <div className="mt-16 pt-8 flex flex-wrap gap-6 justify-between items-end relative z-10">
               <div className="text-center">
-                <div className="w-32 border-b border-slate-400 mb-2"></div>
+                <div className="w-28 sm:w-32 border-b border-slate-400 mb-2"></div>
                 <span className="text-xs text-slate-500 font-semibold">ဘဏ္ဍာရေးမှူး</span>
               </div>
               <div className="text-center">
-                <div className="w-40 border-b border-slate-400 mb-2"></div>
+                <div className="w-32 sm:w-40 border-b border-slate-400 mb-2"></div>
                 <span className="text-xs text-slate-500 font-semibold">အသင်းဥက္ကဋ္ဌ / တာဝန်ခံ</span>
               </div>
             </div>
