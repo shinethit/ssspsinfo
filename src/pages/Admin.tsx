@@ -8,7 +8,6 @@ import * as XLSX from 'xlsx';
 import { Association, NewsTicker, AdminUser, School } from '../types';
 import { useData, sortAnnouncementsByEventDate } from '../context/DataContext';
 import { getUnifiedSchoolLevels } from '../lib/schoolLevels';
-import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../constants';
 import {
   FileText, School as SchoolIcon, Building2,
   Megaphone, Calendar, Layers, History, Mail,
@@ -104,7 +103,6 @@ export default function Admin() {
 
   const [editingSchoolId, setEditingSchoolId] = useState<string | null>(null);
   const [isSchoolFormOpen, setIsSchoolFormOpen] = useState(false);
-  const [adminZoneFilter, setAdminZoneFilter] = useState<string>('all');
   const [isUploadingExcel, setIsUploadingExcel] = useState(false);
   const [excelUploadState, setExcelUploadState] = useState<any>({ status: 'idle', fileName: '', stageText: '', progressPercent: 0 });
 
@@ -127,7 +125,6 @@ export default function Admin() {
   useEffect(() => { if (globalAnnouncements) setAnnouncements(globalAnnouncements); }, [globalAnnouncements]);
 
   const unifiedLevels = useMemo(() => getUnifiedSchoolLevels(schoolLevels, schools), [schoolLevels, schools]);
-  const schoolsForZone = useMemo(() => adminZoneFilter === 'all' ? schools : schools.filter(s => isSchoolInZone(s.zone, adminZoneFilter)), [schools, adminZoneFilter]);
 
   const fetchAnnouncements = async () => { try { const s = await getDocs(collection(db, 'announcements')); setAnnouncements(sortAnnouncementsByEventDate(s.docs.map(d => ({ id: d.id, ...d.data() })) as any)); } catch (e) { console.error(e); } };
   const fetchAssociations = async () => { try { const s = await getDocs(collection(db, 'associations')); setAssociations(s.docs.map(d => ({ id: d.id, ...d.data() })) as Association[]); } catch (e) { console.error(e); } };
@@ -359,19 +356,10 @@ export default function Admin() {
             {/* TAB 2: SCHOOLS */}
             {activeTab === 'schools' && (
               <div className="space-y-4">
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center gap-3">
-                <label className="text-xs font-bold text-slate-700">ဇုန်ဖြင့် စစ်ရန်:</label>
-                <select value={adminZoneFilter} onChange={(e) => setAdminZoneFilter(e.target.value)} className="p-2 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-sky-500">
-                  {ZONE_FILTER_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label} ({opt.value === 'all' ? schools.length : schools.filter(s => isSchoolInZone(s.zone, opt.value)).length})</option>
-                  ))}
-                </select>
-                <span className="text-xs text-slate-500 font-semibold">{schoolsForZone.length} ကျောင်း ပြသနေသည်</span>
-              </div>
               <AdminSchoolManager
                 role={role}
                 canDelete={isModOrAdmin}
-                schools={schoolsForZone}
+                schools={schools}
                 schoolLevels={schoolLevels}
                 onEdit={startEditSchool}
                 onDelete={deleteSchool}

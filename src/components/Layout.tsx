@@ -282,8 +282,10 @@ export default function Layout() {
         3. MAIN CONTENT AREA
       */}
       <div className="pt-16 lg:pl-64 flex flex-col flex-1 w-full max-w-full overflow-x-hidden min-h-screen">
-        {/* Real-time Admin News Ticker (စာတန်းပြေး ကြေညာချက်) */}
-        <NewsTickerBar />
+        {/* Real-time Admin News Ticker (စာတန်းပြေး ကြေညာချက်) — v24.10: hidden on
+            /admin so the admin screens keep that vertical space for their own
+            content; the ticker is public news, not admin tooling. */}
+        {!location.pathname.startsWith('/admin') && <NewsTickerBar />}
 
         <main className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10 flex-1 overflow-x-hidden">
           <Outlet />
