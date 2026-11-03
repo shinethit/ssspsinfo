@@ -4,7 +4,7 @@ import { db } from '../../lib/firebase';
 import { SchoolUpdateRequest } from '../../types';
 import { toast } from 'sonner';
 import { confirmDialog } from '../../components/ConfirmModal';
-import { CheckCircle2, XCircle, Clock, FileText, Check, X, MapPin } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, FileText, Check, X, MapPin, Trash2 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../../constants';
 import { recordAuditLog } from '../../lib/audit';
@@ -78,7 +78,10 @@ export default function AdminRequestsManager() {
   const handleDelete = async (id: string) => {
     if (!(await confirmDialog('မှတ်တမ်းကို ဖျက်ရန် သေချာပါသလား?'))) return;
     try {
+      const target = requests.find(r => r.id === id);
       await deleteDoc(doc(db, 'school_update_requests', id));
+      // v24.13 (A6): request delete had no audit log (approve/reject did).
+      await recordAuditLog({ action: 'delete', entityType: 'request', entityId: target?.schoolId, entityName: target?.schoolName, details: 'ပြင်ဆင်ခွင့် တောင်းဆိုမှု မှတ်တမ်း ဖျက်ခြင်း' });
       toast.success('မှတ်တမ်း ဖျက်ပြီးပါပြီ');
     } catch (err) {
       toast.error('ဖျက်၍ မရပါ');
@@ -172,6 +175,15 @@ export default function AdminRequestsManager() {
                       </button>
                       <button onClick={() => handleApprove(req)} className="px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition flex items-center gap-1">
                         <Check className="w-3.5 h-3.5" /> အတည်ပြုမည်
+                      </button>
+                    </div>
+                  )}
+                  {/* v24.13 A6: decided requests can be cleared — the delete
+                      handler (with its audit log) previously had no button. */}
+                  {req.status !== 'pending' && (
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button onClick={() => handleDelete(req.id)} className="px-3 py-1.5 text-xs font-bold text-rose-600 bg-white border border-rose-200 rounded-lg hover:bg-rose-50 transition flex items-center gap-1" title="မှတ်တမ်း ဖျက်ရန်">
+                        <Trash2 className="w-3.5 h-3.5" /> ဖျက်မည်
                       </button>
                     </div>
                   )}

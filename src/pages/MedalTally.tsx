@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { SportsEvent } from '../types';
+import { SportsEvent, SportsMatchResult } from '../types';
 import { Trophy, ArrowLeft, Loader2, Award } from 'lucide-react';
 
 interface MedalCount {
@@ -56,8 +56,31 @@ export default function MedalTally() {
         if (match.medal === 'gold') record.gold += 1;
         else if (match.medal === 'silver') record.silver += 1;
         else if (match.medal === 'bronze') record.bronze += 1;
-        
+
         record.total = record.gold + record.silver + record.bronze;
+
+        // v24.13: a match can also carry optional 2nd-place (silver) and
+        // 3rd-place (bronze) schools — one winner + one medal per match used
+        // to make silver/bronze structurally almost unreachable. These are
+        // extra fields on the match (not in SportsMatchResult yet), so read
+        // via a cast. They only count for a valid match (real winner +
+        // medal, as above), never for the winner itself, and never
+        // double-count the winner's own medal.
+        const extra = match as SportsMatchResult & { secondPlace?: string; thirdPlace?: string };
+        const places: Array<{ school: string | undefined; medal: 'silver' | 'bronze' }> = [
+          { school: extra.secondPlace, medal: 'silver' },
+          { school: extra.thirdPlace, medal: 'bronze' },
+        ];
+        places.forEach(({ school, medal }) => {
+          if (!school || school === winningTeam) return;
+          if (!tallyMap.has(school)) {
+            tallyMap.set(school, { schoolName: school, gold: 0, silver: 0, bronze: 0, total: 0 });
+          }
+          const placeRecord = tallyMap.get(school)!;
+          if (medal === 'silver') placeRecord.silver += 1;
+          else placeRecord.bronze += 1;
+          placeRecord.total = placeRecord.gold + placeRecord.silver + placeRecord.bronze;
+        });
       });
     });
 

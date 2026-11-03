@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { toast } from 'sonner';
 import { MapPin, Edit2, Plus, Users, Phone, FileText } from 'lucide-react';
 import ImageUploadDropzone from '../ImageUploadDropzone';
 import { STUDENT_RANGE_TIERS } from '../../types';
@@ -24,7 +25,7 @@ const schoolSchema = z.object({
   contact2Name: z.string().optional(), contact2Role: z.string().optional(), contact2Phone: z.string().optional(),
   contact2Phone2: z.string().optional(), contact2Viber: z.string().optional(), contact2Telegram: z.string().optional(),
   schoolNote: z.string().optional(), note: z.string().optional(),
-  isAnnualFeePaid: z.boolean().optional(), status: z.enum(['active', 'under_review', 'inactive']).optional(),
+  status: z.enum(['active', 'under_review', 'inactive']).optional(),
 });
 
 interface SchoolFormProps {
@@ -45,7 +46,7 @@ export default function SchoolForm({ initialData, isEditing, onCancel, onSubmit,
       adminViber: '', adminTelegram: '', contactName: '', contactRole: '', contactPhone: '', contactPhone2: '',
       contactViber: '', contactTelegram: '', contact2Name: '', contact2Role: '', contact2Phone: '',
       contact2Phone2: '', contact2Viber: '', contact2Telegram: '', schoolNote: '', note: '',
-      isAnnualFeePaid: false, status: 'active',
+      status: 'active',
     },
   });
 
@@ -55,7 +56,17 @@ export default function SchoolForm({ initialData, isEditing, onCancel, onSubmit,
   const [extraCoord1Phones, setExtraCoord1Phones] = useState<string[]>([]);
   const [extraCoord2Phones, setExtraCoord2Phones] = useState<string[]>([]);
 
+  // v24.13 (A12): reset only when the editing school's ID changes (or the
+  // modal opens for a new school), NOT on every initialData identity
+  // change — initialData is schools.find(...), so every onSnapshot /
+  // fetchSchools rebuilds the array with new object identities and the
+  // old effect wiped unsaved input mid-edit.
+  const lastResetKeyRef = useRef<string | null>(null);
   useEffect(() => {
+    const editingId = isEditing && (initialData as any)?.id ? (initialData as any).id : null;
+    const key = editingId ?? '__new__';
+    if (lastResetKeyRef.current === key) return;
+    lastResetKeyRef.current = key;
     if (initialData) {
       schoolForm.reset({ ...initialData, studentCount: initialData.studentCount ?? '', feeAmount: initialData.feeAmount ?? '' });
       setExtraSchoolPhones(Array.isArray(initialData.schoolPhones) ? [...initialData.schoolPhones] : []);
@@ -63,12 +74,46 @@ export default function SchoolForm({ initialData, isEditing, onCancel, onSubmit,
       setExtraAdminPhones(Array.isArray(initialData.adminPhones) ? [...initialData.adminPhones] : []);
       setExtraCoord1Phones(Array.isArray(initialData.contactPhones) ? [...initialData.contactPhones] : []);
       setExtraCoord2Phones(Array.isArray(initialData.contact2Phones) ? [...initialData.contact2Phones] : []);
+    } else {
+      schoolForm.reset();
+      setExtraSchoolPhones([]);
+      setExtraFounderPhones([]);
+      setExtraAdminPhones([]);
+      setExtraCoord1Phones([]);
+      setExtraCoord2Phones([]);
     }
-  }, [initialData, schoolForm]);
+  }, [initialData, isEditing, schoolForm]);
+
+  // v24.13 (A1): invalid submits used to fail silently — no onInvalid
+  // handler and formState.errors was never rendered. Name the first
+  // missing/invalid field in a toast; inline errors render under the fields.
+  const formErrors = schoolForm.formState.errors;
+  const handleInvalidSubmit = (errors: any) => {
+    const firstMessage =
+      errors?.name?.message || errors?.level?.message || 'လိုအပ်သော အချက်အလက် ဖြည့်စွက်ပေးပါ';
+    toast.error(String(firstMessage));
+  };
+
+  // v24.13 (A9): the Cloudinary settings live on the Backup tab — switching
+  // tabs behind the still-open SchoolForm modal left the admin staring at
+  // the form with no visible change. Close the modal first, then switch.
+  const handleOpenCloudinarySettings = () => {
+    onCancel();
+    setActiveTab('backup');
+    toast.info('Cloudinary ဆက်တင်များသည် Backup & Cloud tab တွင် ရှိပါသည်');
+  };
 
   const handleLocalSubmit = async (data: any) => {
+    // v24.13 (F2a): the form must never send isAnnualFeePaid — a paid flag
+    // with no transaction is a bare flag. On edit the existing flag is
+    // preserved by omitting the key entirely; on create it defaults false.
+    // (The field is also gone from the schema, so zod strips it from data;
+    // this destructure is the belt-and-braces guard for the reset path,
+    // which still spreads initialData.)
+    const { isAnnualFeePaid: _droppedFeeFlag, ...rest } = data;
     const payload = {
-      ...data, schoolPhones: extraSchoolPhones.map(p => p.trim()).filter(Boolean),
+      ...rest, ...(isEditing ? {} : { isAnnualFeePaid: false }),
+      schoolPhones: extraSchoolPhones.map(p => p.trim()).filter(Boolean),
       founderPhones: extraFounderPhones.map(p => p.trim()).filter(Boolean),
       adminPhones: extraAdminPhones.map(p => p.trim()).filter(Boolean),
       contactPhones: extraCoord1Phones.map(p => p.trim()).filter(Boolean),
@@ -92,23 +137,25 @@ export default function SchoolForm({ initialData, isEditing, onCancel, onSubmit,
         </div>
       </div>
 
-      <form onSubmit={schoolForm.handleSubmit(handleLocalSubmit)} className="p-4 sm:p-6 space-y-6">
+      <form onSubmit={schoolForm.handleSubmit(handleLocalSubmit, handleInvalidSubmit)} className="p-4 sm:p-6 space-y-6">
         
         {/* TAB 1: BASIC INFO */}
         {activeTab === 'basic' && (
           <div className="grid sm:grid-cols-2 gap-5 animate-in fade-in">
             <div className="sm:col-span-2">
-              <ImageUploadDropzone value={schoolForm.watch('logoUrl') || ''} onChange={(url) => schoolForm.setValue('logoUrl', url)} label="ကျောင်း Logo / အမှတ်တံဆိပ်" folder="shan-state-schools" onOpenSettings={() => setActiveTab('backup')} />
+              <ImageUploadDropzone value={schoolForm.watch('logoUrl') || ''} onChange={(url) => schoolForm.setValue('logoUrl', url)} label="ကျောင်း Logo / အမှတ်တံဆိပ်" folder="shan-state-schools" onOpenSettings={handleOpenCloudinarySettings} />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">ကျောင်းအမည် *</label>
               <input {...schoolForm.register('name')} placeholder="ကျောင်းအမည်" className="w-full p-2.5 border rounded-lg text-sm focus:border-sky-500 outline-none" />
+              {formErrors.name && <p className="text-xs text-rose-600 font-semibold mt-1">{String(formErrors.name.message)}</p>}
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">ကျောင်းအဆင့် *</label>
               <select {...schoolForm.register('level')} className="w-full p-2.5 border rounded-lg text-sm bg-white font-bold focus:border-sky-500 outline-none">
                 {schoolLevels.map((l) => <option key={l.id} value={l.name}>{l.name}</option>)}
               </select>
+              {formErrors.level && <p className="text-xs text-rose-600 font-semibold mt-1">{String(formErrors.level.message)}</p>}
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">ကျောင်း အခြေအနေ</label>
@@ -118,11 +165,13 @@ export default function SchoolForm({ initialData, isEditing, onCancel, onSubmit,
                 <option value="inactive">⚪ ရပ်နား (Inactive)</option>
               </select>
             </div>
+            {/* v24.13 (F2a): the Paid checkbox is gone — ticking it used to
+                set isAnnualFeePaid with no transaction, amount or voucher.
+                A fee is marked paid only through the fee modal / Finance /
+                toggle paths, which record a real transaction. The year and
+                payment-date fields stay: they describe the fee, not its
+                paid state. */}
             <div className="space-y-3 p-3 border rounded-xl bg-slate-50">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" {...schoolForm.register('isAnnualFeePaid')} className="w-4 h-4 text-sky-600 rounded" />
-                <span className="text-sm font-bold text-slate-700">နှစ်စဉ်ကြေး ပေးသွင်းပြီး (Paid)</span>
-              </label>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-semibold text-slate-600 mb-1">ပညာသင်နှစ် (Academic Year)</label>
@@ -143,9 +192,16 @@ export default function SchoolForm({ initialData, isEditing, onCancel, onSubmit,
                   <input {...schoolForm.register('city')} placeholder="မြို့" className="w-full p-2.5 border rounded-lg text-sm bg-white" />
                   <select {...schoolForm.register('zone')} className="w-full p-2.5 border rounded-lg text-sm bg-white">
                     <option value="">- ဇုန် ရွေးပါ -</option>
-                    {STANDARD_ZONES.map(z => (
-                      <option key={z} value={z}>{z}</option>
-                    ))}
+                    {/* v24.13 S7: a non-standard zone (e.g. from Excel import)
+                        is kept as an extra option so it renders and can be
+                        re-selected instead of showing a blank select. */}
+                    {(() => {
+                      const currentZone: string | undefined = schoolForm.watch('zone');
+                      const zones = ([...STANDARD_ZONES] as string[]).concat(currentZone && !(STANDARD_ZONES as readonly string[]).includes(currentZone) ? [currentZone] : []);
+                      return zones.map(z => (
+                        <option key={z} value={z}>{z}</option>
+                      ));
+                    })()}
                   </select>
                </div>
             </div>

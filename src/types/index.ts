@@ -441,6 +441,8 @@ export interface SportsMatchResult {
   scoreB: string | number;
   winner?: string; // အနိုင်ရသူ
   medal?: 'gold' | 'silver' | 'bronze'; // ရရှိသည့် ဆုတံဆိပ်
+  secondPlace?: string; // ဒုတိယဆု (ငွေတံဆိပ်) — v24.13
+  thirdPlace?: string; // တတိယဆု (ကြေးတံဆိပ်) — v24.13
   matchTime?: string; // ပွဲချိန် (optional)
 }
 

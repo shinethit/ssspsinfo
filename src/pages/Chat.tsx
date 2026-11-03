@@ -13,6 +13,15 @@ export default function Chat() {
   const [loadError, setLoadError] = useState(false);
   const [user] = useAuthState(auth);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesBoxRef = useRef<HTMLDivElement>(null);
+  // v24.13 P7: only auto-scroll when the reader is already near the bottom —
+  // the old unconditional scroll yanked the reader down on every new message.
+  const nearBottomRef = useRef(true);
+  const handleMessagesScroll = () => {
+    const el = messagesBoxRef.current;
+    if (!el) return;
+    nearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+  };
 
   useEffect(() => {
     const q = query(collection(db, 'messages'), orderBy('createdAt', 'desc'), limit(100));
@@ -28,7 +37,9 @@ export default function Chat() {
   }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (nearBottomRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
   const sendMessage = async (e: React.FormEvent) => {
@@ -90,7 +101,7 @@ export default function Chat() {
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col h-[65vh] min-h-[420px] max-h-[700px] overflow-hidden w-full">
         {/* Message Log */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 w-full">
+        <div ref={messagesBoxRef} onScroll={handleMessagesScroll} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 w-full">
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400 space-y-2">
               <MessageSquare className="w-10 h-10 text-slate-300" />
@@ -126,6 +137,18 @@ export default function Chat() {
                   >
                     {msg.text}
                   </div>
+                  {/* v24.13 P7: per-message timestamp. A pending
+                      serverTimestamp (null until the server stamps it) shows
+                      no timestamp rather than jumping later. */}
+                  {(() => {
+                    const ts = msg.createdAt?.toDate?.();
+                    if (!ts || isNaN(ts.getTime())) return null;
+                    return (
+                      <span className="text-[11px] text-slate-400 px-1 mt-1">
+                        {ts.toLocaleString('my-MM', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    );
+                  })()}
                 </div>
               );
             })

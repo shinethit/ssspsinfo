@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { Gallery } from '../../types';
 import { toast } from 'sonner';
@@ -20,9 +20,17 @@ export default function AdminGalleryManager() {
   const fetchPhotos = async () => {
     try {
       setLoading(true);
-      const q = query(collection(db, 'gallery'), orderBy('createdAt', 'desc'));
-      const snap = await getDocs(q);
-      setPhotos(snap.docs.map(d => ({ id: d.id, ...d.data() } as Gallery)));
+      // A10 (v24.13): no orderBy — orderBy('createdAt') silently dropped
+      // every photo missing createdAt (same bug v24.6 fixed on the public
+      // Gallery page). Fetch all and sort in code, missing dates last.
+      const snap = await getDocs(collection(db, 'gallery'));
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Gallery));
+      items.sort((a, b) => {
+        const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return tb - ta;
+      });
+      setPhotos(items);
     } catch (err) {
       console.error(err);
     } finally {

@@ -23,6 +23,8 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
 
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
   const [receiptSchool, setReceiptSchool] = useState<School | null>(null);
+  // v24.13 (F7): the stored voucher for the receipt opened from Finance.
+  const [receiptVoucherNo, setReceiptVoucherNo] = useState<string | null>(null);
 
   // Global Academic Year
   const [globalAcademicYear, setGlobalAcademicYear] = useState(() => getGlobalAcademicYear());
@@ -61,18 +63,43 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
     if (!(await confirmDialog(`နှစ်စဉ်ကြေး သွင်းပြီးထားသော ကျောင်းအားလုံးကို "${globalAcademicYear}" သို့ ပြောင်းလဲပါမည်။ သေချာပါသလား?`))) return;
     setIsUpdatingBatch(true);
     try {
+      // v24.13 (F4): capture the OLD global year before the roll. Before,
+      // only the school flags moved to the new year, so Finance rendered
+      // both the flag card and the transaction row for the same payment
+      // and the total counted it twice.
+      const oldYear = getGlobalAcademicYear();
+      const newYear = globalAcademicYear;
       const q = query(collection(db, 'schools'));
       const snap = await getDocs(q);
       const batch = writeBatch(db);
       let count = 0;
+      const rolledSchoolIds: string[] = [];
       snap.docs.forEach(d => {
         if (d.data().isAnnualFeePaid) {
-          batch.update(doc(db, 'schools', d.id), { feeAcademicYear: globalAcademicYear });
+          batch.update(doc(db, 'schools', d.id), { feeAcademicYear: newYear });
+          rolledSchoolIds.push(d.id);
           count++;
         }
       });
       await batch.commit();
-      toast.success(`ကျောင်း (${count}) ခု၏ ပညာသင်နှစ်ကို ပြောင်းလဲပြီးပါပြီ`);
+      // Re-year every matching annual-fee transaction (same school +
+      // annual-fee type + old year) so the flag and the transaction agree
+      // on the year again.
+      let txCount = 0;
+      if (rolledSchoolIds.length > 0 && oldYear !== newYear) {
+        const txSnap = await getDocs(collection(db, 'transactions'));
+        const txBatch = writeBatch(db);
+        txSnap.docs.forEach(d => {
+          const t = d.data();
+          if (rolledSchoolIds.includes(t.schoolId) && t.feeType === ANNUAL_FEE_TYPE && t.academicYear === oldYear) {
+            txBatch.update(doc(db, 'transactions', d.id), { academicYear: newYear });
+            txCount++;
+          }
+        });
+        if (txCount > 0) await txBatch.commit();
+      }
+      toast.success(`ကျောင်း (${count}) ခု၏ ပညာသင်နှစ်ကို ပြောင်းလဲပြီးပါပြီ${txCount > 0 ? `၊ မှတ်တမ်း (${txCount}) ခုကိုလည်း ပြောင်းလဲပြီးပါပြီ` : ''}`);
+      fetchTransactions();
     } catch (error) {
       console.error(error);
       toast.error('Batch Update လုပ်၍ မရပါ');
@@ -87,17 +114,33 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
     setIsSubmitting(true);
 
     try {
+      // v24.13 (F6): 0 / negative / non-numeric amounts are rejected here
+      // (and again inside recordAnnualFeePayment) — the form used to
+      // accept them and record a 0-ကျပ် payment.
+      const numericAmount = Number(amount);
+      if (!Number.isFinite(numericAmount) || numericAmount <= 0) { toast.error('ပမာဏ ၀ ထက် ကြီးရပါမည်'); return; }
       if (feeType === ANNUAL_FEE_TYPE) {
         // v24.7: one write path does both — the transaction AND the school's
         // paid flag. Recording only one used to leave the two disagreeing.
-        const { voucherNo } = await recordAnnualFeePayment({
-          school: selectedSchool,
-          amount: Number(amount),
-          paidDate,
-          academicYear: formAcademicYear,
-          note,
-        });
-        await recordAuditLog({ action: 'create', entityType: 'transaction', entityId: selectedSchool.id, entityName: selectedSchool.name, details: `နှစ်စဉ်ကြေး ${Number(amount).toLocaleString('my-MM')} ကျပ် (${formAcademicYear}, ${voucherNo})` });
+        // v24.13 (F5b): if this school+year already has an annual-fee
+        // transaction, just set the flag and reuse it — never write a
+        // second transaction for the same payment.
+        const freshSnap = await getDocs(collection(db, 'transactions'));
+        const freshList = freshSnap.docs.map(d => ({ id: d.id, ...d.data() } as TransactionRecord));
+        const existingTx = findAnnualFeeTransaction(freshList, selectedSchool.id, formAcademicYear);
+        if (existingTx) {
+          await updateDoc(doc(db, 'schools', selectedSchool.id), { isAnnualFeePaid: true, feePaidDate: existingTx.paidDate || paidDate, feeAmount: numericAmount, feeAcademicYear: formAcademicYear, updatedAt: new Date().toISOString() });
+          await recordAuditLog({ action: 'update', entityType: 'school', entityId: selectedSchool.id, entityName: selectedSchool.name, details: `နှစ်စဉ်ကြေး ${numericAmount.toLocaleString('my-MM')} ကျပ် (${formAcademicYear}) — ရှိပြီးသား မှတ်တမ်း ပြန်သုံးခြင်း (${existingTx.voucherNo || 'voucher မရှိ'})` });
+        } else {
+          const { voucherNo } = await recordAnnualFeePayment({
+            school: selectedSchool,
+            amount: numericAmount,
+            paidDate,
+            academicYear: formAcademicYear,
+            note,
+          });
+          await recordAuditLog({ action: 'create', entityType: 'transaction', entityId: selectedSchool.id, entityName: selectedSchool.name, details: `နှစ်စဉ်ကြေး ${numericAmount.toLocaleString('my-MM')} ကျပ် (${formAcademicYear}, ${voucherNo})` });
+        }
       } else {
         // Other fee types have no school flag — plain transaction. The
         // voucher is generated from a freshly fetched list so two admins
@@ -131,11 +174,23 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
   };
 
   const handleDeleteTransaction = async (id: string) => {
-    if (!(await confirmDialog('ဤငွေသွင်းမှတ်တမ်းကို ဖျက်ရန် သေချာပါသလား?'))) return;
+    const target = transactions.find(t => t.id === id);
+    // v24.13 (F5a): deleting an annual-fee transaction must also clear the
+    // school's paid flag, or the flag would claim a payment that no longer
+    // exists. Only when the transaction is for the school's current fee
+    // year — deleting an old year's transaction must not un-pay this year.
+    const isAnnualFee = target?.feeType === ANNUAL_FEE_TYPE;
+    const school = isAnnualFee ? schools.find(s => s.id === target.schoolId) : undefined;
+    const clearsFlag = Boolean(isAnnualFee && school && school.isAnnualFeePaid && (!target.academicYear || !school.feeAcademicYear || target.academicYear === school.feeAcademicYear));
+    if (!(await confirmDialog(clearsFlag
+      ? `ဤနှစ်စဉ်ကြေး မှတ်တမ်းကို ဖျက်လိုက်လျှင် "${target?.schoolName}" ၏ နှစ်စဉ်ကြေး သွင်းပြီးအမှတ်ကိုလည်း ပယ်ဖျက်ပါမည်။ သေချာပါသလား?`
+      : 'ဤငွေသွင်းမှတ်တမ်းကို ဖျက်ရန် သေချာပါသလား?'))) return;
     try {
-      const target = transactions.find(t => t.id === id);
       await deleteDoc(doc(db, 'transactions', id));
-      if (target) await recordAuditLog({ action: 'delete', entityType: 'transaction', entityId: target.schoolId, entityName: target.schoolName, details: `${target.feeType} ${Number(target.amount || 0).toLocaleString('my-MM')} ကျပ် (${target.paidDate}) ဖျက်ခြင်း` });
+      if (clearsFlag && school) {
+        await updateDoc(doc(db, 'schools', school.id), { isAnnualFeePaid: false, updatedAt: new Date().toISOString() });
+      }
+      if (target) await recordAuditLog({ action: 'delete', entityType: 'transaction', entityId: target.schoolId, entityName: target.schoolName, details: `${target.feeType} ${Number(target.amount || 0).toLocaleString('my-MM')} ကျပ် (${target.paidDate}) ဖျက်ခြင်း${clearsFlag ? ' — ကျောင်း၏ သွင်းပြီးအမှတ် ပယ်ဖျက်ခြင်း' : ''}` });
       toast.success('မှတ်တမ်း ဖျက်ပြီးပါပြီ');
       fetchTransactions();
     } catch (err) {
@@ -235,6 +290,14 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
   // hides and the total counts only the transactions. Flag-only payments
   // (recorded before v24.7) still show via the card.
   const annualFeeTx = selectedSchool ? findAnnualFeeTransaction(schoolTransactions, selectedSchool.id, selectedSchool.feeAcademicYear) : undefined;
+  // v24.13 (F7): the flag card's voucher — the STORED voucher when any
+  // annual-fee transaction exists for this school, else the derived number
+  // for a legacy flag-only payment. (The card only shows when the
+  // same-year transaction is missing, so a different-year transaction
+  // can still supply the stored number.)
+  const flagCardTx = selectedSchool ? findAnnualFeeTransaction(schoolTransactions, selectedSchool.id) : undefined;
+  const flagCardVoucherNo = flagCardTx?.voucherNo
+    || (selectedSchool?.feePaidDate ? `SSSPSFV-${new Date(selectedSchool.feePaidDate).toISOString().slice(0, 10).replace(/-/g, '')}-${selectedSchool.id.substring(0, 4).toUpperCase()}` : undefined);
   const schoolTotal = selectedSchool
     ? schoolTransactions.reduce((sum, t) => sum + t.amount, 0) + (!annualFeeTx && selectedSchool.isAnnualFeePaid ? (selectedSchool.feeAmount || 0) : 0)
     : 0;
@@ -326,7 +389,7 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">ပမာဏ (ကျပ်)</label>
-                  <input type="number" required value={amount} onChange={e => setAmount(e.target.value)} className="w-full p-2.5 border rounded-xl text-sm bg-white" />
+                  <input type="number" required min="0.01" value={amount} onChange={e => setAmount(e.target.value)} className="w-full p-2.5 border rounded-xl text-sm bg-white" />
                 </div>
                 
                 <div>
@@ -385,10 +448,16 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
                         <span>{selectedSchool.feePaidDate ? new Date(selectedSchool.feePaidDate).toLocaleDateString('my-MM') : 'ရက်စွဲမရှိပါ'}</span>
                         <span>•</span>
                         <span className="font-mono font-bold">{(selectedSchool.feeAmount || 0).toLocaleString('my-MM')} ကျပ်</span>
+                        {flagCardVoucherNo && (
+                          <>
+                            <span>•</span>
+                            <span className="font-mono">ဖြတ်ပိုင်းအမှတ်: {flagCardVoucherNo}</span>
+                          </>
+                        )}
                       </div>
                     </div>
                     <div className="flex gap-1">
-                      <button onClick={() => setReceiptSchool(selectedSchool)} className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded-lg transition" title="ဖြတ်ပိုင်းထုတ်ရန်">
+                      <button onClick={() => { setReceiptVoucherNo(flagCardVoucherNo ?? null); setReceiptSchool(selectedSchool); }} className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded-lg transition" title="ဖြတ်ပိုင်းထုတ်ရန်">
                         <Printer className="w-4 h-4" />
                       </button>
                     </div>
@@ -410,7 +479,10 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
                       <Link to={`/receipt/${t.id}`} className="p-1.5 text-sky-600 hover:bg-sky-50 rounded-lg transition" title="ဖြတ်ပိုင်းထုတ်ရန်">
                         <Printer className="w-4 h-4" />
                       </Link>
-                      <button onClick={() => handleDeleteTransaction(t.id)} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition opacity-0 group-hover:opacity-100" title="ဖျက်ရန်">
+                      {/* v24.13 (F5c): the delete button is always visible —
+                          it used to be opacity-0 until hover, so on touch
+                          devices there was no hover and no way to delete. */}
+                      <button onClick={() => handleDeleteTransaction(t.id)} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition" title="ဖျက်ရန်">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -423,7 +495,7 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
       </div>
 
       {receiptSchool && (
-        <AnnualFeeReceipt school={receiptSchool} onClose={() => setReceiptSchool(null)} />
+        <AnnualFeeReceipt school={receiptSchool} voucherNo={receiptVoucherNo ?? undefined} paidDate={receiptSchool.feePaidDate} onClose={() => { setReceiptSchool(null); setReceiptVoucherNo(null); }} />
       )}
     </div>
   );

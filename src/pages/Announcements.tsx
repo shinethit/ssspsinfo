@@ -93,6 +93,18 @@ export default function Announcements() {
     return filteredAnnouncements.slice(start, start + itemsPerPage);
   }, [filteredAnnouncements, currentPage]);
 
+  // v24.13: windowed pagination — the old slice(0, 7) stopped at page 7
+  // with no way to reach later pages. Show a 5-page window around the
+  // current page plus first/last buttons.
+  const pageWindow = useMemo(() => {
+    let start = Math.max(1, currentPage - 2);
+    let end = Math.min(totalPages, start + 4);
+    start = Math.max(1, end - 4);
+    const pages: number[] = [];
+    for (let p = start; p <= end; p++) pages.push(p);
+    return pages;
+  }, [totalPages, currentPage]);
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* Top Action Bar with Back Button */}
@@ -324,8 +336,19 @@ export default function Announcements() {
                   {currentPage} / {totalPages}
                 </span>
                 <div className="hidden sm:flex items-center gap-1">
-                  {Array.from({ length: totalPages }).slice(0, 7).map((_, idx) => {
-                    const pageNum = idx + 1;
+                  {pageWindow[0] > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPage(1)}
+                        className="w-8 h-8 rounded-lg text-xs font-semibold cursor-pointer text-slate-600 hover:bg-slate-100 border border-slate-200 bg-white"
+                      >
+                        1
+                      </button>
+                      {pageWindow[0] > 2 && <span className="text-xs text-slate-400 px-0.5">…</span>}
+                    </>
+                  )}
+                  {pageWindow.map((pageNum) => {
                     const isActive = pageNum === currentPage;
                     return (
                       <button
@@ -342,6 +365,18 @@ export default function Announcements() {
                       </button>
                     );
                   })}
+                  {pageWindow[pageWindow.length - 1] < totalPages && (
+                    <>
+                      {pageWindow[pageWindow.length - 1] < totalPages - 1 && <span className="text-xs text-slate-400 px-0.5">…</span>}
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPage(totalPages)}
+                        className="w-8 h-8 rounded-lg text-xs font-semibold cursor-pointer text-slate-600 hover:bg-slate-100 border border-slate-200 bg-white"
+                      >
+                        {totalPages}
+                      </button>
+                    </>
+                  )}
                 </div>
                 <button
                   type="button"

@@ -23,6 +23,10 @@ const announcementSchema = z.object({
 interface AdminAnnouncementsTabProps {
   announcements: any[];
   onRefresh: () => void;
+  // v24.13 (A9): lets the dropzone's "Cloudinary Setup" action switch to
+  // the Backup tab, like SchoolForm — without it an unconfigured upload
+  // here just errors with no path to the settings.
+  setActiveTab?: (tab: any) => void;
 }
 
 // v24.6: local YYYY-MM-DD — toISOString() is UTC, so announcements created
@@ -32,7 +36,7 @@ const todayLocal = (): string => {
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
 };
 
-export default function AdminAnnouncementsTab({ announcements, onRefresh }: AdminAnnouncementsTabProps) {
+export default function AdminAnnouncementsTab({ announcements, onRefresh, setActiveTab }: AdminAnnouncementsTabProps) {
   const { addAnnouncement, updateAnnouncement, deleteAnnouncement: removeAnnouncement } = useData();
 
   const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
@@ -40,6 +44,23 @@ export default function AdminAnnouncementsTab({ announcements, onRefresh }: Admi
     resolver: zodResolver(announcementSchema),
     defaultValues: { title: '', body: '', category: 'general', eventDate: todayLocal(), attachmentUrl: '', zone: '' },
   });
+
+  // v24.13 (A1): invalid submits used to fail silently — no onInvalid
+  // handler and formState.errors was never rendered. Name the first
+  // missing/invalid field in a toast; inline errors render under the fields.
+  const formErrors = announcementForm.formState.errors;
+  const handleInvalidSubmit = (errors: any) => {
+    const firstMessage =
+      errors?.title?.message || errors?.category?.message || errors?.eventDate?.message || errors?.body?.message ||
+      'လိုအပ်သော အချက်အလက် ဖြည့်စွက်ပေးပါ';
+    toast.error(String(firstMessage));
+  };
+
+  // v24.13 (A9): the Cloudinary settings live on the Backup tab.
+  const handleOpenCloudinarySettings = () => {
+    setActiveTab?.('backup');
+    toast.info('Cloudinary ဆက်တင်များသည် Backup & Cloud tab တွင် ရှိပါသည်');
+  };
 
   const sortedAnnouncements = useMemo(() => sortAnnouncementsByEventDate(announcements as any), [announcements]);
 
@@ -70,7 +91,7 @@ export default function AdminAnnouncementsTab({ announcements, onRefresh }: Admi
   return (
     <div className="grid lg:grid-cols-12 gap-6 animate-in fade-in">
       <div className="lg:col-span-5">
-        <form onSubmit={announcementForm.handleSubmit(onAnnouncementSubmit)} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4 sticky top-6">
+        <form onSubmit={announcementForm.handleSubmit(onAnnouncementSubmit, handleInvalidSubmit)} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4 sticky top-6">
           <h3 className="font-extrabold text-lg text-slate-900 flex items-center gap-2">
             <FileText className="w-5 h-5 text-sky-600" />
             {editingAnnouncementId ? 'ကြေညာချက် ပြင်ဆင်ရန်' : 'ကြေညာချက်အသစ် တင်ရန်'}
@@ -78,6 +99,7 @@ export default function AdminAnnouncementsTab({ announcements, onRefresh }: Admi
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">ခေါင်းစဉ် *</label>
             <input {...announcementForm.register('title')} placeholder="ကြေညာချက် ခေါင်းစဉ်..." className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white focus:border-sky-500" />
+            {formErrors.title && <p className="text-xs text-rose-600 font-semibold mt-1">{String(formErrors.title.message)}</p>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -85,10 +107,12 @@ export default function AdminAnnouncementsTab({ announcements, onRefresh }: Admi
               <select {...announcementForm.register('category')} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none">
                 {ANNOUNCEMENT_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
               </select>
+              {formErrors.category && <p className="text-xs text-rose-600 font-semibold mt-1">{String(formErrors.category.message)}</p>}
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">ရက်စွဲ *</label>
               <input type="date" {...announcementForm.register('eventDate')} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none" />
+              {formErrors.eventDate && <p className="text-xs text-rose-600 font-semibold mt-1">{String(formErrors.eventDate.message)}</p>}
             </div>
           </div>
           <div>
@@ -101,10 +125,11 @@ export default function AdminAnnouncementsTab({ announcements, onRefresh }: Admi
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">အကြောင်းအရာ အပြည့်အစုံ *</label>
             <textarea rows={5} {...announcementForm.register('body')} placeholder="အကြောင်းအရာ ရေးသားပါ..." className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white focus:border-sky-500" />
+            {formErrors.body && <p className="text-xs text-rose-600 font-semibold mt-1">{String(formErrors.body.message)}</p>}
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">ပူးတွဲဖိုင် / ပုံ (Image or Link)</label>
-            <ImageUploadDropzone value={announcementForm.watch('attachmentUrl') || ''} onChange={(url) => announcementForm.setValue('attachmentUrl', url)} />
+            <ImageUploadDropzone value={announcementForm.watch('attachmentUrl') || ''} onChange={(url) => announcementForm.setValue('attachmentUrl', url)} onOpenSettings={handleOpenCloudinarySettings} />
             <input {...announcementForm.register('attachmentUrl')} placeholder="သို့မဟုတ် ပုံ/ဖိုင် Link တိုက်ရိုက်ထည့်ရန်..." className="w-full mt-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none" />
           </div>
           <div className="flex gap-2 pt-2">

@@ -18,7 +18,19 @@ export default function AdminLevelsTab({ unifiedLevels }: AdminLevelsTabProps) {
   const [levelDescInput, setLevelDescInput] = useState('');
   const [isSavingLevel, setIsSavingLevel] = useState(false);
 
-  const handleStartEditLevel = (l: UnifiedSchoolLevel) => { setEditingLevelId(l.id); setLevelNameInput(l.name); setLevelOrderInput(l.order ?? ''); setLevelDescInput(l.description ?? ''); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  // A11: discovered levels (id 'discovered-…', built from school data) and
+  // the 'unassigned-level' bucket are derived, not stored — there is no
+  // school_levels doc to delete, so delete must not be offered for them.
+  const isDerivedLevel = (l: UnifiedSchoolLevel) =>
+    l.id.startsWith('discovered-') || l.id === 'unassigned-level' || !!l.isUnassigned;
+
+  const handleStartEditLevel = (l: UnifiedSchoolLevel) => {
+    // v24.13: editing a derived level is the same no-op as deleting one —
+    // there is no stored school_levels doc, so the name change would land
+    // nowhere (updateSchoolLevel would fail on the missing doc).
+    if (isDerivedLevel(l)) { toast.error('ဤအဆင့်သည် ကျောင်းအချက်အလက်မှ အလိုအလျောက် ဖြစ်ပေါ်လာသော အဆင့် ဖြစ်သဖြင့် ပြင်၍မရပါ — ကျောင်းများ၏ အဆင့်ကို ပြင်လိုက်လျှင် သူ့အလိုလို ပြောင်းသွားပါမည်'); return; }
+    setEditingLevelId(l.id); setLevelNameInput(l.name); setLevelOrderInput(l.order ?? ''); setLevelDescInput(l.description ?? ''); window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   const handleCancelEditLevel = () => { setEditingLevelId(null); setLevelNameInput(''); setLevelOrderInput(''); setLevelDescInput(''); };
   const handleSaveLevel = async (e: React.FormEvent) => {
     e.preventDefault(); if (!levelNameInput.trim()) return; setIsSavingLevel(true);
@@ -28,7 +40,12 @@ export default function AdminLevelsTab({ unifiedLevels }: AdminLevelsTabProps) {
       handleCancelEditLevel();
     } catch (e) { toast.error('အမှားဖြစ်ပွားပါသည်'); } finally { setIsSavingLevel(false); }
   };
-  const handleDeleteLevel = async (l: UnifiedSchoolLevel) => { if (!(await confirmDialog('ဖျက်ရန် သေချာပါသလား?'))) return; try { await deleteSchoolLevel(l.id); toast.success('ဖျက်ပြီးပါပြီ'); } catch (e) { toast.error('ဖျက်၍မရပါ'); } };
+  const handleDeleteLevel = async (l: UnifiedSchoolLevel) => {
+    // A11: discovered levels are derived from school data, not stored in
+    // school_levels — deleting one "succeeded" while removing nothing.
+    // The button is disabled for them; this guard is defense in depth.
+    if (isDerivedLevel(l)) { toast.error('ဤအဆင့်သည် ကျောင်းအချက်အလက်မှ အလိုအလျောက် ဖြစ်ပေါ်လာသော အဆင့် ဖြစ်သဖြင့် သီးသန့် ဖျက်၍မရပါ'); return; }
+    if (!(await confirmDialog('ဖျက်ရန် သေချာပါသလား?'))) return; try { await deleteSchoolLevel(l.id); toast.success('ဖျက်ပြီးပါပြီ'); } catch (e) { toast.error('ဖျက်၍မရပါ'); } };
   const handleResetLevels = async () => { if (!(await confirmDialog('မူလအတိုင်း ပြန်ထားရန် သေချာပါသလား?'))) return; try { await resetSchoolLevelsToDefault(); toast.success('ပြန်ထားပြီးပါပြီ'); } catch (e) { toast.error('ပြန်ထား၍မရပါ'); } };
 
   return (
@@ -74,12 +91,28 @@ export default function AdminLevelsTab({ unifiedLevels }: AdminLevelsTabProps) {
                 <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                   {l.name}
                   <span className="text-xs bg-sky-50 text-sky-700 px-2 py-0.5 rounded-full font-bold">{l.schools.length} ကျောင်း</span>
+                  {isDerivedLevel(l) && (
+                    <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">ကျောင်းအချက်အလက်မှ အလိုအလျောက်</span>
+                  )}
                 </h4>
                 {l.description && <p className="text-xs text-slate-500 mt-0.5">{l.description}</p>}
+                {isDerivedLevel(l) && (
+                  <p className="text-xs text-slate-400 mt-0.5">ဤအဆင့်သည် ကျောင်းအချက်အလက်မှ အလိုအလျောက် ဖြစ်ပေါ်လာသဖြင့် သီးသန့် ပြင်/ဖျက်၍မရပါ — ကျောင်းများ၏ အဆင့်ကို ပြင်လိုက်လျှင် သူ့အလိုလို ပျောက်သွားပါမည်။</p>
+                )}
               </div>
               <div className="flex items-center gap-1.5">
-                <button onClick={() => handleStartEditLevel(l)} className="p-2 text-slate-400 hover:text-amber-600 rounded-lg cursor-pointer"><Edit2 className="w-4 h-4" /></button>
-                <button onClick={() => handleDeleteLevel(l)} className="p-2 text-slate-400 hover:text-rose-600 rounded-lg cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+                <button
+                  onClick={() => handleStartEditLevel(l)}
+                  disabled={isDerivedLevel(l)}
+                  title={isDerivedLevel(l) ? 'ကျောင်းအချက်အလက်မှ အလိုအလျောက် ဖြစ်ပေါ်လာသော အဆင့် — သီးသန့် ပြင်၍မရပါ' : 'ပြင်ရန်'}
+                  className="p-2 text-slate-400 hover:text-amber-600 rounded-lg cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-slate-400"
+                ><Edit2 className="w-4 h-4" /></button>
+                <button
+                  onClick={() => handleDeleteLevel(l)}
+                  disabled={isDerivedLevel(l)}
+                  title={isDerivedLevel(l) ? 'ကျောင်းအချက်အလက်မှ အလိုအလျောက် ဖြစ်ပေါ်လာသော အဆင့် — သီးသန့် ဖျက်၍မရပါ' : 'ဖျက်ရန်'}
+                  className="p-2 text-slate-400 hover:text-rose-600 rounded-lg cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-slate-400"
+                ><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
           ))}

@@ -27,11 +27,16 @@ export default function AdminTickersTab({ tickers, onRefresh }: AdminTickersTabP
     e.preventDefault(); if (!tickerText.trim()) return;
     try {
       setSubmittingTicker(true);
-      const ddt = autoAssignDateTime ? getFormattedDateTime() : (customDateTime.trim() || getFormattedDateTime());
       if (editingTickerId) {
-        await updateDoc(doc(db, 'tickers', editingTickerId), { text: tickerText.trim(), priority: tickerPriority, link: tickerLink.trim(), isActive: tickerIsActive, autoTimestamp: autoAssignDateTime, displayDateTime: ddt, updatedAt: new Date().toISOString() });
+        // A13: editing must NOT re-stamp the displayed date. The old code
+        // recomputed displayDateTime as "now" on every edit (autoTimestamp
+        // defaults true), so a mere text fix moved the ticker's date. The
+        // date/autoTimestamp are preserved as stored; only "now" is ever
+        // assigned for a NEW ticker with autoTimestamp.
+        await updateDoc(doc(db, 'tickers', editingTickerId), { text: tickerText.trim(), priority: tickerPriority, link: tickerLink.trim(), isActive: tickerIsActive, updatedAt: new Date().toISOString() });
         toast.success('စာတန်းပြေး ပြင်ဆင်ပြီးပါပြီ'); setEditingTickerId(null);
       } else {
+        const ddt = autoAssignDateTime ? getFormattedDateTime() : (customDateTime.trim() || getFormattedDateTime());
         await addDoc(collection(db, 'tickers'), { text: tickerText.trim(), priority: tickerPriority, link: tickerLink.trim(), isActive: tickerIsActive, autoTimestamp: autoAssignDateTime, displayDateTime: ddt, createdAt: new Date().toISOString() });
         toast.success('စာတန်းပြေးအသစ် တင်ပြီးပါပြီ');
       }

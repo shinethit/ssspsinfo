@@ -69,7 +69,7 @@ export default function Help() {
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-10">
       <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-        <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-sky-950 font-bold text-xs sm:text-sm transition cursor-pointer shadow-2xs">
+        <button onClick={() => { if (window.history.length > 1) navigate(-1); else navigate('/'); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-sky-950 font-bold text-xs sm:text-sm transition cursor-pointer shadow-2xs">
           <ArrowLeft className="w-4 h-4 text-sky-800" /> နောက်သို့
         </button>
         <Link to="/" className="text-xs font-semibold text-slate-600 hover:text-sky-800 px-2.5 py-1 rounded-lg hover:bg-slate-100 transition">ပင်မစာမျက်နှာ ➔</Link>
@@ -108,7 +108,14 @@ export default function Help() {
           <FeatureItem icon={Images} title="ဓာတ်ပုံများ" text="အသင်းရဲ့ လှုပ်ရှားမှုဓာတ်ပုံများကို ကြည့်နိုင်သည်။" to="/gallery" />
           <FeatureItem icon={BarChart3} title="ဒက်ရှ်ဘုတ် (စာရင်းအင်း)" text="အသင်းဝင် ကျောင်းအရေအတွက်၊ ငွေကြေးစာရင်း အကျဉ်းချုပ်ကို ကြည့်နိုင်သည်။" to="/dashboard" />
           <FeatureItem icon={Building2} title="အသင်းများ" text="အသင်းအဖွဲ့ဝင်အသင်းများအကြောင်း ကြည့်နိုင်သည်။" to="/associations" />
-          <FeatureItem icon={MessageSquare} title="Chat ဆွေးနွေးခန်း" text="အသင်းဝင်များ အချင်းချင်း စကားပြော ဆွေးနွေးနိုင်သော နေရာဖြစ်သည်။" to="/chat" />
+        </div>
+      </SectionCard>
+
+      {/* v24.13 P8: Chat is signed-in-only (rules + Chat page) — it was wrongly
+          listed above under "login မလိုပါ". It lives here now. */}
+      <SectionCard icon={LogIn} iconBg="bg-amber-100 text-amber-700" title="login ဝင်ပြီးမှ သုံးနိုင်သော စာမျက်နှာ" subtitle="အောက်ပါစာမျက်နှာကို အကောင့်ဖြင့် login ဝင်ပြီးမှသာ သုံးနိုင်ပါသည်">
+        <div className="grid sm:grid-cols-2 gap-3">
+          <FeatureItem icon={MessageSquare} title="Chat ဆွေးနွေးခန်း" text="အသင်းဝင်များ အချင်းချင်း စကားပြော ဆွေးနွေးနိုင်သော နေရာဖြစ်သည်။ အကောင့်ဖြင့် login ဝင်ပြီးမှ မက်ဆေ့ခ်ျ ဖတ်/ပို့နိုင်သည်။" to="/chat" />
         </div>
       </SectionCard>
 
@@ -177,7 +184,7 @@ export default function Help() {
           </div>
           <div>
             <p className="font-bold text-slate-900 text-sm flex gap-2"><LogIn className="w-4 h-4 text-sky-700 shrink-0 mt-0.5" /> အကောင့်လိုချင်လျှင် (သို့) အချက်အလက်မှားနေလျှင် ဘယ်သူ့ကို ဆက်သွယ်ရမလဲ?</p>
-            <p className="text-sm text-slate-600 leading-relaxed mt-1 pl-6">အသင်း၏ Admin ကို ဆက်သွယ်ပါ။ ကျောင်းအကောင့် ဖွင့်ပေးခြင်း၊ အချက်အလက်ပြင်ဆင်ခြင်းတို့ကို Admin က ဆောင်ရွက်ပေးသည်။</p>
+            <p className="text-sm text-slate-600 leading-relaxed mt-1 pl-6">အသင်း၏ Admin ကို ဆက်သွယ်ပါ။ ကျောင်းအကောင့် ဖွင့်ပေးခြင်း၊ အချက်အလက်ပြင်ဆင်ခြင်းတို့ကို Admin က ဆောင်ရွက်ပေးသည်။ Admin နှင့် ကျောင်းတာဝန်ခံများ၏ ဖုန်းနံပါတ်များကို <Link to="/contacts" className="text-sky-700 font-bold underline">ဆက်သွယ်ရန် စာမျက်နှာ (Contacts)</Link> တွင် ကြည့်နိုင်ပါသည်။</p>
           </div>
         </div>
       </SectionCard>

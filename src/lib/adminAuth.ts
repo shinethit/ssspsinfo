@@ -9,6 +9,7 @@ import {
 } from 'firebase/auth';
 import { db, auth } from './firebase';
 import { normalizeRole, type AdminRole } from './roles';
+import { recordAuditLog } from './audit';
 
 export { normalizeRole };
 export type { AdminRole };
@@ -99,6 +100,11 @@ export function mapFirebaseAuthError(errorCode: string): string {
     case 'auth/weak-password':
     case 'weak-password':
       return 'စကားဝှက်သည် အနည်းဆုံး စာလုံး ၆ လုံး ရှိရပါမည်။';
+    // v24.13 (A8): creating an admin / school account with an email that
+    // is already registered used to fall through to the generic error.
+    case 'auth/email-already-in-use':
+    case 'email-already-in-use':
+      return 'ဤ email ကို အခြားအကောင့်က သုံးထားပြီးဖြစ်သည်';
     case 'permission-denied':
     case 'auth/permission-denied':
       return 'အချက်အလက်များ ဖတ်ရှုခွင့် ခွင့်ပြုချက် မရှိပါ (Permission Denied)။ စနစ်စီမံခန့်ခွဲသူထံ ဆက်သွယ်ပါ။';
@@ -226,6 +232,10 @@ export async function sendAdminPasswordReset(email: string): Promise<{ success: 
   }
   try {
     await sendPasswordResetEmail(auth, cleanEmail);
+    // v24.13 (A6): password reset emails had no audit log. Audited here in
+    // the shared function (not in each caller) so the Admin console and
+    // the Login forgot-password flow each log exactly once.
+    await recordAuditLog({ action: 'update', entityType: 'admin', entityName: cleanEmail, details: 'စကားဝှက် reset လင့်ခ် ပို့ခြင်း' });
     return { success: true };
   } catch (err: any) {
     const code = err?.code || err?.message || '';
@@ -251,11 +261,15 @@ export async function changeAdminPassword(
   if (newPassword && auth.currentUser && auth.currentUser.email?.toLowerCase() === cleanEmail.toLowerCase()) {
     try {
       await updatePassword(auth.currentUser, newPassword);
+      // v24.13 (A6): password changes had no audit log. Audited here in
+      // the shared function so the action logs exactly once.
+      await recordAuditLog({ action: 'update', entityType: 'admin', entityName: cleanEmail, details: 'Admin စကားဝှက် ပြောင်းလဲခြင်း' });
       return { success: true };
     } catch (err: any) {
       if (err.code === 'auth/requires-recent-login') {
         // Send reset email if session requires recent re-authentication
         await sendPasswordResetEmail(auth, cleanEmail);
+        await recordAuditLog({ action: 'update', entityType: 'admin', entityName: cleanEmail, details: 'စကားဝှက် ပြောင်းလဲရန် reset လင့်ခ် ပို့ခြင်း (recent-login လိုအပ်သောကြောင့်)' });
         return {
           success: true,
           error: 'လုံခြုံရေးအရ စကားဝှက် ပြောင်းလဲရန် လင့်ခ်ကို အီးမေးလ်သို့ ပေးပို့ထားပါသည်။ အီးမေးလ်မှတစ်ဆင့် စကားဝှက် ပြောင်းလဲပေးပါ။',

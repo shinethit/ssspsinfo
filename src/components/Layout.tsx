@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '../lib/firebase';
 import { Toaster } from 'sonner';
 import {
   BookOpen,
@@ -26,11 +28,26 @@ import {
 import NewsTickerBar from './NewsTickerBar';
 import GlobalSearch from './GlobalSearch';
 import { CURRENT_VERSION } from '../constants';
+import { getAdminSession } from '../lib/adminAuth';
 import { OfflineIndicator } from './OfflineIndicator';
 import { ConfirmModalHost } from './ConfirmModal';
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // v24.13: when a school is signed in, the menu offers the Portal instead
+  // of the login page (there was no menu path to the portal at all).
+  const [schoolUser] = useAuthState(auth);
+  // v24.13: admins also have a Firebase user — without this check they
+  // would see "School Portal" and land on its "no school info" screen.
+  // getAdminSession() is the synchronous in-memory admin cache; re-render
+  // when it changes (adminAuth dispatches this event on auth change).
+  const [, setAdminAuthTick] = useState(0);
+  useEffect(() => {
+    const h = () => setAdminAuthTick((t) => t + 1);
+    window.addEventListener('sssps_admin_auth_changed', h);
+    return () => window.removeEventListener('sssps_admin_auth_changed', h);
+  }, []);
+  const isAdminUser = getAdminSession().isLoggedIn;
 
   // v24.9: when the mobile menu is open, stop the page behind it scrolling.
   useEffect(() => {
@@ -59,7 +76,9 @@ export default function Layout() {
     { to: '/chat', label: 'Chat ဆွေးနွေးခန်း', labelEn: 'Chat Room', icon: MessageSquare },
     // v24.7: School Login / Portal was only linked from inside the Help
     // page, so schools had to know the URL. It now has a menu item.
-    { to: '/school-login', label: 'ကျောင်းအကောင့်ဝင်ရန်', labelEn: 'School Login', icon: SchoolIcon },
+    // v24.13: signed-in schools see "School Portal" instead of "School Login".
+    // Admins are excluded (they have a Firebase user too, but no school).
+    { to: schoolUser && !isAdminUser ? '/school-portal' : '/school-login', label: schoolUser && !isAdminUser ? 'ကျောင်း Portal' : 'ကျောင်းအကောင့်ဝင်ရန်', labelEn: schoolUser && !isAdminUser ? 'School Portal' : 'School Login', icon: SchoolIcon },
     { to: '/help', label: 'အသုံးပြုနည်း', labelEn: 'How to Use', icon: HelpCircle },
   ];
 
@@ -75,7 +94,7 @@ export default function Layout() {
       {/* 
         1. FIXED TOP HEADER
       */}
-      <header className="fixed top-0 left-0 right-0 h-16 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs z-40 w-full flex items-center">
+      <header className="fixed top-0 left-0 right-0 h-16 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs z-40 w-full flex items-center print:hidden">
         <div className="w-full px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-3">
           {/* Left: Back Button (if not on Home) + Hamburger Button + Brand Title */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
@@ -155,7 +174,7 @@ export default function Layout() {
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed top-16 bottom-0 left-0 w-64 bg-white border-r border-slate-200 z-50 flex flex-col justify-between overflow-y-auto transition-transform duration-300 ease-in-out shadow-lg lg:shadow-none ${
+        className={`fixed top-16 bottom-0 left-0 w-64 bg-white border-r border-slate-200 z-50 flex flex-col justify-between overflow-y-auto transition-transform duration-300 ease-in-out shadow-lg lg:shadow-none print:hidden ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
@@ -297,7 +316,7 @@ export default function Layout() {
         </main>
 
         {/* Global Footer */}
-        <footer className="bg-slate-100 border-t border-slate-200 py-6 px-4 text-center text-slate-500 text-xs sm:text-sm mt-auto w-full overflow-x-hidden">
+        <footer className="bg-slate-100 border-t border-slate-200 py-6 px-4 text-center text-slate-500 text-xs sm:text-sm mt-auto w-full overflow-x-hidden print:hidden">
           <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-slate-600">
             <p className="font-medium text-slate-700">
               ရှမ်းပြည်နယ် (တောင်ပိုင်း) ကိုယ်ပိုင်ကျောင်းများအသင်း — သတင်းနှင့် ပြန်ကြားရေးဌာန

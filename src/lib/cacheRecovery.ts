@@ -68,6 +68,9 @@ export function findRecoverableCache(): RecoverableCacheData | null {
   return null;
 }
 
+// v24.13 (F8): a cached doc keeps its stored id — the old length > 10
+// test minted a fresh id for any short real id, duplicating the doc on
+// every restore. Only a doc with no id at all gets a generated one.
 export async function restoreRecoveredCacheToFirestore(data: RecoverableCacheData): Promise<{
   schoolsRestored: number;
   announcementsRestored: number;
@@ -80,21 +83,21 @@ export async function restoreRecoveredCacheToFirestore(data: RecoverableCacheDat
 
   for (const school of data.schools) {
     const { id, ...schoolData } = school;
-    const docRef = id && id.length > 10 ? doc(db, 'schools', id) : doc(collection(db, 'schools'));
+    const docRef = id ? doc(db, 'schools', id) : doc(collection(db, 'schools'));
     batch.set(docRef, { ...schoolData, updatedAt: new Date().toISOString() }, { merge: true });
     schoolsRestored++;
   }
 
   for (const ann of data.announcements) {
     const { id, ...annData } = ann;
-    const docRef = id && id.length > 10 ? doc(db, 'announcements', id) : doc(collection(db, 'announcements'));
+    const docRef = id ? doc(db, 'announcements', id) : doc(collection(db, 'announcements'));
     batch.set(docRef, { ...annData, updatedAt: new Date().toISOString() }, { merge: true });
     announcementsRestored++;
   }
 
   for (const assoc of data.associations) {
     const { id, ...assocData } = assoc;
-    const docRef = id && id.length > 10 ? doc(db, 'associations', id) : doc(collection(db, 'associations'));
+    const docRef = id ? doc(db, 'associations', id) : doc(collection(db, 'associations'));
     batch.set(docRef, { ...assocData, updatedAt: new Date().toISOString() }, { merge: true });
     associationsRestored++;
   }

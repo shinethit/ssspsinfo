@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useMemo, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Association, CommitteeMember } from '../types';
 import { useData } from '../context/DataContext';
 import { Building2, Users, Phone, MapPin, Search, Mail, Send, Award, School as SchoolIcon, ArrowLeft } from 'lucide-react';
@@ -8,7 +8,14 @@ import SortSelect from '../components/ui/SortSelect';
 export default function Associations() {
   const navigate = useNavigate();
   const { associations, loading } = useData();
-  const [searchQuery, setSearchQuery] = useState('');
+  // v24.13 P3: GlobalSearch links here with ?search=<name> — read it as the
+  // initial search (same pattern as Admin ?tab=).
+  const [searchParams] = useSearchParams();
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
+  useEffect(() => {
+    const s = searchParams.get('search');
+    if (s !== null && s !== searchQuery) setSearchQuery(s);
+  }, [searchParams]);
   const [selectedTownship, setSelectedTownship] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'name_asc' | 'name_desc'>('name_asc');
 

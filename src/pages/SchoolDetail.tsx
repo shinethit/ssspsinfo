@@ -8,8 +8,11 @@ import { useData } from '../context/DataContext';
 import { toast } from 'sonner';
 import { confirmDialog } from '../components/ConfirmModal';
 import { ArrowLeft, Phone, Send, School as SchoolIcon, CheckCircle2, XCircle, Edit2, Trash2, MapPin } from 'lucide-react';
+import { recordAnnualFeePayment } from '../lib/finance';
+import { recordAuditLog } from '../lib/audit';
+import { getGlobalAcademicYear } from '../lib/academicYear';
 import { getAdminSession } from '../lib/adminAuth';
-import { getCategorizedSchoolPhones } from '../lib/phoneUtils';
+import { getCategorizedSchoolPhones, cleanDialNumber } from '../lib/phoneUtils';
 
 export default function SchoolDetail() {
   const { id } = useParams<{ id: string }>();
@@ -18,6 +21,9 @@ export default function SchoolDetail() {
 
   const [school, setSchool] = useState<School | null>(cachedSchool || null);
   const [loading, setLoading] = useState(!cachedSchool);
+  // v24.13: a fetch error is its own state — before, a failed fetch silently
+  // kept whatever stale cached copy was on screen.
+  const [fetchError, setFetchError] = useState(false);
   const [user] = useAuthState(auth);
   // v24.12: who may touch this school — an admin/moderator session, or the
   // school's own account (linked via school.authUid). Before, ANY logged-in
@@ -43,11 +49,18 @@ export default function SchoolDetail() {
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           setSchool({ id: docSnap.id, ...docSnap.data() } as School);
-        } else if (!cachedSchool) {
+          setFetchError(false);
+        } else {
+          // v24.13: a deleted school must show not-found even when a stale
+          // cached copy exists — before, the cached copy stayed forever.
           setSchool(null);
         }
       } catch (err) {
         console.error('Error fetching school detail:', err);
+        // v24.13: a fetch error must show an error state, not silently keep
+        // stale cached data on screen as if it were current.
+        setFetchError(true);
+        setSchool(null);
       } finally {
         setLoading(false);
       }
@@ -68,21 +81,40 @@ export default function SchoolDetail() {
     }
   };
 
+  // v24.13 (F1): the toggle goes through the same shared write path as
+  // Admin handleToggleSchoolFee — a paid fee ALWAYS has a matching
+  // transaction + voucher, never a bare flag. Before, this was a raw
+  // updateDoc({ isAnnualFeePaid }) with no transaction, no amount/date/
+  // voucher, no confirm and no amount guard.
   const handleToggleFeeStatus = async () => {
     if (!school) return;
     try {
       const nextStatus = !school.isAnnualFeePaid;
-      await updateDoc(doc(db, 'schools', school.id), {
-        isAnnualFeePaid: nextStatus,
-        updatedAt: new Date().toISOString(),
-      });
-      setSchool({ ...school, isAnnualFeePaid: nextStatus });
+      if (nextStatus) {
+        const amount = Number(school.feeAmount) || 0;
+        if (!amount || amount <= 0) { toast.error('ပမာဏ မရှိသေးပါ'); return; }
+        const paidDate = new Date().toISOString().split('T')[0];
+        const academicYear = school.feeAcademicYear || getGlobalAcademicYear();
+        // recordAnnualFeePayment reuses the existing transaction when this
+        // school+year already has one, so toggling can never duplicate it.
+        const { voucherNo } = await recordAnnualFeePayment({ school, amount, paidDate, academicYear });
+        await recordAuditLog({ action: 'create', entityType: 'transaction', entityId: school.id, entityName: school.name, details: `နှစ်စဉ်ကြေး ${amount.toLocaleString('my-MM')} ကျပ် ပေးပြီးအဖြစ် အမှတ်အသားလုပ်ခြင်း (${voucherNo})` });
+        setSchool({ ...school, isAnnualFeePaid: true, feePaidDate: paidDate, feeAmount: amount, feeAcademicYear: academicYear });
+        toast.success(`"${school.name}" ၏ နှစ်စဉ်ကြေးကို ပေးသွင်းပြီးအဖြစ် ပြောင်းလဲလိုက်ပါပြီ`);
+      } else {
+        if (!(await confirmDialog(`"${school.name}" ၏ နှစ်စဉ်ကြေးပေးသွင်းပြီးမှုကို ပယ်ဖျက်မည်လား?`))) return;
+        // Un-marking only clears the flag. The transaction record stays in
+        // Finance (money history is never silently deleted) — delete it
+        // there if the payment was recorded by mistake.
+        await updateDoc(doc(db, 'schools', school.id), {
+          isAnnualFeePaid: false,
+          updatedAt: new Date().toISOString(),
+        });
+        await recordAuditLog({ action: 'update', entityType: 'school', entityId: school.id, entityName: school.name, details: 'နှစ်စဉ်ကြေး ပေးပြီးအမှတ် ပယ်ဖျက်ခြင်း (ငွေသွင်းမှတ်တမ်းကိုတော့ Finance တွင် ဆက်ထားပါသည်)' });
+        setSchool({ ...school, isAnnualFeePaid: false });
+        toast.success(`"${school.name}" ၏ နှစ်စဉ်ကြေးကို မပေးသွင်းရသေးအဖြစ် ပြောင်းလဲလိုက်ပါပြီ`);
+      }
       syncData(false);
-      toast.success(
-        nextStatus
-          ? `"${school.name}" ၏ နှစ်စဉ်ကြေးကို ပေးသွင်းပြီးအဖြစ် ပြောင်းလဲလိုက်ပါပြီ`
-          : `"${school.name}" ၏ နှစ်စဉ်ကြေးကို မပေးသွင်းရသေးအဖြစ် ပြောင်းလဲလိုက်ပါပြီ`
-      );
     } catch (err) {
       toast.error('ပြောင်းလဲ၍ မရပါ');
     }
@@ -102,8 +134,9 @@ export default function SchoolDetail() {
     return (
       <div className="max-w-4xl mx-auto bg-white p-12 rounded-2xl border border-slate-200 text-center space-y-4">
         <SchoolIcon className="w-12 h-12 text-slate-300 mx-auto" />
-        <h3 className="text-xl font-bold text-slate-700">ကျောင်းအချက်အလက် ရှာမတွေ့ပါ</h3>
-        <p className="text-slate-500 text-sm">ရှာဖွေနေသော ကျောင်းအချက်အလက် မရှိတော့ပါ သို့မဟုတ် ဖျက်လိုက်ပြီး ဖြစ်နိုင်ပါသည်။</p>
+        {/* v24.13: a fetch error shows an error state, not the not-found text. */}
+        <h3 className="text-xl font-bold text-slate-700">{fetchError ? 'အချက်အလက် ဖတ်ယူ၍ မရပါ' : 'ကျောင်းအချက်အလက် ရှာမတွေ့ပါ'}</h3>
+        <p className="text-slate-500 text-sm">{fetchError ? 'အင်တာနက်ချိတ်ဆက်မှု စစ်ဆေးပြီး ပြန်လည်ကြိုးစားပါ။' : 'ရှာဖွေနေသော ကျောင်းအချက်အလက် မရှိတော့ပါ သို့မဟုတ် ဖျက်လိုက်ပြီး ဖြစ်နိုင်ပါသည်။'}</p>
         <Link to="/contacts" className="inline-flex items-center gap-1.5 text-sm font-semibold text-sky-700 hover:text-sky-900">
           <ArrowLeft className="w-4 h-4" /> အသင်းဝင်ကျောင်းများသို့ ပြန်သွားရန်
         </Link>
@@ -251,7 +284,7 @@ export default function SchoolDetail() {
                   {allSchoolPhones.map((ph, idx) => (
                     <a
                       key={idx}
-                      href={`tel:${ph}`}
+                      href={`tel:${cleanDialNumber(ph)}`}
                       className="text-sky-700 font-bold hover:underline bg-sky-50 px-2.5 py-0.5 rounded-lg border border-sky-200 break-all"
                     >
                       {ph}
@@ -390,7 +423,7 @@ export default function SchoolDetail() {
               return (
                 <div className="space-y-1.5">
                   {phones.map((ph, idx) => (
-                    <a key={idx} href={`tel:${ph}`} className="flex items-center gap-2 text-sm text-sky-700 hover:text-sky-900 font-medium">
+                    <a key={idx} href={`tel:${cleanDialNumber(ph)}`} className="flex items-center gap-2 text-sm text-sky-700 hover:text-sky-900 font-medium">
                       <Phone className="w-4 h-4 text-sky-500 shrink-0" /> {ph}
                     </a>
                   ))}
@@ -411,7 +444,7 @@ export default function SchoolDetail() {
               return (
                 <div className="space-y-1.5">
                   {phones.map((ph, idx) => (
-                    <a key={idx} href={`tel:${ph}`} className="flex items-center gap-2 text-sm text-sky-700 hover:text-sky-900 font-medium">
+                    <a key={idx} href={`tel:${cleanDialNumber(ph)}`} className="flex items-center gap-2 text-sm text-sky-700 hover:text-sky-900 font-medium">
                       <Phone className="w-4 h-4 text-sky-500 shrink-0" /> {ph}
                     </a>
                   ))}
@@ -432,7 +465,7 @@ export default function SchoolDetail() {
               return (
                 <div className="space-y-1.5">
                   {phones.map((ph, idx) => (
-                    <a key={idx} href={`tel:${ph}`} className="flex items-center gap-2 text-sm text-sky-700 hover:text-sky-900 font-medium">
+                    <a key={idx} href={`tel:${cleanDialNumber(ph)}`} className="flex items-center gap-2 text-sm text-sky-700 hover:text-sky-900 font-medium">
                       <Phone className="w-4 h-4 text-sky-500 shrink-0" /> {ph}
                     </a>
                   ))}
@@ -453,7 +486,7 @@ export default function SchoolDetail() {
               return (
                 <div className="space-y-1.5">
                   {phones.map((ph, idx) => (
-                    <a key={idx} href={`tel:${ph}`} className="flex items-center gap-2 text-sm text-sky-700 hover:text-sky-900 font-medium">
+                    <a key={idx} href={`tel:${cleanDialNumber(ph)}`} className="flex items-center gap-2 text-sm text-sky-700 hover:text-sky-900 font-medium">
                       <Phone className="w-4 h-4 text-sky-500 shrink-0" /> {ph}
                     </a>
                   ))}

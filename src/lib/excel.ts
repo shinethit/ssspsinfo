@@ -149,7 +149,12 @@ export const normalizeSchoolRow = (row: Record<string, any>) => {
       // fee stays empty instead of silently becoming a tier default.
       feeAmount: explicitFee !== undefined ? explicitFee : null,
       feeAcademicYear: cleanStr(row['feeAcademicYear'] ?? row['ပညာသင်နှစ်'] ?? getGlobalAcademicYear()),
-      isAnnualFeePaid: parseFeePaid(row['isAnnualFeePaid'] ?? row['နှစ်စဉ်ကြေး (ပေးပြီး / မပေးရသေး)'] ?? row['နှစ်စဉ်ကြေး'] ?? row['annualFee']),
+      // v24.13 (F2b/A17): ALL THREE fee-column spellings must be accepted —
+      // template 'နှစ်စဉ်ကြေး (သွင်းပြီး / မသွင်းရသေး)', old parser lookup
+      // 'နှစ်စဉ်ကြေး (ပေးပြီး / မပေးရသေး)', export 'နှစ်စဉ်ကြေး အခြေအနေ'.
+      // Before, only the middle one was looked up, so the template's own
+      // column (and a re-import of an export) silently read as unpaid.
+      isAnnualFeePaid: parseFeePaid(row['isAnnualFeePaid'] ?? row['နှစ်စဉ်ကြေး (သွင်းပြီး / မသွင်းရသေး)'] ?? row['နှစ်စဉ်ကြေး (ပေးပြီး / မပေးရသေး)'] ?? row['နှစ်စဉ်ကြေး အခြေအနေ'] ?? row['နှစ်စဉ်ကြေး'] ?? row['annualFee']),
       status: (row['status'] === 'under_review' || row['အခြေအနေ'] === 'စိစစ်ဆဲ' || row['အခြေအနေ'] === 'စစ်ဆေးဆဲ')
         ? ('under_review' as const)
         : (row['status'] === 'inactive' || row['အခြေအနေ'] === 'ယာယီရပ်နား' || row['အခြေအနေ'] === 'ရပ်နား')

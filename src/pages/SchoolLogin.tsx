@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { toast } from 'sonner';
@@ -10,7 +11,29 @@ export default function SchoolLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [sendingReset, setSendingReset] = useState(false);
   const navigate = useNavigate();
+  // v24.13: a school that is already signed in goes straight to the portal
+  // instead of seeing the login form again.
+  const [signedInUser, authLoading] = useAuthState(auth);
+  useEffect(() => {
+    if (!authLoading && signedInUser) navigate('/school-portal', { replace: true });
+  }, [signedInUser, authLoading, navigate]);
+
+  // v24.13 S4: forgot-password — reset link by email (admins already had
+  // this; school accounts had no reset path at all).
+  const handleForgotPassword = async () => {
+    if (!email.trim()) { toast.error('စကားဝှက် ပြန်လည်သတ်မှတ်ရန် အီးမေးလ် ဖြည့်ပါ'); return; }
+    setSendingReset(true);
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      toast.success(`စကားဝှက် ပြန်လည်သတ်မှတ်ရန် လင့်ခ်ကို ${email.trim()} သို့ ပို့ပြီးပါပြီ`);
+    } catch {
+      toast.error('စကားဝှက် ပြန်လည်သတ်မှတ်ရန် အီးမေးလ် ပို့၍ မရပါ — အီးမေးလ် မှန်ကန်မှု စစ်ဆေးပါ');
+    } finally {
+      setSendingReset(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,6 +95,9 @@ export default function SchoolLogin() {
           </div>
           <button type="submit" disabled={isSubmitting} className="w-full bg-sky-900 text-white py-3 rounded-xl font-bold hover:bg-sky-800 transition">
             {isSubmitting ? 'စစ်ဆေးနေပါသည်...' : 'ဝင်ရောက်မည်'}
+          </button>
+          <button type="button" onClick={handleForgotPassword} disabled={sendingReset} className="w-full text-center text-sm font-bold text-sky-700 hover:text-sky-900 disabled:opacity-50">
+            {sendingReset ? 'ပို့နေပါသည်...' : 'စကားဝှက် မေ့နေပါသလား?'}
           </button>
         </form>
 

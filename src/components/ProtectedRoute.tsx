@@ -3,6 +3,7 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { auth, db } from '../lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { doc, getDoc } from 'firebase/firestore';
+import { toast } from 'sonner';
 
 export default function ProtectedRoute() {
   const [user, loading] = useAuthState(auth);
@@ -57,6 +58,13 @@ export default function ProtectedRoute() {
     };
   }, [user, loading]);
 
+  // v24.13 S9: tell a signed-in non-admin why /admin refused them.
+  useEffect(() => {
+    if (!loading && !checkingAdmin && user && isAdmin === false) {
+      toast.error('ဤစာမျက်နှာသည် Admin အတွက်သာ ဖြစ်သည်');
+    }
+  }, [loading, checkingAdmin, user, isAdmin]);
+
   if (loading || checkingAdmin) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
@@ -68,8 +76,14 @@ export default function ProtectedRoute() {
     );
   }
 
-  if (!user || !isAdmin) {
+  // v24.13 S9: a signed-in school account opening /admin was silently
+  // dumped on the admin login page. Explain, and send them to the login
+  // page that is actually theirs; nobody signed in still goes to /login.
+  if (!user) {
     return <Navigate to="/login" replace />;
+  }
+  if (!isAdmin) {
+    return <Navigate to="/school-login" replace />;
   }
 
   return <Outlet />;

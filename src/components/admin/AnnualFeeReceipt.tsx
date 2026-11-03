@@ -6,8 +6,17 @@ import { Download, Printer, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getGlobalAcademicYear } from '../../lib/academicYear';
 
-export default function AnnualFeeReceipt({ school, onClose }: { school: School; onClose: () => void }) {
+// v24.13 (F7): the receipt takes the STORED voucher number (and paid date)
+// from the transaction when the caller has it. The derived number
+// SSSPSFV-<date>-<first 4 chars of school id> is only a fallback for
+// legacy flag-only payments that have no transaction — it used to be the
+// only number shown, so it disagreed with the voucher stored in Finance.
+export default function AnnualFeeReceipt({ school, onClose, voucherNo, paidDate }: { school: School; onClose: () => void; voucherNo?: string; paidDate?: string }) {
   const receiptRef = useRef<HTMLDivElement>(null);
+  const displayPaidDate = paidDate || school.feePaidDate;
+  const displayVoucherNo = voucherNo || (displayPaidDate
+    ? `SSSPSFV-${new Date(displayPaidDate).toISOString().slice(0, 10).replace(/-/g, '')}-${school.id.substring(0, 4).toUpperCase()}`
+    : 'N/A');
 
   const handleDownload = async (format: 'pdf' | 'jpeg') => {
     if (!receiptRef.current) return;
@@ -38,8 +47,8 @@ export default function AnnualFeeReceipt({ school, onClose }: { school: School; 
     window.print();
   };
 
-  const formattedDate = school.feePaidDate 
-    ? new Date(school.feePaidDate).toLocaleDateString('my-MM', { year: 'numeric', month: 'long', day: 'numeric' })
+  const formattedDate = displayPaidDate
+    ? new Date(displayPaidDate).toLocaleDateString('my-MM', { year: 'numeric', month: 'long', day: 'numeric' })
     : new Date().toLocaleDateString('my-MM', { year: 'numeric', month: 'long', day: 'numeric' });
 
   return (
@@ -84,7 +93,7 @@ export default function AnnualFeeReceipt({ school, onClose }: { school: School; 
                 <div>
                   <span className="text-slate-500 font-semibold block mb-1">ဖြတ်ပိုင်းအမှတ်:</span>
                   <span className="font-mono font-bold bg-slate-100 px-3 py-1 rounded-lg border border-slate-200 break-all">
-                    {school.feePaidDate ? `SSSPSFV-${new Date(school.feePaidDate).toISOString().slice(0,10).replace(/-/g, '')}-${school.id.substring(0, 4).toUpperCase()}` : 'N/A'}
+                    {displayVoucherNo}
                   </span>
                 </div>
                 <div className="text-right">

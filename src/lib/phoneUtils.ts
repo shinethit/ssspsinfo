@@ -1,5 +1,17 @@
 import { School } from '../types';
 
+// v24.13 P4: shared dial helper — Myanmar digits (၀-၉) become Latin digits
+// FIRST, then everything except [0-9+] is stripped, so a number typed in
+// Myanmar digits still dials. SchoolDetail wiring is the other agent's job;
+// Contacts' cleanDial values below now use this helper too.
+const MYANMAR_DIGITS = '၀၁၂၃၄၅၆၇၈၉';
+
+export function cleanDialNumber(num: string | undefined | null): string {
+  if (!num) return '';
+  const latin = num.replace(/[၀-၉]/g, (d) => String(MYANMAR_DIGITS.indexOf(d)));
+  return latin.replace(/[^0-9+]/g, '');
+}
+
 export const toBurmeseNumber = (num: number): string => {
   const digits = ['၀', '၁', '၂', '၃', '၄', '၅', '၆', '၇', '၈', '၉'];
   return String(num).replace(/\d/g, (d) => digits[parseInt(d, 10)]);
@@ -29,7 +41,7 @@ export const getCategorizedSchoolPhones = (school: School): CategorizedSchoolPho
           if (!item || typeof item !== 'string') continue;
           const parts = item.split(/[/,\n;]+/).map((p) => p.trim()).filter(Boolean);
           for (const p of parts) {
-            const clean = p.replace(/[^0-9+]/g, '');
+            const clean = cleanDialNumber(p);
             if (clean && clean.length >= 5 && !seen.has(clean)) {
               seen.add(clean);
               list.push(p);
@@ -39,7 +51,7 @@ export const getCategorizedSchoolPhones = (school: School): CategorizedSchoolPho
       } else if (typeof input === 'string') {
         const parts = input.split(/[/,\n;]+/).map((p) => p.trim()).filter(Boolean);
         for (const p of parts) {
-          const clean = p.replace(/[^0-9+]/g, '');
+          const clean = cleanDialNumber(p);
           if (clean && clean.length >= 5 && !seen.has(clean)) {
             seen.add(clean);
             list.push(p);
@@ -62,7 +74,7 @@ export const getCategorizedSchoolPhones = (school: School): CategorizedSchoolPho
     results.push({
       key: `founder-${idx}-${num}`, category: 'founder', fullLabel: getPhoneLabel('တည်ထောင်သူ', idx),
       personName: school.founderName?.trim() || undefined, personRole: 'တည်ထောင်သူ (Founder)',
-      number: num, cleanDial: num.replace(/[^0-9+]/g, ''),
+      number: num, cleanDial: cleanDialNumber(num),
     });
   });
 
@@ -72,7 +84,7 @@ export const getCategorizedSchoolPhones = (school: School): CategorizedSchoolPho
     results.push({
       key: `admin-${idx}-${num}`, category: 'admin', fullLabel: getPhoneLabel('စီမံအုပ်ချုပ်သူ', idx),
       personName: school.adminName?.trim() || undefined, personRole: 'စီမံအုပ်ချုပ်သူ (Admin/Principal)',
-      number: num, cleanDial: num.replace(/[^0-9+]/g, ''),
+      number: num, cleanDial: cleanDialNumber(num),
     });
   });
 
@@ -84,7 +96,7 @@ export const getCategorizedSchoolPhones = (school: School): CategorizedSchoolPho
     results.push({
       key: `contact1-${idx}-${num}`, category: 'contact1', fullLabel: getPhoneLabel('တာဝန်ခံ (၁)', idx),
       personName: contact1Name || undefined, personRole: contact1Role,
-      number: num, cleanDial: num.replace(/[^0-9+]/g, ''),
+      number: num, cleanDial: cleanDialNumber(num),
     });
   });
 
@@ -96,7 +108,7 @@ export const getCategorizedSchoolPhones = (school: School): CategorizedSchoolPho
     results.push({
       key: `contact2-${idx}-${num}`, category: 'contact2', fullLabel: getPhoneLabel('တာဝန်ခံ (၂)', idx),
       personName: contact2Name || undefined, personRole: contact2Role,
-      number: num, cleanDial: num.replace(/[^0-9+]/g, ''),
+      number: num, cleanDial: cleanDialNumber(num),
     });
   });
 
@@ -106,7 +118,7 @@ export const getCategorizedSchoolPhones = (school: School): CategorizedSchoolPho
     results.push({
       key: `school-${idx}-${num}`, category: 'school', fullLabel: getPhoneLabel('ကျောင်း', idx),
       personRole: 'ကျောင်း ရုံးခန်း (School Office)',
-      number: num, cleanDial: num.replace(/[^0-9+]/g, ''),
+      number: num, cleanDial: cleanDialNumber(num),
     });
   });
 

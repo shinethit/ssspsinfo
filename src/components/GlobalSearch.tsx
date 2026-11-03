@@ -157,7 +157,7 @@ export default function GlobalSearch() {
                   {associationResults.map(assoc => (
                     <div
                       key={assoc.id}
-                      onClick={() => handleNavigate('/associations')}
+                      onClick={() => handleNavigate(`/associations?search=${encodeURIComponent(assoc.name)}`)}
                       className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 cursor-pointer transition group"
                     >
                       <div className="p-2 rounded-lg bg-emerald-100 text-emerald-700 group-hover:bg-emerald-200 shrink-0">

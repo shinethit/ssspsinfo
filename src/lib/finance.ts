@@ -28,8 +28,34 @@ export async function recordAnnualFeePayment(args: {
   note?: string;
   recordedBy?: string;
 }): Promise<{ transactionId: string; voucherNo: string }> {
+  // v24.13 (F6): never record a zero/negative/invented amount — the guard
+  // lives here so every caller (fee modal, Finance form, toggles, Excel
+  // import) is covered, not just the one form that was fixed before.
+  if (!Number.isFinite(args.amount) || args.amount <= 0) {
+    throw new Error('နှစ်စဉ်ကြေး ပမာဏ ၀ ထက် ကြီးရပါမည်');
+  }
   const snap = await getDocs(collection(db, 'transactions'));
   const existing = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as TransactionRecord);
+  // v24.13 (F5b): a school + academic year has at most ONE annual-fee
+  // transaction. If one already exists, reuse it — just make sure the flag
+  // matches — instead of writing a second transaction for the same payment
+  // (toggling, re-marking, or re-importing used to duplicate it).
+  const already = findAnnualFeeTransaction(existing, args.school.id, args.academicYear);
+  if (already) {
+    let voucherNo = already.voucherNo || '';
+    if (!voucherNo) {
+      voucherNo = generateVoucherNo(args.paidDate, existing);
+      await updateDoc(doc(db, 'transactions', already.id), { voucherNo });
+    }
+    await updateDoc(doc(db, 'schools', args.school.id), {
+      isAnnualFeePaid: true,
+      feePaidDate: args.paidDate,
+      feeAmount: args.amount,
+      feeAcademicYear: args.academicYear,
+      updatedAt: new Date().toISOString(),
+    });
+    return { transactionId: already.id, voucherNo };
+  }
   const voucherNo = generateVoucherNo(args.paidDate, existing);
   const ref = await addDoc(collection(db, 'transactions'), {
     schoolId: args.school.id,

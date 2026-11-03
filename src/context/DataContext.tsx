@@ -10,6 +10,8 @@ import {
   setDoc,
   getDoc,
   writeBatch,
+  query,
+  where,
 } from 'firebase/firestore';
 import { db, cleanFirestoreData } from '../lib/firebase';
 import { School, Announcement, Association, DEFAULT_SCHOOL_LEVELS, SchoolLevelItem } from '../types';
@@ -67,6 +69,18 @@ interface CachePayload {
   timestamp: number;
 }
 
+// A14: what a school delete cascades to. Returned by deleteSchool /
+// getSchoolDeleteImpact so the caller can list the counts in the confirm
+// dialog (and in the success message) before anything is deleted.
+export interface SchoolDeleteImpact {
+  schoolId: string;
+  schoolName: string;
+  transactionCount: number;
+  eventCount: number;
+  athleteCount: number;
+  registrationCount: number;
+}
+
 interface DataContextType {
   schools: School[];
   announcements: Announcement[];
@@ -81,7 +95,10 @@ interface DataContextType {
   // Robust CRUD Operations with instant optimistic update & storage persistence
   addSchool: (schoolData: Omit<School, 'id' | 'createdAt'>) => Promise<string>;
   updateSchool: (id: string, schoolData: Partial<School>) => Promise<void>;
-  deleteSchool: (id: string) => Promise<void>;
+  deleteSchool: (id: string) => Promise<SchoolDeleteImpact>;
+  // A14: counts of the records a school delete would cascade to, so the
+  // caller (Admin.tsx confirm dialog) can list them before deleting.
+  getSchoolDeleteImpact: (id: string) => Promise<SchoolDeleteImpact>;
   addAnnouncement: (data: Omit<Announcement, 'id'>) => Promise<string>;
   updateAnnouncement: (id: string, data: Partial<Announcement>) => Promise<void>;
   deleteAnnouncement: (id: string) => Promise<void>;
@@ -409,8 +426,89 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [announcements, associations, persistCache]
   );
 
+  // A14: everything that belongs to a school and must go with it when the
+  // school is deleted. Key fields verified in code:
+  // - fee transactions: transactions.schoolId (src/lib/finance.ts:35;
+  //   rules allow moderator delete)
+  // - school activities: events.schoolId (src/pages/SchoolPortal.tsx:84)
+  // - athletes: athletes.schoolId since v24.7; older records only carry
+  //   the free-text school name, so match by name too (same fallback the
+  //   portal uses) — deduped by doc id
+  // - registrations of the school's own events: event_registrations.eventId
+  // The login (Auth) account is NOT touched here — it cannot be deleted
+  // client-side; it must be removed in Firebase Console (the confirm
+  // dialog and success toast in Admin.tsx must say so).
+  const collectSchoolDeleteImpact = useCallback(
+    async (id: string): Promise<{ impact: SchoolDeleteImpact; refs: Array<ReturnType<typeof doc>> }> => {
+      const school = schools.find((s) => s.id === id);
+      let schoolName = school?.name || '';
+      if (!schoolName) {
+        try {
+          const snap = await getDoc(doc(db, 'schools', id));
+          if (snap.exists()) schoolName = (snap.data() as School).name || '';
+        } catch (e) {
+          // Name is only used for the legacy athlete name-match and the
+          // dialog text; the schoolId-keyed cascade still runs without it.
+        }
+      }
+
+      const txSnap = await getDocs(query(collection(db, 'transactions'), where('schoolId', '==', id)));
+      const evSnap = await getDocs(query(collection(db, 'events'), where('schoolId', '==', id)));
+      const athByIdSnap = await getDocs(query(collection(db, 'athletes'), where('schoolId', '==', id)));
+
+      const athleteRefs = new Map<string, ReturnType<typeof doc>>();
+      athByIdSnap.docs.forEach((d) => athleteRefs.set(d.id, d.ref));
+      if (schoolName) {
+        const athByNameSnap = await getDocs(query(collection(db, 'athletes'), where('school', '==', schoolName)));
+        athByNameSnap.docs.forEach((d) => {
+          if (!athleteRefs.has(d.id)) athleteRefs.set(d.id, d.ref);
+        });
+      }
+
+      // Registrations belong to the school's events; without their event
+      // they would be orphaned and invisible, so they go with the events.
+      const regRefs: Array<ReturnType<typeof doc>> = [];
+      for (const evDoc of evSnap.docs) {
+        const regSnap = await getDocs(query(collection(db, 'event_registrations'), where('eventId', '==', evDoc.id)));
+        regSnap.docs.forEach((d) => regRefs.push(d.ref));
+      }
+
+      const refs: Array<ReturnType<typeof doc>> = [
+        doc(db, 'schools', id),
+        ...txSnap.docs.map((d) => d.ref),
+        ...evSnap.docs.map((d) => d.ref),
+        ...Array.from(athleteRefs.values()),
+        ...regRefs,
+      ];
+      return {
+        impact: {
+          schoolId: id,
+          schoolName,
+          transactionCount: txSnap.size,
+          eventCount: evSnap.size,
+          athleteCount: athleteRefs.size,
+          registrationCount: regRefs.length,
+        },
+        refs,
+      };
+    },
+    [schools]
+  );
+
+  const getSchoolDeleteImpact = useCallback(
+    async (id: string): Promise<SchoolDeleteImpact> => {
+      const { impact } = await collectSchoolDeleteImpact(id);
+      return impact;
+    },
+    [collectSchoolDeleteImpact]
+  );
+
   const deleteSchool = useCallback(
-    async (id: string): Promise<void> => {
+    async (id: string): Promise<SchoolDeleteImpact> => {
+      // Count + collect everything first, so a failure to read the related
+      // records aborts before the school doc itself is touched.
+      const { impact, refs } = await collectSchoolDeleteImpact(id);
+
       // 1. Optimistic UI update immediately
       let prevSchools: School[] | null = null;
       setSchools((prev) => {
@@ -420,9 +518,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return next;
       });
 
-      // 2. Delete from Firestore (v24.7: roll back on failure, as above)
+      // 2. Cascade delete from Firestore (v24.7: roll back on failure, as
+      // above). writeBatch caps at 500 ops, so chunk large cascades.
+      // NOTE: batches commit one by one — a failure mid-cascade can leave
+      // an earlier batch deleted while later ones remain; the UI rolls
+      // back and the error is rethrown so the caller toasts it instead
+      // of reporting success.
       try {
-        await deleteDoc(doc(db, 'schools', id));
+        for (let i = 0; i < refs.length; i += 500) {
+          const batch = writeBatch(db);
+          refs.slice(i, i + 500).forEach((ref) => batch.delete(ref));
+          await batch.commit();
+        }
       } catch (err) {
         if (prevSchools) {
           setSchools(prevSchools);
@@ -430,8 +537,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         throw err;
       }
+      return impact;
     },
-    [announcements, associations, persistCache]
+    [announcements, associations, persistCache, collectSchoolDeleteImpact]
   );
 
   const addAnnouncement = useCallback(
@@ -828,6 +936,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addSchool,
       updateSchool,
       deleteSchool,
+      getSchoolDeleteImpact,
       addAnnouncement,
       updateAnnouncement,
       deleteAnnouncement,
@@ -850,6 +959,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addSchool,
       updateSchool,
       deleteSchool,
+      getSchoolDeleteImpact,
       addAnnouncement,
       updateAnnouncement,
       deleteAnnouncement,

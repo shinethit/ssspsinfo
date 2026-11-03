@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '../lib/firebase';
 import { Announcement, School, Association } from '../types';
 import { useData, getAnnouncementTimestamp } from '../context/DataContext';
 import { getCategoryBadge } from './Announcements';
@@ -30,8 +32,21 @@ import { getUnifiedSchoolLevels } from '../lib/schoolLevels';
 import ShareButton from '../components/ShareButton';
 import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../constants';
 
+// v24.13: same guarded announcement-date format as Announcements.tsx
+// (Home used an unguarded toLocaleDateString on the raw value).
+function formatHomeAnnouncementDate(a: Announcement): string {
+  const rawDate = a.eventDate || (a.publishedAt ? a.publishedAt.split('T')[0] : '');
+  if (!rawDate) return 'မကြာသေးမီက';
+  const d = new Date(rawDate.includes('T') ? rawDate : `${rawDate}T12:00:00`);
+  return !isNaN(d.getTime())
+    ? d.toLocaleDateString('my-MM', { year: 'numeric', month: 'long', day: 'numeric' })
+    : rawDate;
+}
+
 export default function Home() {
   const { schools, announcements, associations, schoolLevels, loading } = useData();
+  // v24.13: the "ဝင်မည်" chat button sent guests to a dead error page.
+  const [user] = useAuthState(auth);
   const [quickSearch, setQuickSearch] = useState('');
   const [selectedZone, setSelectedZone] = useState<string>('all');
 
@@ -144,7 +159,7 @@ export default function Home() {
               <div className="mt-1 bg-white rounded-xl p-2 shadow-2xl border border-slate-200 text-left text-slate-900 animate-in fade-in zoom-in-95 max-h-64 overflow-y-auto">
                 <div className="text-xs font-bold text-slate-500 px-2 pb-1.5 border-b border-slate-100 flex items-center justify-between">
                   <span>ရှာဖွေတွေ့ရှိ ({filteredQuickSchools.length})</span>
-                  <Link to={`/contacts?search=${encodeURIComponent(quickSearch)}`} className="text-sky-700 hover:underline">
+                  <Link to={`/contacts?search=${encodeURIComponent(quickSearch)}${selectedZone !== 'all' ? `&zone=${encodeURIComponent(selectedZone)}` : ''}`} className="text-sky-700 hover:underline">
                     အားလုံးကြည့်မည် &rarr;
                   </Link>
                 </div>
@@ -259,7 +274,7 @@ export default function Home() {
                     </span>
                     <span className="text-xs text-slate-500 font-medium flex items-center gap-0.5 shrink-0">
                       <Calendar className="w-2.5 h-2.5 text-sky-600" />
-                      {a.eventDate || (a.publishedAt ? new Date(a.publishedAt).toLocaleDateString('my-MM') : 'မကြာသေးမီက')}
+                      {formatHomeAnnouncementDate(a)}
                     </span>
                   </div>
 
@@ -384,7 +399,7 @@ export default function Home() {
           </div>
           <div className="pt-0.5">
             <Link
-              to="/chat"
+              to={user ? '/chat' : '/login'}
               className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold text-sm rounded-md transition"
             >
               <span>ဝင်မည်</span>

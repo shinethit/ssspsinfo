@@ -41,7 +41,10 @@ export default function CalendarPage() {
       // v24.6: a zone-less event applies to all zones — it used to be hidden
       // under every specific zone filter and wrongly shown under "အခြား"
       if (e.zone && !isSchoolInZone(e.zone, zoneFilter)) return false;
-      if (typeFilter !== 'all' && e.eventType !== typeFilter) return false;
+      // v24.13 P1(b): admin-created events carry no eventType (the stamp is
+      // another agent's job) — treat a missing eventType as 'general' so the
+      // type filter no longer hides every admin event.
+      if (typeFilter !== 'all' && (e.eventType || 'general') !== typeFilter) return false;
       return true;
     });
   }, [events, zoneFilter, typeFilter]);
@@ -186,6 +189,10 @@ export default function CalendarPage() {
                       {ev.schoolName && <span>ကျောင်း: <strong className="text-slate-700">{ev.schoolName}</strong></span>}
                       {ev.zone && <span className="text-sky-800 bg-sky-100 px-1.5 rounded">{ev.zone}</span>}
                     </div>
+                    {/* v24.13 P6: register for this event */}
+                    <Link to={`/events?register=${ev.id}`} className="inline-flex items-center justify-center gap-1 w-full bg-sky-900 hover:bg-sky-800 text-white px-3 py-2 rounded-xl font-bold text-xs transition">
+                      စာရင်းသွင်းမည်
+                    </Link>
                   </div>
                 ))}
               </div>
@@ -223,6 +230,10 @@ export default function CalendarPage() {
                       {ev.schoolName && <span>ကျောင်း: <strong className="text-slate-700">{ev.schoolName}</strong></span>}
                       {ev.zone && <span className="text-sky-800 bg-sky-100 px-1.5 rounded">{ev.zone}</span>}
                     </div>
+                    {/* v24.13 P6: register for this event */}
+                    <Link to={`/events?register=${ev.id}`} className="inline-flex items-center justify-center gap-1 bg-sky-900 hover:bg-sky-800 text-white px-3 py-2 rounded-xl font-bold text-xs transition shrink-0">
+                      စာရင်းသွင်းမည်
+                    </Link>
                   </div>
                 </div>
               ))}

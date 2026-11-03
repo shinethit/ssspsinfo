@@ -14,7 +14,10 @@ const associationSchema = z.object({
   township: z.string().optional(),
   address: z.string().optional(),
   phone: z.string().optional(),
-  email: z.string().optional(),
+  // v24.13 (A1): the A16 email input had no validation at all, so a typo'd
+  // address saved silently. Empty stays allowed; a non-empty value must
+  // be a valid email so the inline error below can show.
+  email: z.string().email('မှန်ကန်သော အီးမေးလ်လိပ်စာ ရိုက်ထည့်ပေးပါ').optional().or(z.literal('')),
   logoUrl: z.string().optional(),
   description: z.string().optional(),
   members: z.array(
@@ -43,6 +46,24 @@ export default function AdminAssociationsTab({ associations, onRefresh }: AdminA
   });
   const { fields: memberFields, append: appendMember, remove: removeMember } = useFieldArray({ control: associationForm.control, name: 'members' });
 
+  // v24.13 (A1): invalid submits used to fail silently — no onInvalid
+  // handler and formState.errors was never rendered. A brand-new
+  // association could not be saved until a member name was typed, with
+  // zero explanation. Name the first missing/invalid field in a toast;
+  // inline errors render under the fields, and the member requirement
+  // is now stated in the UI instead of being a hidden rule.
+  const formErrors = associationForm.formState.errors;
+  const handleInvalidSubmit = (errors: any) => {
+    const firstMemberError = Array.isArray(errors?.members)
+      ? errors.members.find((m: any) => m?.name?.message || m?.role?.message)
+      : null;
+    const firstMessage =
+      errors?.name?.message || errors?.email?.message ||
+      firstMemberError?.name?.message || firstMemberError?.role?.message ||
+      'လိုအပ်သော အချက်အလက် ဖြည့်စွက်ပေးပါ';
+    toast.error(String(firstMessage));
+  };
+
   const startEditAssociation = (a: Association) => {
     setEditingAssociationId(a.id);
     associationForm.reset({ ...a, members: a.members?.length ? a.members : [{ name: '', role: 'ဥက္ကဋ္ဌ', school: '', phone: '', viber: '', telegram: '', photoUrl: '' }] });
@@ -66,7 +87,7 @@ export default function AdminAssociationsTab({ associations, onRefresh }: AdminA
 
   return (
     <div className="space-y-6 animate-in fade-in">
-      <form onSubmit={associationForm.handleSubmit(onAssociationSubmit)} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-5">
+      <form onSubmit={associationForm.handleSubmit(onAssociationSubmit, handleInvalidSubmit)} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-5">
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <h3 className="font-extrabold text-lg text-slate-900 flex items-center gap-2">
             <Building2 className="w-5 h-5 text-sky-600" />
@@ -81,6 +102,7 @@ export default function AdminAssociationsTab({ associations, onRefresh }: AdminA
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">အသင်းအဖွဲ့ အမည် *</label>
             <input {...associationForm.register('name')} placeholder="အသင်းအမည်..." className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none" />
+            {formErrors.name && <p className="text-xs text-rose-600 font-semibold mt-1">{String(formErrors.name.message)}</p>}
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">မြို့နယ်</label>
@@ -90,8 +112,17 @@ export default function AdminAssociationsTab({ associations, onRefresh }: AdminA
             <label className="block text-xs font-bold text-slate-700 mb-1">ဖုန်းနံပါတ်</label>
             <input type="tel" inputMode="tel" {...associationForm.register('phone')} placeholder="09..." className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none" />
           </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">အီးမေးလ်</label>
+            <input type="email" {...associationForm.register('email')} placeholder="example@mail.com" className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none" />
+            {formErrors.email && <p className="text-xs text-rose-600 font-semibold mt-1">{String(formErrors.email.message)}</p>}
+          </div>
           <div className="sm:col-span-2">
-            <label className="block text-xs font-bold text-slate-700 mb-1">လိပ်စာနှင့် ဖော်ပြချက်</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">လိပ်စာ</label>
+            <input {...associationForm.register('address')} placeholder="အသင်းရုံး လိပ်စာ..." className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none" />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-bold text-slate-700 mb-1">ဖော်ပြချက်</label>
             <input {...associationForm.register('description')} placeholder="အသင်းအကြောင်း အကျဉ်းချုပ်..." className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none" />
           </div>
           <div>
@@ -102,7 +133,10 @@ export default function AdminAssociationsTab({ associations, onRefresh }: AdminA
 
         <div className="space-y-3 pt-2">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-extrabold text-slate-800">အမှုဆောင် အဖွဲ့ဝင်များ ({memberFields.length})</h4>
+            <div>
+              <h4 className="text-sm font-extrabold text-slate-800">အမှုဆောင် အဖွဲ့ဝင်များ ({memberFields.length})</h4>
+              <p className="text-xs text-slate-500 mt-0.5">အဖွဲ့ဝင်အနည်းဆုံး ၁ ဦး၏ အမည်နှင့် ရာထူး ဖြည့်ရပါမည် — မဖြည့်လျှင် သိမ်း၍မရပါ။</p>
+            </div>
             <button type="button" onClick={() => appendMember({ name: '', role: 'အဖွဲ့ဝင်', school: '', phone: '', viber: '', telegram: '', photoUrl: '' })} className="text-xs font-bold bg-sky-50 text-sky-700 border border-sky-200 px-3 py-1.5 rounded-xl hover:bg-sky-100 transition cursor-pointer">
               + အဖွဲ့ဝင် ထပ်ထည့်ရန်
             </button>
@@ -110,8 +144,14 @@ export default function AdminAssociationsTab({ associations, onRefresh }: AdminA
           <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
             {memberFields.map((field, index) => (
               <div key={field.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 grid sm:grid-cols-5 gap-2.5 items-center">
-                <input {...associationForm.register(`members.${index}.name` as const)} placeholder="အမည် *" className="p-2 bg-white border border-slate-200 rounded-lg text-xs outline-none" />
-                <input {...associationForm.register(`members.${index}.role` as const)} placeholder="ရာထူး *" className="p-2 bg-white border border-slate-200 rounded-lg text-xs outline-none" />
+                <div>
+                  <input {...associationForm.register(`members.${index}.name` as const)} placeholder="အမည် *" className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs outline-none" />
+                  {formErrors.members?.[index]?.name && <p className="text-xs text-rose-600 font-semibold mt-1">{String(formErrors.members[index]?.name?.message)}</p>}
+                </div>
+                <div>
+                  <input {...associationForm.register(`members.${index}.role` as const)} placeholder="ရာထူး *" className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs outline-none" />
+                  {formErrors.members?.[index]?.role && <p className="text-xs text-rose-600 font-semibold mt-1">{String(formErrors.members[index]?.role?.message)}</p>}
+                </div>
                 <input {...associationForm.register(`members.${index}.school` as const)} placeholder="ကိုယ်စားပြုကျောင်း" className="p-2 bg-white border border-slate-200 rounded-lg text-xs outline-none" />
                 <input type="tel" inputMode="tel" {...associationForm.register(`members.${index}.phone` as const)} placeholder="ဖုန်းနံပါတ်" className="p-2 bg-white border border-slate-200 rounded-lg text-xs outline-none" />
                 <div className="flex items-center gap-1.5">

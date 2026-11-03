@@ -2,7 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { auth, db } from '../lib/firebase';
 import { collection, query, where, getDocs, updateDoc, doc, addDoc, deleteDoc } from 'firebase/firestore';
-import { School, Athlete, EventItem, SchoolUpdateRequest } from '../types';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { School, Athlete, EventItem, SchoolUpdateRequest, TransactionRecord, STUDENT_RANGE_TIERS, DEFAULT_SCHOOL_LEVELS } from '../types';
+import { useData } from '../context/DataContext';
+import { findAnnualFeeTransaction } from '../lib/finance';
+import { getGlobalAcademicYear } from '../lib/academicYear';
 import { toast } from 'sonner';
 import { confirmDialog } from '../components/ConfirmModal';
 import { LogOut, Save, School as SchoolIcon, Phone, MapPin, Users, Eye, ShieldCheck, UserCheck, Calendar, Clock, Trash2, Send, FileText } from 'lucide-react';
@@ -14,6 +19,10 @@ const REQUESTABLE_FIELDS = [
   { value: 'name', label: 'ကျောင်းအမည်' },
   { value: 'level', label: 'ကျောင်းအဆင့်' },
   { value: 'studentRange', label: 'ကျောင်းသားဦးရေ Range' },
+  { value: 'founderPhone', label: 'တည်ထောင်သူ ဖုန်း' },
+  { value: 'adminPhone', label: 'စီမံအုပ်ချုပ်သူ ဖုန်း' },
+  { value: 'contactPhone', label: 'တာဝန်ခံ (၁) ဖုန်း' },
+  { value: 'contact2Phone', label: 'တာဝန်ခံ (၂) ဖုန်း' },
 ] as const;
 
 export default function SchoolPortal() {
@@ -22,6 +31,14 @@ export default function SchoolPortal() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
+  // v24.13 S1: loading-aware auth — auth.currentUser is null on a fresh
+  // page load until Firebase restores the session, so the old synchronous
+  // read kicked the school out to /school-login on every refresh.
+  const [authUser, authLoading] = useAuthState(auth);
+  const { schoolLevels } = useData();
+  // v24.13 S5: the school's annual-fee transaction (for paid date/voucher).
+  const [feeTxn, setFeeTxn] = useState<TransactionRecord | null>(null);
+  const [resettingPw, setResettingPw] = useState(false);
 
   // Form State
   const [phone, setPhone] = useState('');
@@ -49,14 +66,34 @@ export default function SchoolPortal() {
   const [reqValue, setReqValue] = useState('');
   const [isSubmittingReq, setIsSubmittingReq] = useState(false);
 
+  // v24.13 S2: refetch the school's own change requests (used after submit).
+  const fetchMyRequests = async (uid: string) => {
+    try {
+      const reqQuery = query(collection(db, 'school_update_requests'), where('requestedByUid', '==', uid));
+      const reqSnap = await getDocs(reqQuery);
+      const reqData = reqSnap.docs.map(d => ({ id: d.id, ...d.data() } as SchoolUpdateRequest));
+      reqData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setMyRequests(reqData);
+    } catch {
+      // Reading requests is optional — the portal works without it.
+    }
+  };
+
   useEffect(() => {
+    if (authLoading) return;
+    const user = authUser;
+    if (!user) { navigate('/school-login'); return; }
     const fetchSchoolData = async () => {
-      const user = auth.currentUser;
-      if (!user) { navigate('/school-login'); return; }
 
       try {
-        const q = query(collection(db, 'schools'), where('authUid', '==', user.uid));
-        const snap = await getDocs(q);
+        // v24.13 S3: legacy accounts have no authUid — fall back to the
+        // accountEmail lookup, exactly as SchoolLogin does. Never backfill
+        // authUid from the portal (the schools update rule allows the school
+        // only 6 keys, so such a write would be denied).
+        let snap = await getDocs(query(collection(db, 'schools'), where('authUid', '==', user.uid)));
+        if (snap.empty && user.email) {
+          snap = await getDocs(query(collection(db, 'schools'), where('accountEmail', '==', user.email)));
+        }
         
         if (!snap.empty) {
           const data = { id: snap.docs[0].id, ...snap.docs[0].data() } as School;
@@ -81,21 +118,22 @@ export default function SchoolPortal() {
           }
           setAthletes(athleteDocs.map(d => ({ id: d.id, ...d.data() } as Athlete)));
 
+          // v24.13 S5: annual-fee transaction for the paid date / voucher.
+          try {
+            const txnSnap = await getDocs(query(collection(db, 'transactions'), where('schoolId', '==', data.id)));
+            const txns = txnSnap.docs.map(d => ({ id: d.id, ...d.data() } as TransactionRecord));
+            setFeeTxn(findAnnualFeeTransaction(txns, data.id, data.feeAcademicYear) ?? null);
+          } catch {
+            // Fee status still shows from the school flag without it.
+          }
+
           const actQuery = query(collection(db, 'events'), where('schoolId', '==', data.id));
           const actSnap = await getDocs(actQuery);
           setActivities(actSnap.docs.map(d => ({ id: d.id, ...d.data() } as EventItem)));
 
           // The school's own change requests (readable by the requester
           // since v24.7 — see firestore.rules).
-          try {
-            const reqQuery = query(collection(db, 'school_update_requests'), where('requestedByUid', '==', user.uid));
-            const reqSnap = await getDocs(reqQuery);
-            const reqData = reqSnap.docs.map(d => ({ id: d.id, ...d.data() } as SchoolUpdateRequest));
-            reqData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-            setMyRequests(reqData);
-          } catch {
-            // Reading requests is optional — the portal works without it.
-          }
+          await fetchMyRequests(user.uid);
         } else {
           toast.error('ကျောင်းအချက်အလက် ရှာမတွေ့ပါ');
         }
@@ -106,7 +144,7 @@ export default function SchoolPortal() {
       }
     };
     fetchSchoolData();
-  }, [navigate]);
+  }, [authUser, authLoading, navigate]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,6 +159,16 @@ export default function SchoolPortal() {
         studentCount: studentCount ? Number(studentCount) : null,
         updatedAt: new Date().toISOString()
       });
+      // v24.13 S2: refresh local state so the page (and new activities,
+      // which stamp the school's zone/name) use the just-saved values.
+      setSchool(prev => prev ? {
+        ...prev,
+        schoolPhone: phone,
+        address,
+        township,
+        zone,
+        studentCount: studentCount ? Number(studentCount) : null,
+      } : prev);
       toast.success('အချက်အလက်များ သိမ်းဆည်းပြီးပါပြီ');
     } catch (err) {
       toast.error('သိမ်းဆည်းရာတွင် အမှားဖြစ်ပွားပါသည်');
@@ -170,6 +218,10 @@ export default function SchoolPortal() {
     if (!fieldDef || !newValue) { toast.error('ပြောင်းလိုသော အချက်အလက်ကို ဖြည့်ပါ'); return; }
     const oldValue = String((school as any)[reqField] ?? '');
     if (oldValue === newValue) { toast.info('တန်ဖိုး အသစ်က လက်ရှိ တန်ဖိုးနဲ့ အတူတူပဲ ဖြစ်နေပါတယ်'); return; }
+    // v24.13 S6: one pending request per field — a second one for the same
+    // field would sit behind the first and confuse the admin queue.
+    const hasPendingSameField = myRequests.some(r => r.status === 'pending' && r.changes.some(c => c.field === reqField));
+    if (hasPendingSameField) { toast.error('ဤအချက်အတွက် စစ်ဆေးရန် ကျန်နေသော တောင်းဆိုမှု ရှိပြီးသားပါ — အတည်ပြု/ပယ်ဖျက်ပြီးမှ အသစ်တောင်းဆိုနိုင်ပါသည်'); return; }
     setIsSubmittingReq(true);
     try {
       const docRef = await addDoc(collection(db, 'school_update_requests'), {
@@ -182,7 +234,8 @@ export default function SchoolPortal() {
         status: 'pending',
         createdAt: new Date().toISOString(),
       });
-      setMyRequests(prev => [{ id: docRef.id, schoolId: school.id, schoolName: school.name, requestedBy: user.email || school.name, requestedByUid: user.uid, contactPhone: school.schoolPhone || '', changes: [{ field: reqField, oldValue, newValue }], status: 'pending', createdAt: new Date().toISOString() }, ...prev]);
+      // v24.13 S2: refetch from Firestore so the list reflects the server.
+      await fetchMyRequests(user.uid);
       setReqValue('');
       toast.success('တောင်းဆိုမှု ပေးပို့ပြီးပါပြီ — Admin အတည်ပြုပြီးမှ ပြောင်းလဲပါမည်');
     } catch (err) {
@@ -204,12 +257,28 @@ export default function SchoolPortal() {
     }
   };
 
+  // v24.13 S4: password reset from inside the portal (the Accounts tab
+  // belongs to another agent, so the portal is where the school does this).
+  const handleSendPasswordReset = async () => {
+    const targetEmail = school?.accountEmail || authUser?.email;
+    if (!targetEmail) { toast.error('ဤကျောင်းအကောင့်တွင် အီးမေးလ် မှတ်တမ်းမရှိပါ — Admin ကို ဆက်သွယ်ပါ'); return; }
+    setResettingPw(true);
+    try {
+      await sendPasswordResetEmail(auth, targetEmail);
+      toast.success(`စကားဝှက် ပြန်လည်သတ်မှတ်ရန် လင့်ခ်ကို ${targetEmail} သို့ ပို့ပြီးပါပြီ`);
+    } catch {
+      toast.error('စကားဝှက် ပြန်လည်သတ်မှတ်ရန် အီးမေးလ် ပို့၍ မရပါ');
+    } finally {
+      setResettingPw(false);
+    }
+  };
+
   const handleLogout = async () => {
     await auth.signOut();
     navigate('/school-login');
   };
 
-  if (loading) return <div className="p-10 text-center">ခဏစောင့်ပါ...</div>;
+  if (loading || authLoading) return <div className="p-10 text-center">ခဏစောင့်ပါ...</div>;
   if (!school) return <div className="p-10 text-center">ကျောင်းအချက်အလက် မရှိပါ။</div>;
 
   return (
@@ -228,6 +297,32 @@ export default function SchoolPortal() {
           <button onClick={handleLogout} className="text-xs font-bold text-rose-600 hover:text-rose-800 flex items-center gap-1 bg-rose-50 px-3 py-1.5 rounded-lg">
             <LogOut className="w-4 h-4" /> ထွက်မည်
           </button>
+        </div>
+
+        {/* v24.13 S5: annual-fee status — paid/unpaid, amount, academic year,
+            paid date and voucher (from the transaction when one exists). */}
+        <div className={`p-4 sm:p-5 rounded-2xl border shadow-sm flex flex-wrap items-center gap-3 ${school.isAnnualFeePaid ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+          <div className="flex-1 min-w-[200px]">
+            <p className="text-xs font-bold text-slate-500">နှစ်စဉ်ကြေး အခြေအနေ ({school.feeAcademicYear || feeTxn?.academicYear || getGlobalAcademicYear()} ပညာသင်နှစ်)</p>
+            <p className="font-bold text-slate-900 text-base mt-0.5">{school.isAnnualFeePaid ? '✅ ပေးသွင်းပြီးပါပြီ' : '⏳ ပေးသွင်းရန် ကျန်ရှိပါသည်'}</p>
+            {(school.feeAmount ?? feeTxn?.amount) != null && (
+              <p className="text-sm text-slate-700 mt-0.5">ပမာဏ: <span className="font-bold">{Number(school.feeAmount ?? feeTxn?.amount).toLocaleString('my-MM')} ကျပ်</span></p>
+            )}
+            {(school.feePaidDate || feeTxn?.paidDate) && (
+              <p className="text-sm text-slate-700">ပေးသွင်းသည့်ရက်: <span className="font-bold">{school.feePaidDate || feeTxn?.paidDate}</span></p>
+            )}
+            {feeTxn?.voucherNo && (
+              <p className="text-sm text-slate-700">ဖြတ်ပိုင်းအမှတ်: <span className="font-mono font-bold">{feeTxn.voucherNo}</span></p>
+            )}
+            {!school.isAnnualFeePaid && (
+              <p className="text-xs text-slate-500 mt-1">နှစ်စဉ်ကြေး ပေးသွင်းရန် အသင်း Admin ကို ဆက်သွယ်ပါ။</p>
+            )}
+          </div>
+          {feeTxn && (
+            <Link to={`/receipt/${feeTxn.id}`} className="text-xs font-bold text-sky-700 bg-white px-3 py-2 rounded-lg border border-sky-200 hover:bg-sky-50 transition shrink-0">
+              ဖြတ်ပိုင်း ကြည့်ရန်
+            </Link>
+          )}
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
@@ -269,15 +364,22 @@ export default function SchoolPortal() {
                 <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1"><MapPin className="w-3 h-3 text-indigo-600"/> ဇုန် (Zone)</label>
                 <select value={zone} onChange={e => setZone(e.target.value)} className="w-full p-2.5 border rounded-xl text-sm bg-white">
                   <option value="">- ဇုန် မသတ်မှတ်ရသေး -</option>
-                  {STANDARD_ZONES.map(z => (
+                  {/* v24.13 S7: a non-standard zone (e.g. from Excel import)
+                      is kept as an extra option so it renders and can be
+                      re-selected instead of showing a blank select. */}
+                  {([...STANDARD_ZONES] as string[]).concat(zone && !(STANDARD_ZONES as readonly string[]).includes(zone) ? [zone] : []).map(z => (
                     <option key={z} value={z}>{z}</option>
                   ))}
                 </select>
               </div>
 
-              <div className="pt-4 border-t border-slate-100">
+              <div className="pt-4 border-t border-slate-100 space-y-2">
                 <button type="submit" disabled={saving} className="w-full bg-sky-900 hover:bg-sky-800 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-sm transition flex items-center justify-center gap-2">
                   <Save className="w-4 h-4" /> {saving ? 'သိမ်းဆည်းနေပါသည်...' : 'အချက်အလက်များ သိမ်းမည်'}
+                </button>
+                {/* v24.13 S4: password reset from the portal */}
+                <button type="button" onClick={handleSendPasswordReset} disabled={resettingPw} className="w-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-6 py-2.5 rounded-xl font-bold text-sm transition disabled:opacity-50">
+                  {resettingPw ? 'ပို့နေပါသည်...' : 'စကားဝှက် မေ့နေပါသလား? — ပြန်လည်သတ်မှတ်ရန် အီးမေးလ် ပို့မည်'}
                 </button>
               </div>
             </form>
@@ -328,11 +430,11 @@ export default function SchoolPortal() {
               <FileText className="w-5 h-5 text-amber-600" /> အခြား အချက်အလက် ပြောင်းလဲရန် တောင်းဆိုမည်
             </h2>
           </div>
-          <p className="text-xs text-slate-500">ကျောင်းအမည်၊ အဆင့်၊ ကျောင်းသားဦးရေ Range တို့ကို ကိုယ်တိုင် ပြင်၍မရပါ — Admin ထံ တောင်းဆိုနိုင်ပါသည်။ ဖုန်း၊ လိပ်စာ၊ မြို့နယ်၊ ဇုန်၊ ကျောင်းသားဦးရေတို့ကိုတော့ အပေါ်က form မှာပဲ တိုက်ရိုက် ပြင်နိုင်ပါသည်။</p>
+          <p className="text-xs text-slate-500">ကျောင်းအမည်၊ အဆင့်၊ ကျောင်းသားဦးရေ Range နှင့် တည်ထောင်သူ/စီမံအုပ်ချုပ်သူ/တာဝန်ခံတို့၏ ဖုန်းနံပါတ်များကို ကိုယ်တိုင် ပြင်၍မရပါ — Admin ထံ တောင်းဆိုနိုင်ပါသည်။ ကျောင်းဖုန်း၊ လိပ်စာ၊ မြို့နယ်၊ ဇုန်၊ ကျောင်းသားဦးရေတို့ကိုတော့ အပေါ်က form မှာပဲ တိုက်ရိုက် ပြင်နိုင်ပါသည်။</p>
           <form onSubmit={handleSubmitRequest} className="grid sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">ပြောင်းလိုသော အချက်</label>
-              <select value={reqField} onChange={e => setReqField(e.target.value)} className="w-full p-2.5 border rounded-xl text-sm bg-white">
+              <select value={reqField} onChange={e => { setReqField(e.target.value); setReqValue(''); }} className="w-full p-2.5 border rounded-xl text-sm bg-white">
                 {REQUESTABLE_FIELDS.map(f => (
                   <option key={f.value} value={f.value}>{f.label}</option>
                 ))}
@@ -340,7 +442,23 @@ export default function SchoolPortal() {
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">တန်ဖိုး အသစ်</label>
-              <input required value={reqValue} onChange={e => setReqValue(e.target.value)} placeholder="ဥပမာ - ပညာရောင်ခြည် ကိုယ်ပိုင်အထက်တန်းကျောင်း" className="w-full p-2.5 border rounded-xl text-sm" />
+              {reqField === 'level' ? (
+                <select required value={reqValue} onChange={e => setReqValue(e.target.value)} className="w-full p-2.5 border rounded-xl text-sm bg-white">
+                  <option value="">- အဆင့် ရွေးပါ -</option>
+                  {(schoolLevels.length > 0 ? schoolLevels.map(l => l.name) : DEFAULT_SCHOOL_LEVELS).map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              ) : reqField === 'studentRange' ? (
+                <select required value={reqValue} onChange={e => setReqValue(e.target.value)} className="w-full p-2.5 border rounded-xl text-sm bg-white">
+                  <option value="">- Range ရွေးပါ -</option>
+                  {STUDENT_RANGE_TIERS.map(t => (
+                    <option key={t.key} value={t.key}>{t.label}</option>
+                  ))}
+                </select>
+              ) : (
+                <input required value={reqValue} onChange={e => setReqValue(e.target.value)} placeholder="ဥပမာ - ပညာရောင်ခြည် ကိုယ်ပိုင်အထက်တန်းကျောင်း" className="w-full p-2.5 border rounded-xl text-sm" />
+              )}
             </div>
             <button type="submit" disabled={isSubmittingReq} className="bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer">
               <Send className="w-4 h-4" /> {isSubmittingReq ? 'ပို့နေပါသည်...' : 'တောင်းဆိုမည်'}

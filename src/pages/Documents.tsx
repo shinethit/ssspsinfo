@@ -36,14 +36,32 @@ export default function Documents() {
     fetchDocs();
   }, []);
 
-  const filteredDocs = docs.filter(d =>
-    (d.title || '').toLowerCase().includes(searchQuery.trim().toLowerCase())
-  );
+  // v24.13: search matches the displayed category too, not just the title.
+  const filteredDocs = docs.filter(d => {
+    const q = searchQuery.trim().toLowerCase();
+    return !q || (d.title || '').toLowerCase().includes(q) || (d.category || '').toLowerCase().includes(q);
+  });
+
+  // v24.13: Google Drive viewer links cannot download directly — they still
+  // open in a new tab. Direct file URLs use a real <a download> instead of
+  // window.open, which only opened another tab.
+  const isDriveViewerLink = (url: string) =>
+    url.includes('drive.google.com') || url.includes('docs.google.com');
+  const handleDownload = (doc: DocumentItem) => {
+    if (!doc.fileUrl) { toast.error('ဤစာရွက်စာတမ်းတွင် ဖိုင် လင့်ခ် မရှိပါ'); return; }
+    if (isDriveViewerLink(doc.fileUrl)) { window.open(doc.fileUrl, '_blank'); return; }
+    const a = document.createElement('a');
+    a.href = doc.fileUrl;
+    a.download = (doc.title || 'document').replace(/[^\w\-. ]+/g, '').trim() || 'document';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-10">
       <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-        <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-sky-950 font-bold text-xs sm:text-sm transition cursor-pointer shadow-2xs">
+        <button onClick={() => { if (window.history.length > 1) navigate(-1); else navigate('/'); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-sky-950 font-bold text-xs sm:text-sm transition cursor-pointer shadow-2xs">
           <ArrowLeft className="w-4 h-4 text-sky-800" /> နောက်သို့
         </button>
         <Link to="/" className="text-xs font-semibold text-slate-600 hover:text-sky-800 px-2.5 py-1 rounded-lg hover:bg-slate-100 transition">ပင်မစာမျက်နှာ ➔</Link>
@@ -109,11 +127,7 @@ export default function Documents() {
                   </div>
                 </div>
                 <button
-                  onClick={() => {
-                    // v24.6: a record without a file link used to open a blank tab
-                    if (!doc.fileUrl) { toast.error('ဤစာရွက်စာတမ်းတွင် ဖိုင် လင့်ခ် မရှိပါ'); return; }
-                    window.open(doc.fileUrl, '_blank');
-                  }}
+                  onClick={() => handleDownload(doc)}
                   title="ဒေါင်းလုဒ်ဆွဲရန်"
                   className="p-2.5 text-sky-700 bg-sky-50 hover:bg-sky-100 rounded-xl transition shadow-sm border border-sky-100 cursor-pointer shrink-0"
                 >

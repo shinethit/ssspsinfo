@@ -4,7 +4,7 @@ import { db } from '../../lib/firebase';
 import { SportsEvent, SportsMatchResult, School, Athlete } from '../../types';
 import { toast } from 'sonner';
 import { confirmDialog } from '../../components/ConfirmModal';
-import { Plus, Trash2, PlusCircle, Upload, Download, AlertCircle, MapPin } from 'lucide-react';
+import { Plus, Trash2, PlusCircle, Upload, Download, AlertCircle, MapPin, Edit2 } from 'lucide-react';
 import { DEFAULT_SPORTS_TYPES } from '../../data/sports';
 import AdminSportInfoManager from './AdminSportInfoManager';
 import AdminAthleteManager from './AdminAthleteManager';
@@ -33,6 +33,34 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
   const [winner, setWinner] = useState('');
   const [medal, setMedal] = useState<'gold'|'silver'|'bronze'|''>('');
   const [matchTime, setMatchTime] = useState('');
+  // A2(b)/Medal: optional 2nd-place (silver) and 3rd-place (bronze) schools
+  const [secondPlace, setSecondPlace] = useState('');
+  const [thirdPlace, setThirdPlace] = useState('');
+  // A2(b): sports event being edited (null = creating a new event)
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  // A2(b): result being edited (null = adding a new result)
+  const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
+  // A7: in-flight guards so double-click cannot create twice
+  const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
+  const [isSubmittingMatch, setIsSubmittingMatch] = useState(false);
+
+  // A4: the result form belongs to one event/sport — clear it whenever the
+  // admin picks a different event or switches sport tabs, so a stale
+  // team/score/winner can never be saved under the wrong event.
+  const clearResultForm = () => {
+    setTeamA(''); setPlayerA(''); setScoreA(''); setTeamB(''); setPlayerB(''); setScoreB('');
+    setWinner(''); setMedal(''); setMatchTime(''); setSecondPlace(''); setThirdPlace('');
+    setEditingMatchId(null);
+  };
+
+  // A4: changing either team invalidates the winner (and the 2nd/3rd
+  // places, which are picked from the two teams) and that team's player.
+  const handleTeamAChange = (value: string) => {
+    setTeamA(value); setPlayerA(''); setWinner(''); setSecondPlace(''); setThirdPlace('');
+  };
+  const handleTeamBChange = (value: string) => {
+    setTeamB(value); setPlayerB(''); setWinner(''); setSecondPlace(''); setThirdPlace('');
+  };
 
   const fetchEvents = async () => {
     const snap = await getDocs(collection(db, 'sports_events')).catch(() => ({ docs: [] }));
@@ -59,20 +87,91 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
     return true; 
   };
 
+  // A7: wrapped in try/catch (a failed save used to fail silently) with an
+  // in-flight guard; A2(b): when editing, update the event's title/date/
+  // location instead of creating a new event (results are preserved).
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
-    await addDoc(collection(db, 'sports_events'), {
-      title, sportType: activeSport, status: 'upcoming', startDate, location,
-      results: [], createdAt: new Date().toISOString()
-    });
-    toast.success('ပွဲစဉ်အသစ် တင်ပြီးပါပြီ');
-    setTitle(''); setStartDate(''); setLocation('');
-    fetchEvents();
+    if (isSubmittingEvent) return;
+    setIsSubmittingEvent(true);
+    try {
+      if (editingEventId) {
+        await updateDoc(doc(db, 'sports_events', editingEventId), {
+          title, startDate, location,
+        });
+        toast.success('ပွဲစဉ် ပြင်ဆင်ပြီးပါပြီ');
+        setEditingEventId(null);
+      } else {
+        await addDoc(collection(db, 'sports_events'), {
+          title, sportType: activeSport, status: 'upcoming', startDate, location,
+          results: [], createdAt: new Date().toISOString()
+        });
+        toast.success('ပွဲစဉ်အသစ် တင်ပြီးပါပြီ');
+      }
+      setTitle(''); setStartDate(''); setLocation('');
+      fetchEvents();
+    } catch (err) {
+      toast.error('ပွဲစဉ် သိမ်း၍ မရပါ — အင်တာနက် စစ်ပြီး ထပ်ကြိုးစားပါ');
+    } finally {
+      setIsSubmittingEvent(false);
+    }
   };
 
+  // A2(b): prefill the create-event form with this event's data for editing.
+  const startEditEvent = (ev: SportsEvent) => {
+    setEditingEventId(ev.id);
+    setTitle(ev.title || '');
+    setStartDate(ev.startDate || '');
+    setLocation(ev.location || '');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const cancelEditEvent = () => {
+    setEditingEventId(null);
+    setTitle(''); setStartDate(''); setLocation('');
+  };
+
+  // A2(b): prefill the result form with this match's data for editing.
+  const startEditMatch = (match: SportsMatchResult) => {
+    setEditingMatchId(match.id);
+    setTeamA(match.teamA || '');
+    setPlayerA(match.playerA || '');
+    setScoreA(String(match.scoreA ?? ''));
+    setTeamB(match.teamB || '');
+    setPlayerB(match.playerB || '');
+    setScoreB(String(match.scoreB ?? ''));
+    setWinner(match.winner || '');
+    setMedal(match.medal || '');
+    setMatchTime(match.matchTime || '');
+    setSecondPlace((match as SportsMatchResult & { secondPlace?: string }).secondPlace || '');
+    setThirdPlace((match as SportsMatchResult & { thirdPlace?: string }).thirdPlace || '');
+    setIsIndividual(Boolean(match.playerA || match.playerB));
+  };
+
+  // A2(b): remove one result from the event's results array.
+  const handleDeleteMatch = async (matchId: string) => {
+    if (!selectedEventId) return;
+    if (!(await confirmDialog('ဤရလဒ်ကို ဖျက်ရန် သေချာပါသလား?'))) return;
+    try {
+      const event = events.find(ev => ev.id === selectedEventId);
+      if (!event) return;
+      await updateDoc(doc(db, 'sports_events', selectedEventId), {
+        results: (event.results || []).filter(r => r.id !== matchId)
+      });
+      toast.success('ရလဒ် ဖျက်ပြီးပါပြီ');
+      if (editingMatchId === matchId) clearResultForm();
+      fetchEvents();
+    } catch (err) {
+      toast.error('ရလဒ် ဖျက်၍ မရပါ');
+    }
+  };
+
+  // A7: wrapped in try/catch (a failed save used to fail silently) with an
+  // in-flight guard; A2(b): when editing, replace that match in place
+  // (same id) instead of appending a duplicate.
   const handleAddMatch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEventId) return;
+    if (isSubmittingMatch) return;
     const event = events.find(ev => ev.id === selectedEventId);
     if (!event) return;
 
@@ -86,32 +185,66 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
       toast.error('ဆုတံဆိပ် ရွေးပေးပါ');
       return;
     }
+    // Medal: 2nd/3rd places must be real, distinct schools, not the winner.
+    if (secondPlace && secondPlace !== teamA && secondPlace !== teamB) {
+      toast.error('ဒုတိယနေရာ ကျောင်းကို ရွေးပေးပါ');
+      return;
+    }
+    if (thirdPlace && thirdPlace !== teamA && thirdPlace !== teamB) {
+      toast.error('တတိယနေရာ ကျောင်းကို ရွေးပေးပါ');
+      return;
+    }
+    if (secondPlace && secondPlace === winner) {
+      toast.error('ဒုတိယနေရာသည် အနိုင်ရသူနှင့် မတူရပါ');
+      return;
+    }
+    if (thirdPlace && (thirdPlace === winner || thirdPlace === secondPlace)) {
+      toast.error('တတိယနေရာသည် အနိုင်ရသူ / ဒုတိယနေရာနှင့် မတူရပါ');
+      return;
+    }
 
-    const isDuplicate = event.results?.some(r => 
-      (r.teamA === teamA && r.teamB === teamB) || 
-      (r.teamA === teamB && r.teamB === teamA) ||
-      (playerA && r.playerA === playerA) ||
-      (playerB && r.playerB === playerB)
+    const isDuplicate = (event.results || []).some(r =>
+      r.id !== editingMatchId && (
+        (r.teamA === teamA && r.teamB === teamB) ||
+        (r.teamA === teamB && r.teamB === teamA) ||
+        (playerA && r.playerA === playerA) ||
+        (playerB && r.playerB === playerB)
+      )
     );
 
     if (isDuplicate) {
       if (!(await confirmDialog('ဤအသင်း (သို့မဟုတ်) အားကစားသမားသည် ဤပွဲစဉ်တွင် ပါဝင်ပြီးသား ဖြစ်နေပါသည်။ ထပ်မံထည့်ရန် သေချာပါသလား?'))) return;
     }
 
-    const newMatch: SportsMatchResult = {
-      id: Date.now().toString(), 
-      teamA, playerA: isIndividual ? playerA : undefined, scoreA, 
-      teamB, playerB: isIndividual ? playerB : undefined, scoreB, 
-      winner, medal: medal as any,
-      matchTime: matchTime.trim() || undefined
-    };
+    setIsSubmittingMatch(true);
+    try {
+      // secondPlace/thirdPlace are optional extra fields on the match —
+      // SportsMatchResult has no declared fields for them yet, so they are
+      // added via spread (MedalTally reads them the same way).
+      const newMatch: SportsMatchResult = {
+        id: editingMatchId || Date.now().toString(),
+        teamA, playerA: isIndividual ? playerA : undefined, scoreA,
+        teamB, playerB: isIndividual ? playerB : undefined, scoreB,
+        winner, medal: medal as any,
+        matchTime: matchTime.trim() || undefined,
+        ...(secondPlace ? { secondPlace } : {}),
+        ...(thirdPlace ? { thirdPlace } : {}),
+      } as SportsMatchResult;
 
-    await updateDoc(doc(db, 'sports_events', selectedEventId), {
-      results: [...(event.results || []), newMatch]
-    });
-    toast.success('ရလဒ် ထည့်ပြီးပါပြီ');
-    setTeamA(''); setPlayerA(''); setScoreA(''); setTeamB(''); setPlayerB(''); setScoreB(''); setWinner(''); setMedal(''); setMatchTime('');
-    fetchEvents();
+      const nextResults = editingMatchId
+        ? (event.results || []).map(r => (r.id === editingMatchId ? newMatch : r))
+        : [...(event.results || []), newMatch];
+      await updateDoc(doc(db, 'sports_events', selectedEventId), {
+        results: nextResults
+      });
+      toast.success(editingMatchId ? 'ရလဒ် ပြင်ဆင်ပြီးပါပြီ' : 'ရလဒ် ထည့်ပြီးပါပြီ');
+      clearResultForm();
+      fetchEvents();
+    } catch (err) {
+      toast.error('ရလဒ် သိမ်း၍ မရပါ — အင်တာနက် စစ်ပြီး ထပ်ကြိုးစားပါ');
+    } finally {
+      setIsSubmittingMatch(false);
+    }
   };
 
   const sportEvents = events.filter(e => e.sportType === activeSport);
@@ -145,7 +278,7 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
 
       <div className="flex overflow-x-auto bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm gap-1 snap-x mb-2">
         {DEFAULT_SPORTS_TYPES.map(sport => (
-          <button key={sport} onClick={() => { setActiveSport(sport); setSelectedEventId(null); }} className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-lg whitespace-nowrap transition shrink-0 snap-start ${activeSport === sport ? 'bg-sky-900 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'}`}>
+          <button key={sport} onClick={() => { setActiveSport(sport); setSelectedEventId(null); clearResultForm(); cancelEditEvent(); }} className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-lg whitespace-nowrap transition shrink-0 snap-start ${activeSport === sport ? 'bg-sky-900 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'}`}>
             {sport}
           </button>
         ))}
@@ -162,7 +295,7 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
           <div className="space-y-4">
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
               <h3 className="font-bold text-slate-900 flex items-center gap-2 border-b pb-2">
-                <Plus className="w-5 h-5 text-emerald-600" /> {activeSport} ပွဲစဉ်အသစ်
+                <Plus className="w-5 h-5 text-emerald-600" /> {editingEventId ? `${activeSport} ပွဲစဉ် ပြင်ဆင်ရန်` : `${activeSport} ပွဲစဉ်အသစ်`}
               </h3>
               <form onSubmit={handleCreateEvent} className="space-y-3">
                 <input required value={title} onChange={e => setTitle(e.target.value)} placeholder="ပြိုင်ပွဲ ခေါင်းစဉ်" className="w-full p-2.5 border rounded-xl text-sm" />
@@ -170,7 +303,12 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
                   <input required type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full p-2.5 border rounded-xl text-sm" />
                   <input required value={location} onChange={e => setLocation(e.target.value)} placeholder="ကျင်းပမည့်နေရာ" className="w-full p-2.5 border rounded-xl text-sm" />
                 </div>
-                <button type="submit" className="w-full bg-emerald-700 text-white py-2.5 rounded-xl font-bold text-sm">ပွဲစဉ် တင်မည်</button>
+                <div className="flex gap-2">
+                  <button type="submit" disabled={isSubmittingEvent} className="flex-1 bg-emerald-700 text-white py-2.5 rounded-xl font-bold text-sm disabled:opacity-50">{isSubmittingEvent ? 'တင်နေပါသည်...' : editingEventId ? 'ပြင်ဆင်ချက် သိမ်းမည်' : 'ပွဲစဉ် တင်မည်'}</button>
+                  {editingEventId && (
+                    <button type="button" onClick={cancelEditEvent} className="bg-slate-100 text-slate-700 px-4 py-2.5 rounded-xl font-bold text-sm">Cancel</button>
+                  )}
+                </div>
               </form>
             </div>
 
@@ -178,12 +316,15 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
               <div className="p-3 bg-slate-50 border-b font-bold text-xs text-slate-600 uppercase tracking-wide">ပွဲစဉ်စာရင်း</div>
               <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto">
                 {sportEvents.map(ev => (
-                  <div key={ev.id} onClick={() => setSelectedEventId(ev.id)} className={`p-3 cursor-pointer transition flex justify-between items-start ${selectedEventId === ev.id ? 'bg-sky-50 border-l-4 border-sky-500' : 'hover:bg-slate-50'}`}>
+                  <div key={ev.id} onClick={() => { setSelectedEventId(ev.id); clearResultForm(); }} className={`p-3 cursor-pointer transition flex justify-between items-start ${selectedEventId === ev.id ? 'bg-sky-50 border-l-4 border-sky-500' : 'hover:bg-slate-50'}`}>
                     <div>
                       <h4 className="font-bold text-sm text-slate-900">{ev.title}</h4>
                       <div className="text-xs text-slate-500 mt-1">{ev.startDate} • {ev.location}</div>
                     </div>
-                    <button onClick={async (e) => { e.stopPropagation(); if (await confirmDialog('ဖျက်ရန် သေချာပါသလား?')) { try { await deleteDoc(doc(db, 'sports_events', ev.id)); fetchEvents(); } catch (err) { toast.error('ဖျက်၍ မရပါ'); } } }} className="text-rose-500 p-1 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4" /></button>
+                    <div className="flex gap-1 shrink-0">
+                      <button title="ပွဲစဉ် ပြင်ဆင်ရန်" onClick={(e) => { e.stopPropagation(); startEditEvent(ev); }} className="text-amber-600 p-1 hover:bg-amber-50 rounded"><Edit2 className="w-4 h-4" /></button>
+                      <button onClick={async (e) => { e.stopPropagation(); if (await confirmDialog('ဖျက်ရန် သေချာပါသလား?')) { try { await deleteDoc(doc(db, 'sports_events', ev.id)); fetchEvents(); } catch (err) { toast.error('ဖျက်၍ မရပါ'); } } }} className="text-rose-500 p-1 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4" /></button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -211,7 +352,7 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
                   <form onSubmit={handleAddMatch} className="space-y-2">
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <select required value={teamA} onChange={e => setTeamA(e.target.value)} className="w-full p-2 border rounded-lg text-xs mb-1">
+                        <select required value={teamA} onChange={e => handleTeamAChange(e.target.value)} className="w-full p-2 border rounded-lg text-xs mb-1">
                           <option value="">- ကျောင်းရွေးပါ -</option>
                           {schools.filter(s => isSchoolInZone(s.zone, zoneFilter)).map(s => {
                           const paid = hasPaidSportsFee(s.name);
@@ -228,7 +369,7 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
                         <input required value={scoreA} onChange={e => setScoreA(e.target.value)} placeholder="ရမှတ်" className="w-full p-2 border rounded-lg text-xs mt-1" />
                       </div>
                       <div>
-                        <select required value={teamB} onChange={e => setTeamB(e.target.value)} className="w-full p-2 border rounded-lg text-xs mb-1">
+                        <select required value={teamB} onChange={e => handleTeamBChange(e.target.value)} className="w-full p-2 border rounded-lg text-xs mb-1">
                           <option value="">- ကျောင်းရွေးပါ -</option>
                           {schools.filter(s => isSchoolInZone(s.zone, zoneFilter)).map(s => {
                           const paid = hasPaidSportsFee(s.name);
@@ -259,6 +400,18 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
                         <option value="bronze">🥉 ကြေး</option>
                       </select>
                     </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <select value={secondPlace} onChange={e => setSecondPlace(e.target.value)} className="w-full p-2 border rounded-lg text-xs">
+                        <option value="">- ဒုတိယနေရာ (ငွေ) — မသတ်မှတ်ရသေး -</option>
+                        {teamA && <option value={teamA}>🥈 {teamA}</option>}
+                        {teamB && teamB !== teamA && <option value={teamB}>🥈 {teamB}</option>}
+                      </select>
+                      <select value={thirdPlace} onChange={e => setThirdPlace(e.target.value)} className="w-full p-2 border rounded-lg text-xs">
+                        <option value="">- တတိယနေရာ (ကြေး) — မသတ်မှတ်ရသေး -</option>
+                        {teamA && <option value={teamA}>🥉 {teamA}</option>}
+                        {teamB && teamB !== teamA && <option value={teamB}>🥉 {teamB}</option>}
+                      </select>
+                    </div>
                     <input
                       type="text"
                       value={matchTime}
@@ -266,14 +419,19 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
                       placeholder="ပွဲချိန် (Optional — ဥပမာ 10:00 AM သို့မဟုတ် ည ၇:၀၀)"
                       className="w-full p-2 border rounded-lg text-xs"
                     />
-                    <button type="submit" className="w-full bg-sky-600 text-white py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1"><PlusCircle className="w-3.5 h-3.5" /> ရလဒ်ထည့်မည်</button>
+                    <div className="flex gap-2">
+                      <button type="submit" disabled={isSubmittingMatch} className="flex-1 bg-sky-600 text-white py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-50"><PlusCircle className="w-3.5 h-3.5" /> {isSubmittingMatch ? 'သိမ်းနေပါသည်...' : editingMatchId ? 'ရလဒ် ပြင်ဆင်မည်' : 'ရလဒ်ထည့်မည်'}</button>
+                      {editingMatchId && (
+                        <button type="button" onClick={clearResultForm} className="bg-slate-100 text-slate-700 px-3 py-2 rounded-lg text-xs font-bold">Cancel</button>
+                      )}
+                    </div>
                   </form>
                 </div>
 
                 <div className="divide-y divide-slate-100 p-2 max-h-[300px] overflow-y-auto">
                   {selectedEvent.results?.map(match => (
-                    <div key={match.id} className="p-2 flex justify-between items-center bg-white hover:bg-slate-50 rounded-lg group">
-                      <div className="text-xs font-bold text-slate-700">
+                    <div key={match.id} className="p-2 flex justify-between items-center gap-2 bg-white hover:bg-slate-50 rounded-lg group">
+                      <div className="text-xs font-bold text-slate-700 min-w-0">
                         <span>{match.teamA}</span> 
                         <span className="text-slate-400 font-normal ml-1">{match.playerA && `(${match.playerA})`}</span> 
                         <span className="text-sky-600 font-mono text-sm mx-1">{match.scoreA} - {match.scoreB}</span> 
@@ -284,6 +442,10 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
                             {match.matchTime}
                           </span>
                         )}
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        <button type="button" title="ရလဒ် ပြင်ဆင်ရန်" onClick={() => startEditMatch(match)} className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg"><Edit2 className="w-3.5 h-3.5" /></button>
+                        <button type="button" title="ရလဒ် ဖျက်ရန်" onClick={() => handleDeleteMatch(match.id)} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
                     </div>
                   ))}

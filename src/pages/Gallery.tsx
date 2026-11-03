@@ -12,6 +12,10 @@ export default function Gallery() {
   const [loadError, setLoadError] = useState(false);
   const [selectedAlbum, setSelectedAlbum] = useState('all');
   const [selectedPhoto, setSelectedPhoto] = useState<GalleryItem | null>(null);
+  // v24.13: images that fail to load become a 'ပုံဖွင့်မရပါ' tile and never
+  // open a blank lightbox (the old onError just hid the <img>).
+  const [brokenIds, setBrokenIds] = useState<Set<string>>(new Set());
+  const markBroken = (id: string) => setBrokenIds(prev => new Set(prev).add(id));
 
   useEffect(() => {
     const fetchPhotos = async () => {
@@ -48,7 +52,7 @@ export default function Gallery() {
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-10">
       <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-        <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-sky-950 font-bold text-xs sm:text-sm transition cursor-pointer shadow-2xs">
+        <button onClick={() => { if (window.history.length > 1) navigate(-1); else navigate('/'); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-sky-950 font-bold text-xs sm:text-sm transition cursor-pointer shadow-2xs">
           <ArrowLeft className="w-4 h-4 text-sky-800" /> နောက်သို့
         </button>
         <Link to="/" className="text-xs font-semibold text-slate-600 hover:text-sky-800 px-2.5 py-1 rounded-lg hover:bg-slate-100 transition">ပင်မစာမျက်နှာ ➔</Link>
@@ -105,17 +109,25 @@ export default function Gallery() {
           {filteredPhotos.map(photo => (
             <button
               key={photo.id}
-              onClick={() => setSelectedPhoto(photo)}
-              className="group bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden text-left hover:border-sky-300 transition cursor-pointer"
+              onClick={() => { if (!brokenIds.has(photo.id)) setSelectedPhoto(photo); }}
+              disabled={brokenIds.has(photo.id)}
+              className={`group bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden text-left transition ${brokenIds.has(photo.id) ? 'cursor-not-allowed' : 'hover:border-sky-300 cursor-pointer'}`}
             >
-              <div className="aspect-square overflow-hidden bg-slate-100">
-                <img
-                  src={photo.imageUrl}
-                  alt={photo.title}
-                  loading="lazy"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                  className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                />
+              <div className="aspect-square overflow-hidden bg-slate-100 flex items-center justify-center">
+                {brokenIds.has(photo.id) ? (
+                  <div className="text-center p-3">
+                    <Images className="w-8 h-8 mx-auto text-slate-300" />
+                    <p className="text-xs text-slate-400 font-semibold mt-1">ပုံဖွင့်မရပါ</p>
+                  </div>
+                ) : (
+                  <img
+                    src={photo.imageUrl}
+                    alt={photo.title}
+                    loading="lazy"
+                    onError={() => markBroken(photo.id)}
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                )}
               </div>
               <div className="p-3">
                 <h3 className="font-bold text-slate-900 text-xs sm:text-sm truncate">{photo.title}</h3>
@@ -155,11 +167,19 @@ export default function Gallery() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <img
-              src={selectedPhoto.imageUrl}
-              alt={selectedPhoto.title}
-              className="w-full max-h-[75vh] object-contain bg-slate-900"
-            />
+            {brokenIds.has(selectedPhoto.id) ? (
+              <div className="w-full max-h-[75vh] min-h-[200px] flex flex-col items-center justify-center bg-slate-900 text-slate-400 gap-2 p-8">
+                <Images className="w-10 h-10 text-slate-500" />
+                <p className="text-sm font-semibold">ပုံဖွင့်မရပါ</p>
+              </div>
+            ) : (
+              <img
+                src={selectedPhoto.imageUrl}
+                alt={selectedPhoto.title}
+                onError={() => markBroken(selectedPhoto.id)}
+                className="w-full max-h-[75vh] object-contain bg-slate-900"
+              />
+            )}
           </div>
         </div>
       )}

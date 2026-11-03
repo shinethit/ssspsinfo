@@ -1,23 +1,23 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { collection, getDocs, doc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteField, query, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { toast } from 'sonner';
 import { confirmDialog } from '../components/ConfirmModal';
 import * as XLSX from 'xlsx';
-import { Association, NewsTicker, AdminUser, School } from '../types';
+import { Association, NewsTicker, AdminUser, School, TransactionRecord } from '../types';
 import { useData, sortAnnouncementsByEventDate } from '../context/DataContext';
 import { getUnifiedSchoolLevels } from '../lib/schoolLevels';
 import {
   FileText, School as SchoolIcon, Building2,
   Megaphone, Calendar, Layers, History, Mail,
   HardDriveDownload, XCircle, Trophy,
-  FolderOpen, Coins, UserCog, LayoutDashboard, Images
+  FolderOpen, Coins, UserCog, LayoutDashboard, Images, Eye, EyeOff
 } from 'lucide-react';
 import { createSchoolAccount } from '../lib/schoolAuth';
 import { getAdminSession, clearAdminSession, changeAdminPassword, sendAdminPasswordReset, mapFirebaseAuthError } from '../lib/adminAuth';
 import { getGlobalAcademicYear } from '../lib/academicYear';
-import { recordAnnualFeePayment } from '../lib/finance';
+import { recordAnnualFeePayment, findAnnualFeeTransaction } from '../lib/finance';
 import { recordAuditLog } from '../lib/audit';
 import { canAccessTab } from '../lib/roles';
 import { normalizeSchoolRow, exportSchoolsToExcel } from '../lib/excel';
@@ -53,7 +53,7 @@ export default function Admin() {
   const adminSession = getAdminSession();
   const {
     schools: globalSchools, announcements: globalAnnouncements, schoolLevels,
-    addSchool, updateSchool, deleteSchool: deleteSchoolFromContext,
+    addSchool, updateSchool, deleteSchool: deleteSchoolFromContext, getSchoolDeleteImpact,
   } = useData();
 
   // v24.7: honour ?tab=finance (and friends) so links like the Receipt
@@ -109,6 +109,7 @@ export default function Admin() {
   const [schoolAccountModal, setSchoolAccountModal] = useState<School | null>(null);
   const [schoolAccEmail, setSchoolAccEmail] = useState('');
   const [schoolAccPassword, setSchoolAccPassword] = useState('');
+  const [showSchoolAccPassword, setShowSchoolAccPassword] = useState(false);
   const [isCreatingSchoolAcc, setIsCreatingSchoolAcc] = useState(false);
 
   const [isChangingPassModal, setIsChangingPassModal] = useState(false);
@@ -142,6 +143,22 @@ export default function Admin() {
     e.preventDefault(); if (!schoolAccountModal) return;
     if (!schoolAccEmail || !schoolAccPassword || schoolAccPassword.length < 6) { toast.error('အီးမေးလ်နှင့် စကားဝှက် (၆ လုံး) ဖြည့်စွက်ပါ'); return; }
     try { setIsCreatingSchoolAcc(true); await createSchoolAccount(schoolAccEmail, schoolAccPassword, schoolAccountModal.id); await recordAuditLog({ action: 'create', entityType: 'admin', entityId: schoolAccountModal.id, entityName: schoolAccountModal.name, details: `ကျောင်းအကောင့် ဖွင့်ခြင်း (${schoolAccEmail})` }); toast.success('ကျောင်းအကောင့် ဖန်တီးပြီးပါပြီ'); setSchoolAccountModal(null); setSchoolAccEmail(''); setSchoolAccPassword(''); fetchSchools(); } catch (e: any) { toast.error(mapFirebaseAuthError(e.code || e.message) || 'ဖန်တီး၍မရပါ'); } finally { setIsCreatingSchoolAcc(false); }
+  };
+
+  // v24.13 (A5): "အသစ်ပြန်ဖွင့်မည်" could never succeed — createSchoolAccount
+  // refuses when an account already exists, and the client SDK cannot
+  // delete another user's Auth account. The feasible path is unlinking:
+  // clear authUid + accountEmail on the school doc (confirmed + audited)
+  // so a NEW account can then be created. The old Auth account itself
+  // must still be removed in Firebase Console > Authentication.
+  const handleUnlinkSchoolAccount = async (school: School) => {
+    if (!(await confirmDialog(`"${school.name}" ၏ အကောင့်ချိတ်ဆက်မှုကို ဖြုတ်မည်လား? ဖြုတ်ပြီးလျှင် အကောင့်အသစ် ထပ်ဖွင့်နိုင်ပါသည်။ သတိပြုရန် — အကောင့်အဟောင်း (Auth) ကိုယ်တိုင်ကိုတော့ Firebase Console > Authentication တွင် သီးခြား ဖျက်ရပါမည်။`))) return;
+    try {
+      await updateDoc(doc(db, 'schools', school.id), { authUid: deleteField(), accountEmail: deleteField(), updatedAt: new Date().toISOString() });
+      await recordAuditLog({ action: 'update', entityType: 'school', entityId: school.id, entityName: school.name, details: `ကျောင်းအကောင့် ချိတ်ဆက်မှု ဖြုတ်ခြင်း (${school.accountEmail || school.authUid || ''}) — အကောင့်အသစ် ထပ်ဖွင့်နိုင်ပြီ` });
+      toast.success('အကောင့်ချိတ်ဆက်မှု ဖြုတ်ပြီးပါပြီ — အကောင့်အသစ် ထပ်ဖွင့်နိုင်ပါပြီ');
+      fetchSchools();
+    } catch (e) { toast.error('ဖြုတ်၍မရပါ'); }
   };
 
   const handleSaveNewPassword = async (e: React.FormEvent) => {
@@ -214,8 +231,21 @@ export default function Admin() {
   };
 
   const deleteSchool = async (id: string, name?: string) => {
-    if (!(await confirmDialog(`"${name || 'ဤကျောင်း'}" ကို ဖျက်ရန် သေချာပါသလား?`))) return;
-    try { await deleteSchoolFromContext(id); await recordAuditLog({ action: 'delete', entityType: 'school', entityId: id, entityName: name, details: 'ကျောင်း ဖျက်ခြင်း' }); toast.success('ဖျက်ပြီးပါပြီ'); fetchSchools(); } catch (e) { toast.error('ဖျက်၍မရပါ'); }
+    // v24.13 (A14): count the cascade impact BEFORE confirming, so the
+    // dialog lists exactly what goes with the school. A failed count read
+    // must not block the delete — the dialog then shows no counts, but
+    // still warns about the login account.
+    let impact: { transactionCount: number; eventCount: number; athleteCount: number; registrationCount: number } | null = null;
+    try {
+      impact = await getSchoolDeleteImpact(id);
+    } catch (e) {
+      console.error('Could not load school delete impact:', e);
+    }
+    const impactText = impact
+      ? ` ဤကျောင်းနှင့် ဆက်စပ်နေသော မှတ်တမ်းများလည်း အတူတကွ ဖျက်ပါမည် — ငွေသွင်းမှတ်တမ်း (${impact.transactionCount}) ခု၊ ပွဲစဉ် (${impact.eventCount}) ခု၊ အားကစားသမား (${impact.athleteCount}) ခု၊ စာရင်းသွင်းမှု (${impact.registrationCount}) ခု။`
+      : '';
+    if (!(await confirmDialog(`"${name || 'ဤကျောင်း'}" ကို ဖျက်ရန် သေချာပါသလား?${impactText} ကျောင်း၏ Login အကောင့်ကိုတော့ Firebase Console တွင် သီးခြား ဖျက်ရပါမည်။`))) return;
+    try { await deleteSchoolFromContext(id); await recordAuditLog({ action: 'delete', entityType: 'school', entityId: id, entityName: name, details: `ကျောင်း ဖျက်ခြင်း${impact ? ` (ငွေသွင်းမှတ်တမ်း ${impact.transactionCount} ခု၊ ပွဲစဉ် ${impact.eventCount} ခု၊ အားကစားသမား ${impact.athleteCount} ခု၊ စာရင်းသွင်းမှု ${impact.registrationCount} ခု အတူဖျက်ခြင်း)` : ''}` }); toast.success('ဖျက်ပြီးပါပြီ — ကျောင်း၏ Login အကောင့်ကို Firebase Console တွင် သီးခြား ဖျက်ပေးပါ'); fetchSchools(); } catch (e) { toast.error('ဖျက်၍မရပါ'); }
   };
 
   const handleToggleSchoolFee = async (school: School) => {
@@ -226,8 +256,19 @@ export default function Admin() {
         // transaction + the flag, via the shared write path.
         const amount = Number(school.feeAmount) || 0;
         if (!amount || amount <= 0) { toast.error('ဤကျောင်း၏ နှစ်စဉ်ကြေး ပမာဏ မရှိသေးပါ — ကျောင်းအချက်အလက်တွင် ပမာဏ ထည့်ပြီးမှ အမှတ်အသားလုပ်ပါ'); return; }
-        const { voucherNo } = await recordAnnualFeePayment({ school, amount, paidDate: new Date().toISOString().split('T')[0], academicYear: school.feeAcademicYear || getGlobalAcademicYear() });
-        await recordAuditLog({ action: 'create', entityType: 'transaction', entityId: school.id, entityName: school.name, details: `နှစ်စဉ်ကြေး ${amount.toLocaleString('my-MM')} ကျပ် ပေးပြီးအဖြစ် အမှတ်အသားလုပ်ခြင်း (${voucherNo})` });
+        const academicYear = school.feeAcademicYear || getGlobalAcademicYear();
+        // v24.13 (F5b): if this school+year already has an annual-fee
+        // transaction, just set the flag and reuse it — never write a
+        // second transaction for the same payment.
+        const txSnap = await getDocs(collection(db, 'transactions'));
+        const existingTx = findAnnualFeeTransaction(txSnap.docs.map(d => ({ id: d.id, ...d.data() }) as TransactionRecord), school.id, academicYear);
+        if (existingTx) {
+          await updateDoc(doc(db, 'schools', school.id), { isAnnualFeePaid: true, feePaidDate: existingTx.paidDate || new Date().toISOString().split('T')[0], feeAmount: amount, feeAcademicYear: academicYear, updatedAt: new Date().toISOString() });
+          await recordAuditLog({ action: 'update', entityType: 'school', entityId: school.id, entityName: school.name, details: `နှစ်စဉ်ကြေး ပေးပြီးအဖြစ် အမှတ်အသားလုပ်ခြင်း — ရှိပြီးသား မှတ်တမ်း ပြန်သုံးခြင်း (${existingTx.voucherNo || 'voucher မရှိ'})` });
+        } else {
+          const { voucherNo } = await recordAnnualFeePayment({ school, amount, paidDate: new Date().toISOString().split('T')[0], academicYear });
+          await recordAuditLog({ action: 'create', entityType: 'transaction', entityId: school.id, entityName: school.name, details: `နှစ်စဉ်ကြေး ${amount.toLocaleString('my-MM')} ကျပ် ပေးပြီးအဖြစ် အမှတ်အသားလုပ်ခြင်း (${voucherNo})` });
+        }
       } else {
         // Un-marking only clears the flag. The transaction record stays in
         // Finance (money history is never silently deleted) — delete it
@@ -297,6 +338,10 @@ export default function Admin() {
       let count = 0;
       let skipped = 0;
       const failedRows: number[] = [];
+      // v24.13 (F2b): rows marked paid but with no fee amount import UNPAID
+      // and are listed here, so the admin sees exactly which rows lost
+      // their paid mark instead of silently gaining a bare flag.
+      const unpaidWarnings: { row: number; name: string }[] = [];
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         try {
@@ -304,19 +349,42 @@ export default function Admin() {
           if (!normalized || !normalized.name) { skipped++; continue; }
           const key = [(normalized.name || '').trim().toLowerCase(), (normalized.township || '').trim().toLowerCase()].join('|');
           if (existingKeys.has(key)) { skipped++; continue; }
-          await addSchool(normalized);
+          // v24.13 (F2b): never write the row's paid flag on its own — a
+          // flag with no transaction is a bare flag. The school is created
+          // unpaid (and with no paid date); a real transaction is recorded
+          // below when the row is paid AND has an amount > 0.
+          const { isAnnualFeePaid: rowPaid, ...schoolData } = normalized;
+          const feeAmount = typeof normalized.feeAmount === 'number' ? normalized.feeAmount : null;
+          const newId = await addSchool({ ...schoolData, isAnnualFeePaid: false, feePaidDate: '' });
           existingKeys.add(key);
           count++;
           setExcelUploadState({ status: 'uploading', fileName: file.name, stageText: `ကျောင်းများ ထည့်သွင်းနေသည် (${count}/${rows.length})...`, progressPercent: Math.round((count / rows.length) * 100) });
+          if (rowPaid) {
+            if (feeAmount && feeAmount > 0) {
+              try {
+                const importDate = new Date().toISOString().split('T')[0];
+                const year = getGlobalAcademicYear();
+                const { voucherNo } = await recordAnnualFeePayment({ school: { id: newId, name: normalized.name } as School, amount: feeAmount, paidDate: importDate, academicYear: year });
+                await recordAuditLog({ action: 'create', entityType: 'transaction', entityId: newId, entityName: normalized.name, details: `Excel တင်သွင်းမှု — နှစ်စဉ်ကြေး ${feeAmount.toLocaleString('my-MM')} ကျပ် (${year}, ${voucherNo})` });
+              } catch (err) {
+                failedRows.push(i + 2); // +1 header row, +1 for 1-based numbering
+              }
+            } else {
+              unpaidWarnings.push({ row: i + 2, name: normalized.name });
+            }
+          }
         } catch (err) {
           failedRows.push(i + 2); // +1 header row, +1 for 1-based numbering
         }
       }
       if (count > 0) await recordAuditLog({ action: 'create', entityType: 'school', details: `Excel မှ ကျောင်း (${count}) ကျောင်း တင်သွင်းခြင်း (${file.name})` });
+      const warningText = unpaidWarnings.length > 0
+        ? ` — သတိပြုရန်: ပမာဏ မရှိလို့ မသွင်းရသေးအဖြစ် တင်သွင်းထားသော (${unpaidWarnings.length}) ကျောင်း (အတန်း: ${unpaidWarnings.slice(0, 5).map(w => w.row).join(', ')}${unpaidWarnings.length > 5 ? '…' : ''})`
+        : '';
       if (failedRows.length > 0) {
-        toast.error(`Excel တင်သွင်းခြင်း — (${count}) ကျောင်း အောင်မြင်ပြီး၊ (${skipped}) ခု ကျော်ပြီး၊ (${failedRows.length}) တန်း မအောင်မြင်ပါ (အတန်း: ${failedRows.slice(0, 5).join(', ')}${failedRows.length > 5 ? '…' : ''})`);
+        toast.error(`Excel တင်သွင်းခြင်း — (${count}) ကျောင်း အောင်မြင်ပြီး၊ (${skipped}) ခု ကျော်ပြီး၊ (${failedRows.length}) တန်း မအောင်မြင်ပါ (အတန်း: ${failedRows.slice(0, 5).join(', ')}${failedRows.length > 5 ? '…' : ''})${warningText}`);
       } else {
-        toast.success(`Excel မှ ကျောင်းပေါင်း (${count}) ကျောင်း အောင်မြင်စွာ ထည့်သွင်းပြီးပါပြီ${skipped > 0 ? ` (ထပ်နေသော ${skipped} ခု ကျော်ထားပါသည်)` : ''}`);
+        toast.success(`Excel မှ ကျောင်းပေါင်း (${count}) ကျောင်း အောင်မြင်စွာ ထည့်သွင်းပြီးပါပြီ${skipped > 0 ? ` (ထပ်နေသော ${skipped} ခု ကျော်ထားပါသည်)` : ''}${warningText}`);
       }
       fetchSchools();
     } catch (err) {
@@ -404,7 +472,7 @@ export default function Admin() {
 
             {/* TAB 3: ANNOUNCEMENTS */}
             {activeTab === 'announcements' && (
-              <AdminAnnouncementsTab announcements={announcements} onRefresh={fetchAnnouncements} />
+              <AdminAnnouncementsTab announcements={announcements} onRefresh={fetchAnnouncements} setActiveTab={setActiveTab} />
             )}
 
             {/* TAB 4: ASSOCIATIONS */}
@@ -430,6 +498,7 @@ export default function Admin() {
                 isAdmin={role === 'admin'}
                 onRefreshAdmins={fetchAdmins}
                 onCreateSchoolAccount={(s) => setSchoolAccountModal(s)}
+                onUnlinkSchoolAccount={handleUnlinkSchoolAccount}
               />
             )}
 
@@ -446,7 +515,7 @@ export default function Admin() {
                 associations={associations}
                 tickers={tickers}
                 schoolLevels={schoolLevels}
-                onRestoreDone={() => { fetchSchools(); fetchAnnouncements(); }}
+                onRestoreDone={() => { fetchSchools(); fetchAnnouncements(); fetchAssociations(); }}
               />
             )}
 
@@ -469,7 +538,15 @@ export default function Admin() {
             <p className="text-xs font-bold text-sky-700 mb-4">{schoolAccountModal.name}</p>
             <form onSubmit={handleCreateSchoolAccount} className="space-y-3">
               <input type="email" required value={schoolAccEmail} onChange={e => setSchoolAccEmail(e.target.value)} placeholder="ကျောင်း Email ထည့်ပါ" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none" />
-              <input type="text" required value={schoolAccPassword} onChange={e => setSchoolAccPassword(e.target.value)} placeholder="Password (အနည်းဆုံး ၆ လုံး)" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none" />
+              {/* v24.13 (A8): the password was type="text" (plaintext on
+                  screen); now type="password" with a show/hide toggle
+                  like Login. */}
+              <div className="relative">
+                <input type={showSchoolAccPassword ? 'text' : 'password'} required value={schoolAccPassword} onChange={e => setSchoolAccPassword(e.target.value)} placeholder="Password (အနည်းဆုံး ၆ လုံး)" className="w-full p-2.5 pr-10 border border-slate-200 rounded-xl text-sm outline-none" />
+                <button type="button" onClick={() => setShowSchoolAccPassword(v => !v)} aria-label={showSchoolAccPassword ? 'Hide password' : 'Show password'} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer">
+                  {showSchoolAccPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => setSchoolAccountModal(null)} className="flex-1 bg-slate-100 py-2.5 rounded-xl text-sm font-bold cursor-pointer">မလုပ်တော့ပါ</button>
                 <button type="submit" disabled={isCreatingSchoolAcc} className="flex-1 bg-sky-900 text-white py-2.5 rounded-xl text-sm font-bold cursor-pointer">

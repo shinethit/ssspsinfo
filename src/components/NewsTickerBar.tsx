@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { NewsTicker } from '../types';
@@ -7,7 +7,10 @@ import { Link } from 'react-router-dom';
 
 export default function NewsTickerBar() {
   const [tickers, setTickers] = useState<NewsTicker[]>([]);
-  const [dismissed, setDismissed] = useState(false);
+  // v24.13: dismiss sticks — it is cleared only when a NEW ticker id
+  // arrives. The old code reset it on every snapshot (every ticker edit).
+  const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+  const prevIdsRef = useRef<string[]>([]);
   const [isPaused, setIsPaused] = useState(false);
 
   useEffect(() => {
@@ -25,17 +28,26 @@ export default function NewsTickerBar() {
           ...docSnap.data(),
         })) as NewsTicker[];
 
-        // Sort locally by createdAt desc
+        // v24.13: highest priority first (urgent > warning > info), newest
+        // first within the same priority. The old sort was newest-first, so
+        // an urgent ticker could sit behind a newer info one.
+        const priorityRank = (p?: string) => (p === 'urgent' ? 0 : p === 'warning' ? 1 : 2);
         activeList.sort((a, b) => {
+          const byPriority = priorityRank(a.priority) - priorityRank(b.priority);
+          if (byPriority !== 0) return byPriority;
           const timeA = new Date(a.createdAt || 0).getTime();
           const timeB = new Date(b.createdAt || 0).getTime();
           return timeB - timeA;
         });
 
-        setTickers(activeList);
-        if (activeList.length > 0) {
-          setDismissed(false); // Re-show if new ticker is activated
+        // Only clear the dismiss when a ticker id appears that was not
+        // there before (a genuinely new ticker).
+        const newIds = activeList.map(t => t.id);
+        if (newIds.some(id => !prevIdsRef.current.includes(id))) {
+          setDismissedIds([]);
         }
+        prevIdsRef.current = newIds;
+        setTickers(activeList);
       },
       (error) => {
         console.warn('Ticker real-time subscription error:', error);
@@ -45,12 +57,14 @@ export default function NewsTickerBar() {
     return () => unsubscribe();
   }, []);
 
-  if (tickers.length === 0 || dismissed) {
+  // Only the tickers the user has not dismissed are shown.
+  const visibleTickers = tickers.filter(t => !dismissedIds.includes(t.id));
+  if (visibleTickers.length === 0) {
     return null;
   }
 
-  // Determine top priority style from active tickers
-  const topPriority = tickers[0]?.priority || 'info';
+  // Determine top priority style from the visible tickers
+  const topPriority = visibleTickers[0]?.priority || 'info';
 
   const badgeConfig = {
     urgent: {
@@ -80,7 +94,7 @@ export default function NewsTickerBar() {
 
   return (
     <div
-      className={`w-full max-w-full overflow-hidden border-b transition-colors relative z-30 shadow-2xs ${badgeConfig.bannerBg}`}
+      className={`w-full max-w-full overflow-hidden border-b transition-colors relative z-30 shadow-2xs print:hidden ${badgeConfig.bannerBg}`}
       role="region"
       aria-label="အရေးကြီး စာတန်းပြေး အသိပေးချက်"
     >
@@ -95,11 +109,11 @@ export default function NewsTickerBar() {
             <span className="hidden sm:inline whitespace-nowrap">{badgeConfig.label}</span>
           </div>
 
-          {/* Auto-assigned timestamp badge of the newest ticker */}
-          {tickers[0]?.displayDateTime && (
+          {/* Auto-assigned timestamp badge of the top ticker */}
+          {visibleTickers[0]?.displayDateTime && (
             <div className="hidden md:flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/80 border border-slate-200/60 text-slate-600 text-xs font-medium shrink-0">
               <Clock className="w-3 h-3 text-slate-400" />
-              <span>{tickers[0].displayDateTime}</span>
+              <span>{visibleTickers[0].displayDateTime}</span>
             </div>
           )}
         </div>
@@ -116,7 +130,7 @@ export default function NewsTickerBar() {
               animationPlayState: isPaused ? 'paused' : 'running',
             }}
           >
-            {tickers.map((item, index) => (
+            {visibleTickers.map((item, index) => (
               <span key={item.id} className="inline-flex items-center gap-3 shrink-0">
                 {/* Individual item date/time if available */}
                 {item.displayDateTime && (
@@ -150,7 +164,7 @@ export default function NewsTickerBar() {
                 )}
 
                 {/* Separator between items if multiple */}
-                {tickers.length > 1 && (
+                {visibleTickers.length > 1 && (
                   <span className="text-slate-300 font-bold px-2 select-none">✦</span>
                 )}
               </span>
@@ -171,7 +185,7 @@ export default function NewsTickerBar() {
           </button>
           <button
             type="button"
-            onClick={() => setDismissed(true)}
+            onClick={() => setDismissedIds(visibleTickers.map(t => t.id))}
             aria-label="Dismiss banner"
             title="စာတန်းပြေး ပိတ်ထားရန်"
             className="p-1 rounded-lg hover:bg-black/5 text-slate-500 hover:text-slate-800 transition cursor-pointer"

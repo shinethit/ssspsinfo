@@ -50,6 +50,10 @@ export default function AdminSchoolManager({
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [currentPage, setCurrentPage] = useState(1);
   const [receiptSchool, setReceiptSchool] = useState<School | null>(null);
+  // v24.13 (F7): the voucher shown on the receipt is the STORED voucher
+  // from the transaction that was just recorded, not a number derived
+  // on the fly from the school id.
+  const [receiptVoucherNo, setReceiptVoucherNo] = useState<string | null>(null);
   const itemsPerPage = 20;
 
   const [feeModalSchool, setFeeModalSchool] = useState<School | null>(null);
@@ -85,19 +89,31 @@ export default function AdminSchoolManager({
     });
   }, [filteredSchools, sortBy]);
 
-  const totalPages = Math.ceil(sortedSchools.length / itemsPerPage);
-  const paginatedSchools = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return sortedSchools.slice(start, start + itemsPerPage);
-  }, [sortedSchools, currentPage, itemsPerPage]);
-
-  const groupedData = useMemo(() => {
+  // v24.13 (A15): group the FULL filtered + sorted list first, then
+  // paginate the flattened grouped order. Before, the list was paginated
+  // first and the groups were built from that page, so level badges showed
+  // only the page's counts instead of the level's true totals.
+  const groupedFull = useMemo(() => {
     const unifiedLevels = getUnifiedSchoolLevels(schoolLevels, schools);
     return unifiedLevels.map(level => {
-      const levelSchools = paginatedSchools.filter(s => level.schools.some(ls => ls.id === s.id));
+      const levelSchools = sortedSchools.filter(s => level.schools.some(ls => ls.id === s.id));
       return { config: level, schools: levelSchools };
     }).filter(group => group.schools.length > 0);
-  }, [paginatedSchools, schoolLevels, schools]);
+  }, [sortedSchools, schoolLevels, schools]);
+
+  const flattenedGrouped = useMemo(() => groupedFull.flatMap(g => g.schools), [groupedFull]);
+
+  const totalPages = Math.ceil(flattenedGrouped.length / itemsPerPage);
+  const groupedData = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    const pageSchools = flattenedGrouped.slice(start, start + itemsPerPage);
+    return groupedFull.map(group => ({
+      config: group.config,
+      schools: pageSchools.filter(s => group.config.schools.some(ls => ls.id === s.id)),
+      // Badge total from the FULL filtered list, not just this page.
+      totalSchools: group.schools.length,
+    })).filter(group => group.schools.length > 0);
+  }, [groupedFull, flattenedGrouped, currentPage, itemsPerPage]);
 
   const toggleGroup = (id: string) => {
     setCollapsedGroups(prev => ({ ...prev, [id]: !prev[id] }));
@@ -135,6 +151,9 @@ export default function AdminSchoolManager({
       toast.success(`"${feeModalSchool.name}" အတွက် နှစ်စဉ်ကြေး ပေးသွင်းမှု မှတ်တမ်းတင်ပြီးပါပြီ`);
       const updatedSchool = { ...feeModalSchool, ...updates };
       setFeeModalSchool(null);
+      // v24.13 (F7): pass the stored voucher into the receipt instead of
+      // discarding it — the receipt used to re-derive a different number.
+      setReceiptVoucherNo(voucherNo);
       setReceiptSchool(updatedSchool);
     } catch (err) {
       toast.error('နှစ်စဉ်ကြေး သိမ်းဆည်းရာတွင် အမှားဖြစ်ပွားပါသည်');
@@ -287,7 +306,7 @@ export default function AdminSchoolManager({
                       <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2.5">
                         {group.config.name}
                         <span className="text-xs font-bold bg-sky-100 text-sky-800 px-2.5 py-0.5 rounded-full border border-sky-200">
-                          {group.schools.length} ကျောင်း
+                          {group.totalSchools} ကျောင်း
                         </span>
                       </h3>
                     </div>
@@ -351,8 +370,11 @@ export default function AdminSchoolManager({
                               } else {
                                 setFeeModalSchool(school);
                                 setFeeDate(new Date().toISOString().split('T')[0]);
-                                setFeeAmount(school.feeAmount?.toString() || '200000');
-                                setFeeAcademicYear(school.feeAcademicYear || '၂၀၂၅-၂၀၂၆');
+                                // v24.13 (F3): never invent a fee — an empty
+                                // amount used to silently become 200,000 ကျပ်
+                                // and the year defaulted to '၂၀၂၅-၂၀၂၆'.
+                                setFeeAmount(school.feeAmount?.toString() || '');
+                                setFeeAcademicYear(school.feeAcademicYear || getGlobalAcademicYear());
                               }
                             }}
                             className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition cursor-pointer flex items-center gap-1.5 ${school.isAnnualFeePaid ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'}`}
@@ -363,7 +385,11 @@ export default function AdminSchoolManager({
 
                           {school.isAnnualFeePaid && (
                             <button
-                              onClick={() => setReceiptSchool(school)}
+                              // v24.13 (F7): no stored voucher is known here
+                              // (this manager does not load transactions), so
+                              // the receipt falls back to the derived number
+                              // for legacy flag-only payments.
+                              onClick={() => { setReceiptVoucherNo(null); setReceiptSchool(school); }}
                               className="p-2.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition cursor-pointer"
                               title="ပြေစာထုတ်ရန်"
                             >
@@ -455,7 +481,7 @@ export default function AdminSchoolManager({
 
       {/* 7. Annual Fee Receipt Modal */}
       {receiptSchool && (
-        <AnnualFeeReceipt school={receiptSchool} onClose={() => setReceiptSchool(null)} />
+        <AnnualFeeReceipt school={receiptSchool} voucherNo={receiptVoucherNo ?? undefined} onClose={() => { setReceiptSchool(null); setReceiptVoucherNo(null); }} />
       )}
     </div>
   );

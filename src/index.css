@@ -110,6 +110,21 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
+/* v24.13 P5: printing (e.g. the Receipt page) prints only the receipt —
+   the Layout header/sidebar/ticker/footer carry print:hidden, and these
+   rules hide the app chrome even where a class was missed. */
+@media print {
+  body {
+    background: #fff !important;
+  }
+  header, aside, footer {
+    display: none !important;
+  }
+  @page {
+    margin: 12mm;
+  }
+}
+
 /* v24.9: iPhone Safari auto-zooms when a tapped field is under 16px and does
    not zoom back out when the keyboard closes. Force 16px on all form fields
    so tapping never zooms — on phones, tablets (including iPad landscape)
