@@ -17,10 +17,16 @@ export default function MedalTally() {
   const navigate = useNavigate();
   const [events, setEvents] = useState<SportsEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'sports_events'), (snapshot) => {
       setEvents(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as SportsEvent)));
+      setLoading(false);
+    }, (err) => {
+      // v24.6: without this the page spun forever on a denied/failed read
+      console.error('Medal tally listener error:', err);
+      setLoadError(true);
       setLoading(false);
     });
     return () => unsubscribe();
@@ -33,10 +39,14 @@ export default function MedalTally() {
     events.forEach(event => {
       if (event.status !== 'finished') return;
       event.results?.forEach(match => {
-        // Determine winner (Team A or Team B)
-        const winningTeam = match.winner || (Number(match.scoreA) > Number(match.scoreB) ? match.teamA : match.teamB);
-        
+        // v24.6: only an explicitly recorded winner counts — never guess
+        // from scores (a tie/blank used to credit teamB), and only a real
+        // medal (gold/silver/bronze) creates a tally row (a blank medal
+        // used to create 0-medal rows).
+        const winningTeam = match.winner;
+
         if (!winningTeam || winningTeam === 'သရေ' || winningTeam === 'Draw') return;
+        if (match.medal !== 'gold' && match.medal !== 'silver' && match.medal !== 'bronze') return;
 
         if (!tallyMap.has(winningTeam)) {
           tallyMap.set(winningTeam, { schoolName: winningTeam, gold: 0, silver: 0, bronze: 0, total: 0 });
@@ -80,6 +90,10 @@ export default function MedalTally() {
 
       {loading ? (
         <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-amber-600" /></div>
+      ) : loadError ? (
+        <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 text-slate-500 font-semibold">
+          ဆုတံဆိပ်ဇယား ဖတ်မရပါ။ အင်တာနက် စစ်ပြီး စာမျက်နှာကို ပြန်ဖွင့်ပါ။
+        </div>
       ) : tally.length === 0 ? (
         <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 text-slate-500 font-semibold">
           ပြီးဆုံးသွားသော ပွဲစဉ်များနှင့် ဆုတံဆိပ်များ မရှိသေးပါ။

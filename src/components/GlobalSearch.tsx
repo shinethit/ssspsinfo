@@ -177,12 +177,10 @@ export default function GlobalSearch() {
           )}
         </div>
         
-        {/* Footer */}
+        {/* Footer — v24.6: removed the ↑↓/Enter hints; keyboard selection
+            does not exist, only Esc closes the search */}
         <div className="bg-slate-50 border-t border-slate-100 px-4 py-2 flex items-center justify-between text-[11px] text-slate-500">
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1"><kbd className="bg-white border border-slate-200 rounded px-1">↑</kbd> <kbd className="bg-white border border-slate-200 rounded px-1">↓</kbd> ရွေးရန်</span>
-            <span className="flex items-center gap-1"><kbd className="bg-white border border-slate-200 rounded px-1">Enter</kbd> ဝင်ရန်</span>
-          </div>
+          <span className="text-slate-400">ရိုက်ထည့်ပြီး ရွေးချယ်ပါ</span>
           <span className="flex items-center gap-1"><kbd className="bg-white border border-slate-200 rounded px-1">Esc</kbd> ပိတ်ရန်</span>
         </div>
 

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { DocumentItem } from '../types';
+import { toast } from 'sonner';
 import { FileText, Download, Search, FolderOpen, ArrowLeft, File, Loader2 } from 'lucide-react';
 
 export default function Documents() {
@@ -10,15 +11,24 @@ export default function Documents() {
   const [searchQuery, setSearchQuery] = useState('');
   const [docs, setDocs] = useState<DocumentItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     const fetchDocs = async () => {
       try {
-        const q = query(collection(db, 'documents'), orderBy('uploadedAt', 'desc'));
-        const snap = await getDocs(q);
-        setDocs(snap.docs.map(d => ({ id: d.id, ...d.data() } as DocumentItem)));
+        // v24.6: no orderBy — orderBy('uploadedAt') silently dropped every
+        // record missing uploadedAt. Sort in code, missing dates last.
+        const snap = await getDocs(collection(db, 'documents'));
+        const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as DocumentItem));
+        items.sort((a, b) => {
+          const ta = a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0;
+          const tb = b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0;
+          return tb - ta;
+        });
+        setDocs(items);
       } catch (err) {
         console.error(err);
+        setLoadError(true);
       } finally {
         setLoading(false);
       }
@@ -65,6 +75,11 @@ export default function Documents() {
           <div className="flex justify-center p-12">
             <Loader2 className="w-8 h-8 animate-spin text-amber-600" />
           </div>
+        ) : loadError ? (
+          <div className="p-12 text-center text-slate-500">
+            <FileText className="w-10 h-10 mx-auto text-slate-300 mb-2" />
+            <p className="font-semibold text-sm">စာရွက်စာတမ်းများ ဖတ်မရပါ။ အင်တာနက် စစ်ပြီး စာမျက်နှာကို ပြန်ဖွင့်ပါ။</p>
+          </div>
         ) : docs.length === 0 ? (
           <div className="p-12 text-center text-slate-500">
             <FileText className="w-10 h-10 mx-auto text-slate-300 mb-2" />
@@ -94,7 +109,11 @@ export default function Documents() {
                   </div>
                 </div>
                 <button
-                  onClick={() => window.open(doc.fileUrl, '_blank')}
+                  onClick={() => {
+                    // v24.6: a record without a file link used to open a blank tab
+                    if (!doc.fileUrl) { toast.error('ဤစာရွက်စာတမ်းတွင် ဖိုင် လင့်ခ် မရှိပါ'); return; }
+                    window.open(doc.fileUrl, '_blank');
+                  }}
                   title="ဒေါင်းလုဒ်ဆွဲရန်"
                   className="p-2.5 text-sky-700 bg-sky-50 hover:bg-sky-100 rounded-xl transition shadow-sm border border-sky-100 cursor-pointer shrink-0"
                 >

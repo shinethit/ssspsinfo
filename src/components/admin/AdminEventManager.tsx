@@ -56,14 +56,23 @@ export default function AdminEventManager() {
   };
 
   const toggleActive = async (ev: EventItem) => {
-    await updateDoc(doc(db, 'events', ev.id), { isActive: !ev.isActive });
-    fetchData();
+    try {
+      await updateDoc(doc(db, 'events', ev.id), { isActive: !ev.isActive });
+      fetchData();
+    } catch (err) {
+      toast.error('ပြောင်း၍ မရပါ');
+    }
   };
 
   const handleDelete = async (id: string) => {
     if (!(await confirmDialog('ဖျက်ရန် သေချာပါသလား?'))) return;
-    await deleteDoc(doc(db, 'events', id));
-    fetchData();
+    try {
+      await deleteDoc(doc(db, 'events', id));
+      toast.success('ဖျက်ပြီးပါပြီ');
+      fetchData();
+    } catch (err) {
+      toast.error('ဖျက်၍ မရပါ');
+    }
   };
 
   return (

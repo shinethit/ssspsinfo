@@ -6,8 +6,6 @@ import {
   updateDoc,
   deleteDoc,
   onSnapshot,
-  query,
-  orderBy,
   getDocs,
   setDoc,
   getDoc,
@@ -281,7 +279,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const [schoolsSnap, announcementsSnap, associationsSnap, levelsSnap] = await Promise.all([
           getDocs(collection(db, 'schools')),
-          getDocs(query(collection(db, 'announcements'), orderBy('publishedAt', 'desc'))),
+          // v24.6: no orderBy('publishedAt') — it silently dropped every
+          // announcement missing publishedAt, then replaced state with the
+          // subset. sortAnnouncementsByEventDate handles missing dates below.
+          getDocs(collection(db, 'announcements')),
           getDocs(collection(db, 'associations')),
           getDocs(collection(db, 'school_levels')),
         ]);
@@ -383,15 +384,27 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
 
       // 1. Optimistic UI update immediately
+      let prevSchools: School[] | null = null;
       setSchools((prev) => {
+        prevSchools = prev;
         const next = prev.map((s) => (s.id === id ? { ...s, ...payload } : s));
         persistCache(next, announcements, associations);
         return next;
       });
 
-      // 2. Write to Firestore
+      // 2. Write to Firestore — v24.7: on a denied/failed write, roll the
+      // UI and the offline cache back. Before, the edit looked saved (and
+      // stayed in the cache) even though Firestore rejected it.
       const cleanPayload = cleanFirestoreData(payload);
-      await updateDoc(doc(db, 'schools', id), cleanPayload);
+      try {
+        await updateDoc(doc(db, 'schools', id), cleanPayload);
+      } catch (err) {
+        if (prevSchools) {
+          setSchools(prevSchools);
+          persistCache(prevSchools, announcements, associations);
+        }
+        throw err;
+      }
     },
     [announcements, associations, persistCache]
   );
@@ -399,14 +412,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const deleteSchool = useCallback(
     async (id: string): Promise<void> => {
       // 1. Optimistic UI update immediately
+      let prevSchools: School[] | null = null;
       setSchools((prev) => {
+        prevSchools = prev;
         const next = prev.filter((s) => s.id !== id);
         persistCache(next, announcements, associations);
         return next;
       });
 
-      // 2. Delete from Firestore
-      await deleteDoc(doc(db, 'schools', id));
+      // 2. Delete from Firestore (v24.7: roll back on failure, as above)
+      try {
+        await deleteDoc(doc(db, 'schools', id));
+      } catch (err) {
+        if (prevSchools) {
+          setSchools(prevSchools);
+          persistCache(prevSchools, announcements, associations);
+        }
+        throw err;
+      }
     },
     [announcements, associations, persistCache]
   );
@@ -433,27 +456,49 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateAnnouncement = useCallback(
     async (id: string, data: Partial<Announcement>): Promise<void> => {
+      let prevAnnouncements: Announcement[] | null = null;
       setAnnouncements((prev) => {
+        prevAnnouncements = prev;
         const next = sortAnnouncementsByEventDate(prev.map((a) => (a.id === id ? { ...a, ...data } : a)));
         persistCache(schools, next, associations);
         return next;
       });
 
       const cleanData = cleanFirestoreData(data);
-      await updateDoc(doc(db, 'announcements', id), cleanData);
+      try {
+        await updateDoc(doc(db, 'announcements', id), cleanData);
+      } catch (err) {
+        // v24.7: roll back on failure (see updateSchool)
+        if (prevAnnouncements) {
+          setAnnouncements(prevAnnouncements);
+          persistCache(schools, prevAnnouncements, associations);
+        }
+        throw err;
+      }
     },
     [schools, associations, persistCache]
   );
 
   const deleteAnnouncement = useCallback(
     async (id: string): Promise<void> => {
+      let prevAnnouncements: Announcement[] | null = null;
       setAnnouncements((prev) => {
+        prevAnnouncements = prev;
         const next = prev.filter((a) => a.id !== id);
         persistCache(schools, next, associations);
         return next;
       });
 
-      await deleteDoc(doc(db, 'announcements', id));
+      try {
+        await deleteDoc(doc(db, 'announcements', id));
+      } catch (err) {
+        // v24.7: roll back on failure (see updateSchool)
+        if (prevAnnouncements) {
+          setAnnouncements(prevAnnouncements);
+          persistCache(schools, prevAnnouncements, associations);
+        }
+        throw err;
+      }
     },
     [schools, associations, persistCache]
   );

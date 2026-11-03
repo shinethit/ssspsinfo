@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, query, orderBy, deleteDoc, doc, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, query, orderBy, deleteDoc, doc, writeBatch } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebase';
 import { School, TransactionRecord } from '../../types';
 import { toast } from 'sonner';
 import { confirmDialog } from '../../components/ConfirmModal';
+import { getGlobalAcademicYear } from '../../lib/academicYear';
+import { recordAnnualFeePayment, findAnnualFeeTransaction, ANNUAL_FEE_TYPE } from '../../lib/finance';
+import { recordAuditLog } from '../../lib/audit';
 import { Coins, Plus, Search, Printer, Trash2, ArrowRightLeft, History, MapPin, Download, Settings, Save } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../../constants';
@@ -22,7 +25,7 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
   const [receiptSchool, setReceiptSchool] = useState<School | null>(null);
 
   // Global Academic Year
-  const [globalAcademicYear, setGlobalAcademicYear] = useState(() => localStorage.getItem('global_academic_year') || '၂၀၂၄-၂၀၂၅');
+  const [globalAcademicYear, setGlobalAcademicYear] = useState(() => getGlobalAcademicYear());
   const [isUpdatingBatch, setIsUpdatingBatch] = useState(false);
 
   // Form State
@@ -84,20 +87,39 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
     setIsSubmitting(true);
 
     try {
-      const newVoucherNo = generateVoucherNo(paidDate, transactions);
-      await addDoc(collection(db, 'transactions'), {
-        schoolId: selectedSchool.id,
-        schoolName: selectedSchool.name,
-        feeType,
-        amount: Number(amount),
-        paidDate: paidDate,
-        note,
-        academicYear: formAcademicYear,
-        recordedBy: auth.currentUser?.email || 'Admin',
-        createdAt: new Date().toISOString(),
-        voucherNo: newVoucherNo
-      });
-      
+      if (feeType === ANNUAL_FEE_TYPE) {
+        // v24.7: one write path does both — the transaction AND the school's
+        // paid flag. Recording only one used to leave the two disagreeing.
+        const { voucherNo } = await recordAnnualFeePayment({
+          school: selectedSchool,
+          amount: Number(amount),
+          paidDate,
+          academicYear: formAcademicYear,
+          note,
+        });
+        await recordAuditLog({ action: 'create', entityType: 'transaction', entityId: selectedSchool.id, entityName: selectedSchool.name, details: `နှစ်စဉ်ကြေး ${Number(amount).toLocaleString('my-MM')} ကျပ် (${formAcademicYear}, ${voucherNo})` });
+      } else {
+        // Other fee types have no school flag — plain transaction. The
+        // voucher is generated from a freshly fetched list so two admins
+        // recording the same day cannot collide on the number.
+        const freshSnap = await getDocs(collection(db, 'transactions'));
+        const freshList = freshSnap.docs.map(d => ({ id: d.id, ...d.data() } as TransactionRecord));
+        const newVoucherNo = generateVoucherNo(paidDate, freshList);
+        await addDoc(collection(db, 'transactions'), {
+          schoolId: selectedSchool.id,
+          schoolName: selectedSchool.name,
+          feeType,
+          amount: Number(amount),
+          paidDate: paidDate,
+          note,
+          academicYear: formAcademicYear,
+          recordedBy: auth.currentUser?.email || 'Admin',
+          createdAt: new Date().toISOString(),
+          voucherNo: newVoucherNo
+        });
+        await recordAuditLog({ action: 'create', entityType: 'transaction', entityId: selectedSchool.id, entityName: selectedSchool.name, details: `${feeType} ${Number(amount).toLocaleString('my-MM')} ကျပ် (${formAcademicYear}, ${newVoucherNo})` });
+      }
+
       toast.success('ငွေသွင်းမှု မှတ်တမ်းတင်ပြီးပါပြီ');
       setAmount(''); setNote('');
       fetchTransactions();
@@ -111,7 +133,9 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
   const handleDeleteTransaction = async (id: string) => {
     if (!(await confirmDialog('ဤငွေသွင်းမှတ်တမ်းကို ဖျက်ရန် သေချာပါသလား?'))) return;
     try {
+      const target = transactions.find(t => t.id === id);
       await deleteDoc(doc(db, 'transactions', id));
+      if (target) await recordAuditLog({ action: 'delete', entityType: 'transaction', entityId: target.schoolId, entityName: target.schoolName, details: `${target.feeType} ${Number(target.amount || 0).toLocaleString('my-MM')} ကျပ် (${target.paidDate}) ဖျက်ခြင်း` });
       toast.success('မှတ်တမ်း ဖျက်ပြီးပါပြီ');
       fetchTransactions();
     } catch (err) {
@@ -151,26 +175,46 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
 
     setIsMigrating(true);
     let migratedCount = 0;
+    let skippedCount = 0;
+    // v24.7: retry-safe migration. Before, a retry re-added every payment
+    // that had already migrated (the per-school clear happened after its
+    // payments, so a mid-school failure left duplicates on the next run).
+    // Now each old payment is skipped when an identical transaction already
+    // exists, and every migrated record gets a voucher number.
+    const knownTx = [...transactions];
+    const todayStr = new Date().toISOString().split('T')[0];
     try {
       for (const school of schoolsWithOldPayments) {
         if (!(school as any).payments) continue;
         for (const payment of (school as any).payments) {
-          await addDoc(collection(db, 'transactions'), {
+          const paidDate = payment.paidDate || todayStr;
+          const alreadyThere = knownTx.some(t =>
+            t.schoolId === school.id &&
+            t.feeType === payment.feeType &&
+            Number(t.amount) === Number(payment.amount) &&
+            t.paidDate === paidDate
+          );
+          if (alreadyThere) { skippedCount++; continue; }
+          const voucherNo = generateVoucherNo(paidDate, knownTx);
+          const ref = await addDoc(collection(db, 'transactions'), {
             schoolId: school.id,
             schoolName: school.name,
             feeType: payment.feeType,
             amount: payment.amount,
-            paidDate: payment.paidDate || new Date().toISOString().split('T')[0],
+            paidDate,
             note: payment.note || '',
             academicYear: globalAcademicYear,
             recordedBy: 'System Migration',
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            voucherNo
           });
+          knownTx.push({ id: ref.id, schoolId: school.id, schoolName: school.name, feeType: payment.feeType, amount: payment.amount, paidDate, academicYear: globalAcademicYear, createdAt: new Date().toISOString(), voucherNo } as TransactionRecord);
           migratedCount++;
         }
         await writeBatch(db).update(doc(db, 'schools', school.id), { payments: [] }).commit();
       }
-      toast.success(`မှတ်တမ်း (${migratedCount}) ခုကို အောင်မြင်စွာ ရွှေ့ပြောင်းပြီးပါပြီ`);
+      await recordAuditLog({ action: 'create', entityType: 'transaction', details: `မှတ်တမ်းဟောင်း ရွှေ့ပြောင်းခြင်း — ${migratedCount} ခု ရွှေ့ပြီး, ${skippedCount} ခု ထပ်နေလို့ ကျော်ခြင်း` });
+      toast.success(`မှတ်တမ်း (${migratedCount}) ခုကို အောင်မြင်စွာ ရွှေ့ပြောင်းပြီးပါပြီ${skippedCount > 0 ? ` (ထပ်နေသော ${skippedCount} ခု ကျော်ထားပါသည်)` : ''}`);
       fetchTransactions();
     } catch (err) {
       toast.error('ရွှေ့ပြောင်းရာတွင် အမှားဖြစ်ပွားပါသည်');
@@ -185,6 +229,15 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
     return matchSearch && matchZone;
   });
   const schoolTransactions = selectedSchool ? transactions.filter(t => t.schoolId === selectedSchool.id) : [];
+  // v24.7: the same annual-fee payment must not show twice (once as the
+  // flag card, once as a transaction row) or be counted twice in the total.
+  // When a matching transaction exists, it is the record — the flag card
+  // hides and the total counts only the transactions. Flag-only payments
+  // (recorded before v24.7) still show via the card.
+  const annualFeeTx = selectedSchool ? findAnnualFeeTransaction(schoolTransactions, selectedSchool.id, selectedSchool.feeAcademicYear) : undefined;
+  const schoolTotal = selectedSchool
+    ? schoolTransactions.reduce((sum, t) => sum + t.amount, 0) + (!annualFeeTx && selectedSchool.isAnnualFeePaid ? (selectedSchool.feeAmount || 0) : 0)
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -307,7 +360,7 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
             </div>
             {selectedSchool && (
               <span className="text-xs font-bold bg-emerald-100 text-emerald-800 px-2 py-1 rounded">
-                စုစုပေါင်း: {(schoolTransactions.reduce((sum, t) => sum + t.amount, 0) + (selectedSchool.isAnnualFeePaid ? (selectedSchool.feeAmount || 0) : 0)).toLocaleString('my-MM')} ကျပ်
+                စုစုပေါင်း: {schoolTotal.toLocaleString('my-MM')} ကျပ်
               </span>
             )}
           </div>
@@ -324,7 +377,7 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
               </div>
             ) : (
               <>
-                {selectedSchool.isAnnualFeePaid && (
+                {selectedSchool.isAnnualFeePaid && !annualFeeTx && (
                   <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex justify-between items-center group shadow-sm animate-in fade-in">
                     <div>
                       <p className="font-bold text-sm text-emerald-900">နှစ်စဉ်ကြေး (Annual Fee) - {selectedSchool.feeAcademicYear}</p>

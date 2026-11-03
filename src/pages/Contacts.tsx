@@ -278,7 +278,7 @@ export default function Contacts() {
 
       return matchSearch && matchCategoryTab && matchFee && matchZone;
     });
-  }, [schools, searchTerm, selectedCategoryTab, levelFilter, feeFilter, selectedZone]);
+  }, [schools, searchTerm, selectedCategoryTab, levelFilter, feeFilter, selectedZone, getSchoolCategory]);
 
   // 2. Sort schools cleanly
   const sortedSchools = useMemo(() => {
@@ -332,10 +332,13 @@ export default function Contacts() {
       schools: School[];
     }[] = [];
 
-    const paginatedSchools = sortedSchools.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-    
+    // v24.6: group ALL filtered schools first. Slicing before grouping hid
+    // every level after the first page's 20 schools, and currentPage was
+    // missing from the memo deps so paging did nothing in grouped view.
+    // Grouped view now shows every level (collapsed by default); the
+    // 20-per-page pagination stays for list view only.
     unifiedLevels.forEach((lvl) => {
-      const catSchools = paginatedSchools.filter((s) => {
+      const catSchools = sortedSchools.filter((s) => {
         const schoolCat = getSchoolCategory(s);
         return schoolCat.id === lvl.id;
       });
@@ -1243,8 +1246,8 @@ export default function Contacts() {
           })}
         </div>
       )}
-      {/* Global Pagination Controls */}
-      {sortedSchools.length > 0 && (
+      {/* Global Pagination Controls — list view only (v24.6: grouped view shows all levels, no paging) */}
+      {viewMode === 'list' && sortedSchools.length > 0 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 mt-6 shadow-xs">
           <span className="text-xs font-semibold text-slate-500">
             စာမျက်နှာ {currentPage} / {Math.ceil(sortedSchools.length / itemsPerPage)} (စုစုပေါင်း {sortedSchools.length} ကျောင်း)

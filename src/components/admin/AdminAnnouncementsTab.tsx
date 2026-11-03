@@ -7,6 +7,7 @@ import { confirmDialog } from '../../components/ConfirmModal';
 import { ANNOUNCEMENT_CATEGORIES, getCategoryBadge } from '../../pages/Announcements';
 import { ZONE_FILTER_OPTIONS } from '../../constants';
 import { sortAnnouncementsByEventDate, useData } from '../../context/DataContext';
+import { recordAuditLog } from '../../lib/audit';
 import ImageUploadDropzone from '../../components/ImageUploadDropzone';
 import { Calendar, Edit2, FileText, Trash2 } from 'lucide-react';
 
@@ -24,13 +25,20 @@ interface AdminAnnouncementsTabProps {
   onRefresh: () => void;
 }
 
+// v24.6: local YYYY-MM-DD — toISOString() is UTC, so announcements created
+// between 00:00–06:29 local used to default to yesterday's date.
+const todayLocal = (): string => {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+};
+
 export default function AdminAnnouncementsTab({ announcements, onRefresh }: AdminAnnouncementsTabProps) {
   const { addAnnouncement, updateAnnouncement, deleteAnnouncement: removeAnnouncement } = useData();
 
   const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
   const announcementForm = useForm({
     resolver: zodResolver(announcementSchema),
-    defaultValues: { title: '', body: '', category: 'general', eventDate: new Date().toISOString().split('T')[0], attachmentUrl: '', zone: '' },
+    defaultValues: { title: '', body: '', category: 'general', eventDate: todayLocal(), attachmentUrl: '', zone: '' },
   });
 
   const sortedAnnouncements = useMemo(() => sortAnnouncementsByEventDate(announcements as any), [announcements]);
@@ -42,21 +50,21 @@ export default function AdminAnnouncementsTab({ announcements, onRefresh }: Admi
   };
   const cancelEditAnnouncement = () => {
     setEditingAnnouncementId(null);
-    announcementForm.reset({ title: '', body: '', category: 'general', eventDate: new Date().toISOString().split('T')[0], attachmentUrl: '', zone: '' });
+    announcementForm.reset({ title: '', body: '', category: 'general', eventDate: todayLocal(), attachmentUrl: '', zone: '' });
   };
   const onAnnouncementSubmit = async (data: any) => {
     try {
       const sd = data.eventDate;
       const ipa = new Date(sd + 'T12:00:00Z').toISOString();
       const pl = { ...data, eventDate: sd, publishedAt: ipa, attachments: data.attachmentUrl ? [data.attachmentUrl] : [] };
-      if (editingAnnouncementId) { await updateAnnouncement(editingAnnouncementId, pl); toast.success('ကြေညာချက် ပြင်ဆင်ပြီးပါပြီ'); }
-      else { await addAnnouncement({ ...pl, createdAt: new Date().toISOString() }); toast.success('ကြေညာချက်အသစ် တင်ပြီးပါပြီ'); }
+      if (editingAnnouncementId) { await updateAnnouncement(editingAnnouncementId, pl); await recordAuditLog({ action: 'update', entityType: 'announcement', entityId: editingAnnouncementId, entityName: data.title, details: 'ကြေညာချက် ပြင်ဆင်ခြင်း' }); toast.success('ကြေညာချက် ပြင်ဆင်ပြီးပါပြီ'); }
+      else { const newId = await addAnnouncement({ ...pl, createdAt: new Date().toISOString() }); await recordAuditLog({ action: 'create', entityType: 'announcement', entityId: newId, entityName: data.title, details: 'ကြေညာချက်အသစ် တင်ခြင်း' }); toast.success('ကြေညာချက်အသစ် တင်ပြီးပါပြီ'); }
       cancelEditAnnouncement(); onRefresh();
     } catch (e) { toast.error('အမှားဖြစ်ပွားပါသည်'); }
   };
   const deleteAnnouncement = async (id: string) => {
     if (!(await confirmDialog('ဤကြေညာချက်ကို ဖျက်ရန် သေချာပါသလား?'))) return;
-    try { await removeAnnouncement(id); toast.success('ဖျက်ပြီးပါပြီ'); onRefresh(); } catch (e) { toast.error('ဖျက်၍မရပါ'); }
+    try { const target = announcements.find((a: any) => a.id === id); await removeAnnouncement(id); await recordAuditLog({ action: 'delete', entityType: 'announcement', entityId: id, entityName: target?.title, details: 'ကြေညာချက် ဖျက်ခြင်း' }); toast.success('ဖျက်ပြီးပါပြီ'); onRefresh(); } catch (e) { toast.error('ဖျက်၍မရပါ'); }
   };
 
   return (

@@ -45,20 +45,32 @@ export default function AdminAthleteManager({ activeSport, schools }: { activeSp
     setIsUploading(true);
     try {
       const data = await parseAthleteExcel(file);
-      const batch = writeBatch(db);
-      
+      // v24.7: a single writeBatch fails entirely past 500 rows (Firestore
+      // limit), and rows missing a name/school were skipped silently. Now
+      // the import is chunked into batches of 400 and the summary reports
+      // exactly how many rows were skipped.
+      const BATCH_SIZE = 400;
+      let batch = writeBatch(db);
+      let inBatch = 0;
       let count = 0;
-      data.forEach((row) => {
+      let skipped = 0;
+      const flush = async () => { if (inBatch > 0) { await batch.commit(); batch = writeBatch(db); inBatch = 0; } };
+      for (const row of data) {
         const name = row['အမည်'];
         const school = row['ကိုယ်စားပြုကျောင်း'];
-        if (!name || !school) return;
+        if (!name || !school) { skipped++; continue; }
 
         const sportsString = row['ပါဝင်မည့် အားကစား (ကော်မာခြားပါ)'] || '';
         const sportsArray = sportsString.split(',').map((s: string) => s.trim()).filter(Boolean);
 
         const dob = row['မွေသက္ကရာဇ် (YYYY-MM-DD)'] || row['မွေးသက္ကရာဇ် (YYYY-MM-DD)'] || '';
         const docRef = doc(collection(db, 'athletes'));
-        
+
+        // v24.7: store the school's document id when the name matches a
+        // known school, so the School Portal can list its athletes by id
+        // instead of the fragile free-text name.
+        const matchedSchool = schools.find(s => (s.name || '').trim() === String(school).trim());
+
         batch.set(docRef, cleanFirestoreData({
           name,
           fatherName: row['အဖအမည်'] || '',
@@ -67,16 +79,19 @@ export default function AdminAthleteManager({ activeSport, schools }: { activeSp
           grade: row['အတန်း'] || '',
           rollNo: row['ကျောင်းဝင်အမှတ်'] || '',
           school,
+          schoolId: matchedSchool ? matchedSchool.id : undefined,
           gender: row['ကျား/မ (Male/Female)'] || 'Male',
           sports: sportsArray,
           photoUrl: row['ဓာတ်ပုံ URL (Optional)'] || '',
           createdAt: new Date().toISOString()
         }));
         count++;
-      });
+        inBatch++;
+        if (inBatch >= BATCH_SIZE) await flush();
+      }
 
-      await batch.commit();
-      toast.success(`အားကစားသမား (${count}) ဦး အောင်မြင်စွာ တင်သွင်းပြီးပါပြီ`);
+      await flush();
+      toast.success(`အားကစားသမား (${count}) ဦး အောင်မြင်စွာ တင်သွင်းပြီးပါပြီ${skipped > 0 ? ` (အမည်/ကျောင်း မပြည့်စုံသော ${skipped} တန်း ကျော်ထားပါသည်)` : ''}`);
       fetchAthletes();
     } catch (err) {
       toast.error('Excel ဖတ်ရာတွင် အမှားဖြစ်ပွားပါသည်');
@@ -90,8 +105,10 @@ export default function AdminAthleteManager({ activeSport, schools }: { activeSp
     e.preventDefault();
     if (!manualData.name || !manualData.school) return toast.error('အမည်နှင့် ကျောင်း ဖြည့်ပါ');
     try {
+      const matchedSchool = schools.find(s => (s.name || '').trim() === manualData.school.trim());
       await addDoc(collection(db, 'athletes'), cleanFirestoreData({
         ...manualData,
+        schoolId: matchedSchool ? matchedSchool.id : undefined,
         age: calcAge(manualData.dob),
         sports: [activeSport],
         createdAt: new Date().toISOString()
@@ -107,12 +124,18 @@ export default function AdminAthleteManager({ activeSport, schools }: { activeSp
 
   const handleDelete = async (id: string) => {
     if (!(await confirmDialog('ဤအားကစားသမားကို ဖျက်ရန် သေချာပါသလား?'))) return;
-    await deleteDoc(doc(db, 'athletes', id));
+    try {
+      await deleteDoc(doc(db, 'athletes', id));
+      toast.success('ဖျက်ပြီးပါပြီ');
+    } catch (err) {
+      toast.error('ဖျက်၍ မရပါ');
+    }
     fetchAthletes();
   };
 
   // Filter athletes by the selected sport
-  const filteredAthletes = athletes.filter(a => a.sports.includes(activeSport));
+  // v24.6: guard — one doc without a sports array used to crash this list
+  const filteredAthletes = athletes.filter(a => Array.isArray(a.sports) && a.sports.includes(activeSport));
 
   return (
     <div className="space-y-4">

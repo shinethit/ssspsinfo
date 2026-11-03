@@ -4,8 +4,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { MapPin, Edit2, Plus, Users, Phone, FileText } from 'lucide-react';
 import ImageUploadDropzone from '../ImageUploadDropzone';
-import { STUDENT_RANGE_TIERS, getStudentRangeTier } from '../../types';
+import { STUDENT_RANGE_TIERS } from '../../types';
 import { STANDARD_ZONES } from '../../constants';
+import { getGlobalAcademicYear } from '../../lib/academicYear';
 
 const schoolSchema = z.object({
   logoUrl: z.string().optional(), name: z.string().min(1, 'ကျောင်းအမည် လိုအပ်သည်'),
@@ -38,7 +39,7 @@ export default function SchoolForm({ initialData, isEditing, onCancel, onSubmit,
     resolver: zodResolver(schoolSchema),
     defaultValues: {
       name: '', level: schoolLevels[0]?.name || '၁။ အထက်တန်း', address: '', township: '', city: '', zone: '',
-      studentRange: '0-100', studentCount: '', feeAmount: 200000, feeAcademicYear: '၂၀၂၄-၂၀၂၅', feePaidDate: '',
+      studentRange: '0-100', studentCount: '', feeAmount: '', feeAcademicYear: getGlobalAcademicYear(), feePaidDate: '',
       logoUrl: '', schoolPhone: '', schoolPhone2: '', founderName: '', founderPhone: '', founderPhone2: '',
       founderViber: '', founderTelegram: '', adminName: '', adminPhone: '', adminPhone2: '',
       adminViber: '', adminTelegram: '', contactName: '', contactRole: '', contactPhone: '', contactPhone2: '',
@@ -56,7 +57,7 @@ export default function SchoolForm({ initialData, isEditing, onCancel, onSubmit,
 
   useEffect(() => {
     if (initialData) {
-      schoolForm.reset({ ...initialData, studentCount: initialData.studentCount ?? '', feeAmount: initialData.feeAmount ?? 200000 });
+      schoolForm.reset({ ...initialData, studentCount: initialData.studentCount ?? '', feeAmount: initialData.feeAmount ?? '' });
       setExtraSchoolPhones(Array.isArray(initialData.schoolPhones) ? [...initialData.schoolPhones] : []);
       setExtraFounderPhones(Array.isArray(initialData.founderPhones) ? [...initialData.founderPhones] : []);
       setExtraAdminPhones(Array.isArray(initialData.adminPhones) ? [...initialData.adminPhones] : []);
@@ -156,8 +157,8 @@ export default function SchoolForm({ initialData, isEditing, onCancel, onSubmit,
                   {...schoolForm.register('studentRange')} 
                   onChange={(e) => {
                     schoolForm.register('studentRange').onChange(e);
-                    const tier = getStudentRangeTier(e.target.value);
-                    if (tier) schoolForm.setValue('feeAmount', tier.defaultFee);
+                    // v24.7: changing the range no longer overwrites a fee
+                    // the admin typed by hand with the tier default.
                   }}
                   className="w-full p-2.5 border rounded-lg text-sm bg-white"
                 >
@@ -178,7 +179,7 @@ export default function SchoolForm({ initialData, isEditing, onCancel, onSubmit,
                       const tier = STUDENT_RANGE_TIERS.find(t => count >= t.min && count <= t.max);
                       if (tier) {
                         schoolForm.setValue('studentRange', tier.key);
-                        schoolForm.setValue('feeAmount', tier.defaultFee);
+                        // v24.7: the fee is no longer auto-overwritten here.
                       }
                     }
                   }}

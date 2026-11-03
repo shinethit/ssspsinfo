@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { auth, db } from '../lib/firebase';
-import { collection, query, where, getDocs, updateDoc, doc, addDoc } from 'firebase/firestore';
-import { School, Athlete, EventItem } from '../types';
+import { collection, query, where, getDocs, updateDoc, doc, addDoc, deleteDoc } from 'firebase/firestore';
+import { School, Athlete, EventItem, SchoolUpdateRequest } from '../types';
 import { toast } from 'sonner';
-import { LogOut, Save, School as SchoolIcon, Phone, MapPin, Users, Eye, ShieldCheck, UserCheck, Calendar, Clock } from 'lucide-react';
+import { confirmDialog } from '../components/ConfirmModal';
+import { LogOut, Save, School as SchoolIcon, Phone, MapPin, Users, Eye, ShieldCheck, UserCheck, Calendar, Clock, Trash2, Send, FileText } from 'lucide-react';
 import { STANDARD_ZONES } from '../constants';
 import ImageUploadDropzone from '../components/ImageUploadDropzone';
+
+// Fields a school can ask the admin to change (it cannot edit these itself).
+const REQUESTABLE_FIELDS = [
+  { value: 'name', label: 'ကျောင်းအမည်' },
+  { value: 'level', label: 'ကျောင်းအဆင့်' },
+  { value: 'studentRange', label: 'ကျောင်းသားဦးရေ Range' },
+] as const;
 
 export default function SchoolPortal() {
   const [school, setSchool] = useState<School | null>(null);
@@ -31,6 +39,16 @@ export default function SchoolPortal() {
   const [actImage, setActImage] = useState('');
   const [isSubmittingAct, setIsSubmittingAct] = useState(false);
 
+  // Change requests (v24.7: the Admin "တောင်းဆိုမှုများ" tab had no creator,
+  // so it was always empty. Schools can now ask for changes to fields they
+  // cannot edit themselves; the admin approves them in that tab. The five
+  // contact fields above stay directly editable — a phone number must not
+  // wait for approval.)
+  const [myRequests, setMyRequests] = useState<SchoolUpdateRequest[]>([]);
+  const [reqField, setReqField] = useState<string>('name');
+  const [reqValue, setReqValue] = useState('');
+  const [isSubmittingReq, setIsSubmittingReq] = useState(false);
+
   useEffect(() => {
     const fetchSchoolData = async () => {
       const user = auth.currentUser;
@@ -49,14 +67,35 @@ export default function SchoolPortal() {
           setZone(data.zone || '');
           setStudentCount(data.studentCount?.toString() || '');
 
-          // Fetch athletes for this school
-          const athleteQuery = query(collection(db, 'athletes'), where('school', '==', data.name));
-          const athleteSnap = await getDocs(athleteQuery);
-          setAthletes(athleteSnap.docs.map(d => ({ id: d.id, ...d.data() } as Athlete)));
+          // Fetch athletes for this school — v24.7: match by the school's
+          // document id first (athletes created since v24.7 carry schoolId).
+          // Older records only have the free-text school name, so fall back
+          // to the name match for those.
+          const athleteByIdQuery = query(collection(db, 'athletes'), where('schoolId', '==', data.id));
+          const athleteByIdSnap = await getDocs(athleteByIdQuery);
+          let athleteDocs = athleteByIdSnap.docs;
+          if (athleteDocs.length === 0) {
+            const athleteQuery = query(collection(db, 'athletes'), where('school', '==', data.name));
+            const athleteSnap = await getDocs(athleteQuery);
+            athleteDocs = athleteSnap.docs;
+          }
+          setAthletes(athleteDocs.map(d => ({ id: d.id, ...d.data() } as Athlete)));
 
           const actQuery = query(collection(db, 'events'), where('schoolId', '==', data.id));
           const actSnap = await getDocs(actQuery);
           setActivities(actSnap.docs.map(d => ({ id: d.id, ...d.data() } as EventItem)));
+
+          // The school's own change requests (readable by the requester
+          // since v24.7 — see firestore.rules).
+          try {
+            const reqQuery = query(collection(db, 'school_update_requests'), where('requestedByUid', '==', user.uid));
+            const reqSnap = await getDocs(reqQuery);
+            const reqData = reqSnap.docs.map(d => ({ id: d.id, ...d.data() } as SchoolUpdateRequest));
+            reqData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            setMyRequests(reqData);
+          } catch {
+            // Reading requests is optional — the portal works without it.
+          }
         } else {
           toast.error('ကျောင်းအချက်အလက် ရှာမတွေ့ပါ');
         }
@@ -117,6 +156,51 @@ export default function SchoolPortal() {
       toast.error('တင်၍ မရပါ');
     } finally {
       setIsSubmittingAct(false);
+    }
+  };
+
+  // v24.7: ask the admin to change a field the school cannot edit itself.
+  const handleSubmitRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!school) return;
+    const user = auth.currentUser;
+    if (!user) { toast.error('အကောင့် ဝင်ထားမှု မရှိပါ'); return; }
+    const fieldDef = REQUESTABLE_FIELDS.find(f => f.value === reqField);
+    const newValue = reqValue.trim();
+    if (!fieldDef || !newValue) { toast.error('ပြောင်းလိုသော အချက်အလက်ကို ဖြည့်ပါ'); return; }
+    const oldValue = String((school as any)[reqField] ?? '');
+    if (oldValue === newValue) { toast.info('တန်ဖိုး အသစ်က လက်ရှိ တန်ဖိုးနဲ့ အတူတူပဲ ဖြစ်နေပါတယ်'); return; }
+    setIsSubmittingReq(true);
+    try {
+      const docRef = await addDoc(collection(db, 'school_update_requests'), {
+        schoolId: school.id,
+        schoolName: school.name,
+        requestedBy: user.email || school.name,
+        requestedByUid: user.uid,
+        contactPhone: school.schoolPhone || '',
+        changes: [{ field: reqField, oldValue, newValue }],
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+      });
+      setMyRequests(prev => [{ id: docRef.id, schoolId: school.id, schoolName: school.name, requestedBy: user.email || school.name, requestedByUid: user.uid, contactPhone: school.schoolPhone || '', changes: [{ field: reqField, oldValue, newValue }], status: 'pending', createdAt: new Date().toISOString() }, ...prev]);
+      setReqValue('');
+      toast.success('တောင်းဆိုမှု ပေးပို့ပြီးပါပြီ — Admin အတည်ပြုပြီးမှ ပြောင်းလဲပါမည်');
+    } catch (err) {
+      toast.error('တောင်းဆို၍ မရပါ');
+    } finally {
+      setIsSubmittingReq(false);
+    }
+  };
+
+  // v24.7: a school can remove an activity it posted (create-only before).
+  const handleDeleteActivity = async (id: string) => {
+    if (!(await confirmDialog('ဤလှုပ်ရှားမှုကို ဖျက်ရန် သေချာပါသလား?'))) return;
+    try {
+      await deleteDoc(doc(db, 'events', id));
+      setActivities(prev => prev.filter(a => a.id !== id));
+      toast.success('ဖျက်ပြီးပါပြီ');
+    } catch (err) {
+      toast.error('ဖျက်၍ မရပါ');
     }
   };
 
@@ -237,6 +321,46 @@ export default function SchoolPortal() {
           </div>
         </div>
 
+        {/* Change Requests (v24.7) */}
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+          <div className="flex items-center justify-between border-b pb-3">
+            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-amber-600" /> အခြား အချက်အလက် ပြောင်းလဲရန် တောင်းဆိုမည်
+            </h2>
+          </div>
+          <p className="text-xs text-slate-500">ကျောင်းအမည်၊ အဆင့်၊ ကျောင်းသားဦးရေ Range တို့ကို ကိုယ်တိုင် ပြင်၍မရပါ — Admin ထံ တောင်းဆိုနိုင်ပါသည်။ ဖုန်း၊ လိပ်စာ၊ မြို့နယ်၊ ဇုန်၊ ကျောင်းသားဦးရေတို့ကိုတော့ အပေါ်က form မှာပဲ တိုက်ရိုက် ပြင်နိုင်ပါသည်။</p>
+          <form onSubmit={handleSubmitRequest} className="grid sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">ပြောင်းလိုသော အချက်</label>
+              <select value={reqField} onChange={e => setReqField(e.target.value)} className="w-full p-2.5 border rounded-xl text-sm bg-white">
+                {REQUESTABLE_FIELDS.map(f => (
+                  <option key={f.value} value={f.value}>{f.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">တန်ဖိုး အသစ်</label>
+              <input required value={reqValue} onChange={e => setReqValue(e.target.value)} placeholder="ဥပမာ - ပညာရောင်ခြည် ကိုယ်ပိုင်အထက်တန်းကျောင်း" className="w-full p-2.5 border rounded-xl text-sm" />
+            </div>
+            <button type="submit" disabled={isSubmittingReq} className="bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer">
+              <Send className="w-4 h-4" /> {isSubmittingReq ? 'ပို့နေပါသည်...' : 'တောင်းဆိုမည်'}
+            </button>
+          </form>
+          {myRequests.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="font-bold text-sm text-slate-800">ပေးပို့ထားသော တောင်းဆိုမှုများ ({myRequests.length})</h3>
+              {myRequests.map(r => (
+                <div key={r.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap items-center gap-2 text-sm">
+                  <span className="font-bold text-slate-800">{r.changes.map(c => `${REQUESTABLE_FIELDS.find(f => f.value === c.field)?.label || c.field}: ${c.oldValue || '(အလွတ်)'} → ${c.newValue}`).join(', ')}</span>
+                  <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full font-bold ${r.status === 'pending' ? 'bg-amber-100 text-amber-800' : r.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'}`}>
+                    {r.status === 'pending' ? 'စစ်ဆေးရန် ကျန်' : r.status === 'approved' ? 'အတည်ပြုပြီး' : 'ပယ်ဖျက်ပြီး'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Activity Management */}
         <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
           <div className="flex items-center justify-between border-b pb-3">
@@ -272,11 +396,14 @@ export default function SchoolPortal() {
                 [...activities].sort((a,b) => b.date.localeCompare(a.date)).map(act => (
                   <div key={act.id} className="p-3 bg-white border border-slate-200 rounded-xl flex gap-3 shadow-2xs">
                     {act.imageUrl && <img src={act.imageUrl} alt={act.title} className="w-14 h-14 rounded-lg object-cover border shrink-0" />}
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <p className="font-bold text-sm text-slate-900">{act.title}</p>
                       <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5"><Calendar className="w-3 h-3"/> {act.date} {act.time && `• ${act.time}`}</p>
                       {act.location && <p className="text-[10px] text-slate-400 mt-1"><MapPin className="w-2.5 h-2.5 inline"/> {act.location}</p>}
                     </div>
+                    <button onClick={() => handleDeleteActivity(act.id)} className="self-start p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition shrink-0" title="ဖျက်ရန်">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 ))
               )}

@@ -76,6 +76,17 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
     const event = events.find(ev => ev.id === selectedEventId);
     if (!event) return;
 
+    // v24.6: a result without an explicit winner/medal used to be saved
+    // blank, and the medal table then guessed a winner from the scores.
+    if (!winner) {
+      toast.error('အနိုင်ရသူ ရွေးပေးပါ');
+      return;
+    }
+    if (winner !== 'သရေ' && !medal) {
+      toast.error('ဆုတံဆိပ် ရွေးပေးပါ');
+      return;
+    }
+
     const isDuplicate = event.results?.some(r => 
       (r.teamA === teamA && r.teamB === teamB) || 
       (r.teamA === teamB && r.teamB === teamA) ||
@@ -172,7 +183,7 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
                       <h4 className="font-bold text-sm text-slate-900">{ev.title}</h4>
                       <div className="text-[10px] text-slate-500 mt-1">{ev.startDate} • {ev.location}</div>
                     </div>
-                    <button onClick={async (e) => { e.stopPropagation(); if (await confirmDialog('ဖျက်ရန် သေချာပါသလား?')) { deleteDoc(doc(db, 'sports_events', ev.id)).then(() => fetchEvents()); } }} className="text-rose-500 p-1 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={async (e) => { e.stopPropagation(); if (await confirmDialog('ဖျက်ရန် သေချာပါသလား?')) { try { await deleteDoc(doc(db, 'sports_events', ev.id)); fetchEvents(); } catch (err) { toast.error('ဖျက်၍ မရပါ'); } } }} className="text-rose-500 p-1 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 ))}
               </div>
@@ -184,7 +195,7 @@ export default function AdminSportsManager({ schools }: { schools: School[] }) {
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden sticky top-20">
                 <div className="p-4 bg-slate-900 text-white text-sm font-bold truncate flex justify-between items-center">
                   <span>{selectedEvent.title}</span>
-                  <select value={selectedEvent.status} onChange={e => updateDoc(doc(db, 'sports_events', selectedEvent.id), { status: e.target.value }).then(fetchEvents)} className="text-xs bg-slate-800 border border-slate-600 rounded px-2 py-1 text-white outline-none cursor-pointer">
+                  <select value={selectedEvent.status} onChange={async e => { try { await updateDoc(doc(db, 'sports_events', selectedEvent.id), { status: e.target.value }); fetchEvents(); } catch (err) { toast.error('ပြောင်း၍ မရပါ'); } }} className="text-xs bg-slate-800 border border-slate-600 rounded px-2 py-1 text-white outline-none cursor-pointer">
                     <option value="upcoming">လာမည့်ပွဲစဉ်</option>
                     <option value="ongoing">ယှဉ်ပြိုင်နေဆဲ</option>
                     <option value="finished">ပြီးဆုံးပြီ</option>

@@ -50,11 +50,13 @@ export default function Dashboard() {
   }, [allSchools, selectedZone]);
 
   // --- UNIFIED STATS STATE ---
-  const [sportsStats, setSportsStats] = useState({ athletes: 0, events: 0 });
+  // null = the count could not be read (denied / offline). It must never
+  // silently become 0 — 0 would be shown as a real count.
+  const [sportsStats, setSportsStats] = useState<{ athletes: number | null; events: number | null }>({ athletes: null, events: null });
   // null = transactions total unavailable (guest, or the admin list failed).
   // It must never silently become 0 — 0 would be shown as a real total.
   const [financeStats, setFinanceStats] = useState<{ totalCollected: number | null }>({ totalCollected: null });
-  const [eventStats, setEventStats] = useState(0);
+  const [eventStats, setEventStats] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -64,13 +66,13 @@ export default function Dashboard() {
         // to silently collapse to 0 and show a wrong total as fact.
         const isAdminUser = !!getAdminSession().isLoggedIn;
         const [athletesSnap, sportsSnap, eventsSnap] = await Promise.all([
-          getDocs(collection(db, 'athletes')).catch(() => ({ size: 0 })),
-          getDocs(collection(db, 'sports_events')).catch(() => ({ size: 0 })),
-          getDocs(collection(db, 'events')).catch(() => ({ size: 0 }))
+          getDocs(collection(db, 'athletes')).catch(() => null),
+          getDocs(collection(db, 'sports_events')).catch(() => null),
+          getDocs(collection(db, 'events')).catch(() => null)
         ]);
 
-        setSportsStats({ athletes: athletesSnap.size, events: sportsSnap.size });
-        setEventStats(eventsSnap.size);
+        setSportsStats({ athletes: athletesSnap ? athletesSnap.size : null, events: sportsSnap ? sportsSnap.size : null });
+        setEventStats(eventsSnap ? eventsSnap.size : null);
 
         if (!isAdminUser) {
           setFinanceStats({ totalCollected: null });
@@ -104,15 +106,19 @@ export default function Dashboard() {
   const [selectedRange, setSelectedRange] = useState<string>('all');
   const [selectedFeeStatus, setSelectedFeeStatus] = useState<'all' | 'paid' | 'unpaid'>('all');
 
-  // Helper to normalize fee amount for calculation
+  // Helper to normalize fee amount for calculation — v24.7: only a fee
+  // that was actually recorded counts. Before, a missing fee silently
+  // became the student-range tier default (or 200,000), so the money
+  // totals were estimates dressed up as real amounts.
   const getSchoolFee = (s: School): number => {
     if (s.feeAmount !== undefined && s.feeAmount !== null && !isNaN(Number(s.feeAmount))) {
       return Number(s.feeAmount);
     }
-    const tier = getStudentRangeTier(s.studentRange);
-    if (tier) return tier.defaultFee;
-    return 200000;
+    return 0;
   };
+
+  // Money totals count live schools only — an inactive school will not pay.
+  const financeSchools = useMemo(() => schools.filter(s => s.status !== 'inactive'), [schools]);
 
   // Helper to normalize range key
   const getSchoolRangeKey = (s: School): string => {
@@ -134,7 +140,7 @@ export default function Dashboard() {
 
   // Financial Figures
   const totalCollectedAmount = useMemo(() => {
-    return paidSchools.reduce((sum, s) => sum + getSchoolFee(s), 0);
+    return paidSchools.filter(s => s.status !== 'inactive').reduce((sum, s) => sum + getSchoolFee(s), 0);
   }, [paidSchools]);
 
   // Finance figure shown in the overview card ("အခြားရရှိငွေ"):
@@ -150,8 +156,8 @@ export default function Dashboard() {
   }, [financeStats.totalCollected, loading, totalCollectedAmount]);
 
   const totalExpectedAmount = useMemo(() => {
-    return schools.reduce((sum, s) => sum + getSchoolFee(s), 0);
-  }, [schools]);
+    return financeSchools.reduce((sum, s) => sum + getSchoolFee(s), 0);
+  }, [financeSchools]);
 
   const remainingAmountToCollect = totalExpectedAmount - totalCollectedAmount;
 
@@ -173,8 +179,8 @@ export default function Dashboard() {
       const allInLevel = item.schools;
       const paidInLevel = allInLevel.filter(s => !!s.isAnnualFeePaid);
       const unpaidInLevel = allInLevel.filter(s => !s.isAnnualFeePaid);
-      const collected = paidInLevel.reduce((sum, s) => sum + getSchoolFee(s), 0);
-      const expected = allInLevel.reduce((sum, s) => sum + getSchoolFee(s), 0);
+      const collected = paidInLevel.filter(s => s.status !== 'inactive').reduce((sum, s) => sum + getSchoolFee(s), 0);
+      const expected = allInLevel.filter(s => s.status !== 'inactive').reduce((sum, s) => sum + getSchoolFee(s), 0);
       const pct = allInLevel.length > 0 ? Math.round((paidInLevel.length / allInLevel.length) * 100) : 0;
 
       return {
@@ -198,8 +204,8 @@ export default function Dashboard() {
       const allInRange = schools.filter(s => getSchoolRangeKey(s) === tier.key);
       const paidInRange = allInRange.filter(s => !!s.isAnnualFeePaid);
       const unpaidInRange = allInRange.filter(s => !s.isAnnualFeePaid);
-      const collected = paidInRange.reduce((sum, s) => sum + getSchoolFee(s), 0);
-      const expected = allInRange.reduce((sum, s) => sum + getSchoolFee(s), 0);
+      const collected = paidInRange.filter(s => s.status !== 'inactive').reduce((sum, s) => sum + getSchoolFee(s), 0);
+      const expected = allInRange.filter(s => s.status !== 'inactive').reduce((sum, s) => sum + getSchoolFee(s), 0);
       const pct = allInRange.length > 0 ? Math.round((paidInRange.length / allInRange.length) * 100) : 0;
 
       return {
@@ -263,7 +269,7 @@ export default function Dashboard() {
         );
         const paid = matching.filter(s => !!s.isAnnualFeePaid).length;
         const total = matching.length;
-        const collected = matching.filter(s => !!s.isAnnualFeePaid).reduce((sum, s) => sum + getSchoolFee(s), 0);
+        const collected = matching.filter(s => !!s.isAnnualFeePaid && s.status !== 'inactive').reduce((sum, s) => sum + getSchoolFee(s), 0);
         return {
           tierKey: tier.key,
           tierLabel: tier.shortLabel,
@@ -445,7 +451,7 @@ export default function Dashboard() {
           <div className="p-3 bg-sky-50 text-sky-600 rounded-xl shrink-0"><UserCheck className="w-5 h-5" /></div>
           <div>
             <p className="text-[11px] text-slate-500 font-semibold">အားကစားသမား စုစုပေါင်း</p>
-            <p className="text-xl font-black text-sky-950">{sportsStats.athletes} <span className="text-xs font-normal text-slate-500">ဦး</span></p>
+            <p className="text-xl font-black text-sky-950">{sportsStats.athletes !== null ? (<>{sportsStats.athletes} <span className="text-xs font-normal text-slate-500">ဦး</span></>) : '—'}</p>
           </div>
         </div>
 
@@ -453,14 +459,18 @@ export default function Dashboard() {
           <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shrink-0"><Trophy className="w-5 h-5" /></div>
           <div>
             <p className="text-[11px] text-slate-500 font-semibold">အားကစားပွဲစဉ်</p>
-            <p className="text-xl font-black text-emerald-950">{sportsStats.events} <span className="text-xs font-normal text-slate-500">ခု</span></p>
+            <p className="text-xl font-black text-emerald-950">{sportsStats.events !== null ? (<>{sportsStats.events} <span className="text-xs font-normal text-slate-500">ခု</span></>) : '—'}</p>
           </div>
         </div>
 
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
           <div className="p-3 bg-amber-50 text-amber-600 rounded-xl shrink-0"><Receipt className="w-5 h-5" /></div>
           <div>
-            <p className="text-[11px] text-slate-500 font-semibold">အခြားရရှိငွေ (အားကစားကြေး စသဖြင့်)</p>
+            {/* v24.7: the label used to say "အခြားရရှိငွေ (အားကစားကြေး စသဖြင့်)"
+                while the figure was the annual-fee total for guests (and the
+                all-transactions total for admins). The label now says what
+                the figure actually is. */}
+            <p className="text-[11px] text-slate-500 font-semibold">{financeStats.totalCollected !== null ? 'စုစုပေါင်း ကောက်ခံရရှိငွေ' : 'ကောက်ခံရရှိငွေ (နှစ်စဉ်ကြေး)'}</p>
             <p className="text-xl font-black text-amber-950 truncate">{financeTotalForDisplay !== null ? (<>{formatMMK(financeTotalForDisplay)} <span className="text-xs font-normal text-slate-500">ကျပ်</span></>) : '—'}</p>
           </div>
         </div>
@@ -469,7 +479,7 @@ export default function Dashboard() {
           <div className="p-3 bg-purple-50 text-purple-600 rounded-xl shrink-0"><Ticket className="w-5 h-5" /></div>
           <div>
             <p className="text-[11px] text-slate-500 font-semibold">စာရင်းသွင်းနိုင်သော ပွဲစဉ်များ</p>
-            <p className="text-xl font-black text-purple-950">{eventStats} <span className="text-xs font-normal text-slate-500">ခု</span></p>
+            <p className="text-xl font-black text-purple-950">{eventStats !== null ? (<>{eventStats} <span className="text-xs font-normal text-slate-500">ခု</span></>) : '—'}</p>
           </div>
         </div>
       </section>

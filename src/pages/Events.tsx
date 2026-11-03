@@ -25,7 +25,11 @@ export default function Events() {
         const snap = await getDocs(q);
         const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as EventItem));
         data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        setEvents(data);
+        // v24.6: this page is "upcoming" events — hide events whose date has
+        // passed. Dateless legacy records stay visible.
+        const n = new Date();
+        const todayStr = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+        setEvents(data.filter(e => !e.date || e.date >= todayStr));
       } catch (err) {
         console.error(err);
       } finally {
@@ -41,6 +45,15 @@ export default function Events() {
     if (!schoolName || !contactPhone) {
       toast.error('ကျောင်းအမည်နှင့် ဖုန်းနံပါတ် ဖြည့်သွင်းပါ');
       return;
+    }
+    // v24.6: no registering for an event that already happened
+    if (selectedEvent.date) {
+      const n = new Date();
+      const todayStr = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+      if (selectedEvent.date < todayStr) {
+        toast.error('ဤပွဲ ပြီးသွားပါပြီ — စာရင်းသွင်း၍ မရပါ');
+        return;
+      }
     }
 
     setIsSubmitting(true);

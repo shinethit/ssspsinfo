@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Gallery as GalleryItem } from '../types';
 import { Images, ArrowLeft, Loader2, X } from 'lucide-react';
@@ -9,17 +9,26 @@ export default function Gallery() {
   const navigate = useNavigate();
   const [photos, setPhotos] = useState<GalleryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [selectedAlbum, setSelectedAlbum] = useState('all');
   const [selectedPhoto, setSelectedPhoto] = useState<GalleryItem | null>(null);
 
   useEffect(() => {
     const fetchPhotos = async () => {
       try {
-        const q = query(collection(db, 'gallery'), orderBy('createdAt', 'desc'));
-        const snap = await getDocs(q);
-        setPhotos(snap.docs.map(d => ({ id: d.id, ...d.data() } as GalleryItem)));
+        // v24.6: no orderBy — orderBy('createdAt') silently dropped every
+        // record missing createdAt. Sort in code, missing dates last.
+        const snap = await getDocs(collection(db, 'gallery'));
+        const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as GalleryItem));
+        items.sort((a, b) => {
+          const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return tb - ta;
+        });
+        setPhotos(items);
       } catch (err) {
         console.error(err);
+        setLoadError(true);
       } finally {
         setLoading(false);
       }
@@ -77,6 +86,11 @@ export default function Gallery() {
         <div className="flex justify-center p-12">
           <Loader2 className="w-8 h-8 animate-spin text-sky-600" />
         </div>
+      ) : loadError ? (
+        <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 text-slate-500">
+          <Images className="w-10 h-10 mx-auto text-slate-300 mb-2" />
+          <p className="font-semibold text-sm">ဓာတ်ပုံများ ဖတ်မရပါ။ အင်တာနက် စစ်ပြီး စာမျက်နှာကို ပြန်ဖွင့်ပါ။</p>
+        </div>
       ) : photos.length === 0 ? (
         <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 text-slate-500">
           <Images className="w-10 h-10 mx-auto text-slate-300 mb-2" />
@@ -99,6 +113,7 @@ export default function Gallery() {
                   src={photo.imageUrl}
                   alt={photo.title}
                   loading="lazy"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                 />
               </div>

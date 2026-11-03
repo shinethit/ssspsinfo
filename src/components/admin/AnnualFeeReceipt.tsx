@@ -4,6 +4,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { Download, Printer, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { getGlobalAcademicYear } from '../../lib/academicYear';
 
 export default function AnnualFeeReceipt({ school, onClose }: { school: School; onClose: () => void }) {
   const receiptRef = useRef<HTMLDivElement>(null);
@@ -119,7 +120,7 @@ export default function AnnualFeeReceipt({ school, onClose }: { school: School; 
                 <tbody>
                   <tr>
                     <td className="py-4 px-4 border-b border-slate-100">
-                      နှစ်စဉ်ကြေး (Annual Fee) - {school.feeAcademicYear || '၂၀၂၄-၂၀၂၅'}
+                      နှစ်စဉ်ကြေး (Annual Fee) - {school.feeAcademicYear || getGlobalAcademicYear()}
                     </td>
                     <td className="py-4 px-4 text-right border-b border-slate-100 font-mono font-bold">
                       {(school.feeAmount || 0).toLocaleString('my-MM')} ကျပ်

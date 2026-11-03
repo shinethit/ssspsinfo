@@ -9,6 +9,7 @@ import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../constants';
 export default function CalendarPage() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   
   const [zoneFilter, setZoneFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -25,6 +26,11 @@ export default function CalendarPage() {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as EventItem));
       setEvents(data);
       setLoading(false);
+    }, (err) => {
+      // v24.6: without this a denied/failed read looked like "no events"
+      console.error('Calendar listener error:', err);
+      setLoadError(true);
+      setLoading(false);
     });
     return () => unsub();
   }, []);
@@ -32,7 +38,9 @@ export default function CalendarPage() {
   const filteredEvents = useMemo(() => {
     return events.filter(e => {
       if (e.isActive === false) return false;
-      if (!isSchoolInZone(e.zone, zoneFilter)) return false;
+      // v24.6: a zone-less event applies to all zones — it used to be hidden
+      // under every specific zone filter and wrongly shown under "အခြား"
+      if (e.zone && !isSchoolInZone(e.zone, zoneFilter)) return false;
       if (typeFilter !== 'all' && e.eventType !== typeFilter) return false;
       return true;
     });
@@ -84,6 +92,7 @@ export default function CalendarPage() {
             <option value="all">အမျိုးအစား အားလုံး</option>
             <option value="festival">ပွဲ/အခမ်းအနား</option>
             <option value="school_activity">ကျောင်း Activity</option>
+            <option value="sport">အားကစား</option>
             <option value="general">အထွေထွေ</option>
           </select>
           <select value={zoneFilter} onChange={e => setZoneFilter(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none">
@@ -102,6 +111,14 @@ export default function CalendarPage() {
           </button>
         </div>
       </div>
+
+      {/* v24.6: loading/error states — the loading state existed but was never rendered */}
+      {loading && (
+        <div className="p-4 text-center bg-white rounded-2xl border border-slate-200 text-slate-500 text-sm font-semibold">ပြက္ခဒိန် ဖွင့်နေပါသည်…</div>
+      )}
+      {loadError && (
+        <div className="p-4 text-center bg-white rounded-2xl border border-rose-200 text-rose-700 text-sm font-semibold">ပြက္ခဒိန် ဖတ်မရပါ။ အင်တာနက် စစ်ပြီး စာမျက်နှာကို ပြန်ဖွင့်ပါ။</div>
+      )}
 
       {viewMode === 'month' ? (
         <div className="grid md:grid-cols-3 gap-6">
@@ -157,7 +174,7 @@ export default function CalendarPage() {
                   <div key={ev.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${ev.eventType === 'school_activity' ? 'bg-amber-50 text-amber-800 border-amber-200' : ev.eventType === 'festival' ? 'bg-rose-50 text-rose-800 border-rose-200' : 'bg-sky-50 text-sky-800 border-sky-200'}`}>
-                        {ev.eventType === 'school_activity' ? 'ကျောင်း' : ev.eventType === 'festival' ? 'ပွဲ/အခမ်းအနား' : 'အထွေထွေ'}
+                        {ev.eventType === 'school_activity' ? 'ကျောင်း' : ev.eventType === 'festival' ? 'ပွဲ/အခမ်းအနား' : ev.eventType === 'sport' ? 'အားကစား' : 'အထွေထွေ'}
                       </span>
                       {ev.time && <span className="text-[10px] text-slate-500 font-bold flex items-center gap-1"><Clock className="w-3 h-3"/>{ev.time}</span>}
                     </div>
@@ -195,7 +212,7 @@ export default function CalendarPage() {
                   <div className="space-y-1.5 flex-1">
                     <div className="flex items-center justify-between">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${ev.eventType === 'school_activity' ? 'bg-amber-50 text-amber-800 border-amber-200' : ev.eventType === 'festival' ? 'bg-rose-50 text-rose-800 border-rose-200' : 'bg-sky-50 text-sky-800 border-sky-200'}`}>
-                        {ev.eventType === 'school_activity' ? 'ကျောင်း' : ev.eventType === 'festival' ? 'ပွဲ/အခမ်းအနား' : 'အထွေထွေ'}
+                        {ev.eventType === 'school_activity' ? 'ကျောင်း' : ev.eventType === 'festival' ? 'ပွဲ/အခမ်းအနား' : ev.eventType === 'sport' ? 'အားကစား' : 'အထွေထွေ'}
                       </span>
                       <span className="text-xs font-bold text-sky-900">{ev.date} {ev.time && `• ${ev.time}`}</span>
                     </div>

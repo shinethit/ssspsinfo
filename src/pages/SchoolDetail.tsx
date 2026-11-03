@@ -292,7 +292,7 @@ export default function SchoolDetail() {
             <div className="bg-white/80 p-2.5 rounded-xl border border-slate-200/60">
               <span className="text-[10px] text-slate-500 block">ကျောင်းသားဦးရေ Range</span>
               <strong className="text-slate-900 font-bold text-xs sm:text-sm">
-                {school.studentRange ? `${school.studentRange} ဦး` : '၁ - ၁၀၀ ဦး'}
+                {school.studentRange ? `${school.studentRange} ဦး` : 'မဖော်ပြထားပါ'}
               </strong>
             </div>
 
@@ -306,14 +306,15 @@ export default function SchoolDetail() {
             <div className="bg-white/80 p-2.5 rounded-xl border border-slate-200/60">
               <span className="text-[10px] text-slate-500 block">နှစ်စဉ်ကြေး ပမာဏ</span>
               <strong className="text-sky-950 font-extrabold text-xs sm:text-sm">
-                {Number(school.feeAmount || 50000).toLocaleString('my-MM')} ကျပ်
+                {/* v24.6: never invent a fee — a missing amount used to show 50,000 ကျပ် as fact */}
+                {school.feeAmount ? `${Number(school.feeAmount).toLocaleString('my-MM')} ကျပ်` : 'မဖော်ပြထားပါ'}
               </strong>
             </div>
 
             <div className="bg-white/80 p-2.5 rounded-xl border border-slate-200/60">
               <span className="text-[10px] text-slate-500 block">ပညာသင်နှစ်</span>
               <strong className="text-slate-800 font-bold text-xs sm:text-sm">
-                {school.feeAcademicYear || '၂၀၂၄-၂၀၂၅'}
+                {school.feeAcademicYear || 'မဖော်ပြထားပါ'}
               </strong>
             </div>
           </div>

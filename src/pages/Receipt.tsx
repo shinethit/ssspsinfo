@@ -48,7 +48,13 @@ export default function Receipt() {
   }
 
   // transaction is guaranteed to exist from here on
-  const displayVoucherNo = transaction.voucherNo || `SSSPSFV-${transaction.paidDate.replace(/-/g, '')}-${transaction.id.substring(0, 4).toUpperCase()}`;
+  // v24.7: an old transaction doc missing paidDate used to crash this page
+  // (paidDate.replace on undefined), and a missing amount crashed the
+  // total rows. Both now fall back safely.
+  const displayVoucherNo = transaction.voucherNo || (transaction.paidDate
+    ? `SSSPSFV-${transaction.paidDate.replace(/-/g, '')}-${transaction.id.substring(0, 4).toUpperCase()}`
+    : `SSSPSFV-${transaction.id.substring(0, 4).toUpperCase()}`);
+  const displayAmount = Number(transaction.amount) || 0;
 
   const handlePrint = () => {
     window.print();
@@ -124,7 +130,7 @@ export default function Receipt() {
             </div>
             <div className="text-right">
               <span className="text-slate-500 font-semibold block mb-1">ရက်စွဲ (Date):</span>
-              <span className="font-bold text-slate-900">{new Date(transaction.paidDate).toLocaleDateString('my-MM', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+              <span className="font-bold text-slate-900">{transaction.paidDate ? new Date(transaction.paidDate).toLocaleDateString('my-MM', { year: 'numeric', month: 'long', day: 'numeric' }) : 'ရက်စွဲ မရှိပါ'}</span>
             </div>
           </div>
 
@@ -156,13 +162,13 @@ export default function Receipt() {
                   {transaction.note && <span className="block text-xs text-slate-500 mt-1 bg-slate-50 p-1.5 rounded border border-slate-100">မှတ်စု: {transaction.note}</span>}
                 </td>
                 <td className="py-4 px-4 text-right border-b border-slate-100 font-mono font-bold">
-                  {transaction.amount.toLocaleString('my-MM')} ကျပ်
+                  {displayAmount.toLocaleString('my-MM')} ကျပ်
                 </td>
               </tr>
               <tr>
                 <td className="py-4 px-4 text-right font-bold text-slate-800">စုစုပေါင်း (Total):</td>
                 <td className="py-4 px-4 text-right font-mono font-black text-lg text-sky-900 bg-sky-50 rounded-br-lg">
-                  {transaction.amount.toLocaleString('my-MM')} ကျပ်
+                  {displayAmount.toLocaleString('my-MM')} ကျပ်
                 </td>
               </tr>
             </tbody>

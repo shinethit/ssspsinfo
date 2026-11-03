@@ -21,6 +21,7 @@ import {
   Calendar,
   Images,
   HelpCircle,
+  School as SchoolIcon,
 } from 'lucide-react';
 import NewsTickerBar from './NewsTickerBar';
 import GlobalSearch from './GlobalSearch';
@@ -46,6 +47,9 @@ export default function Layout() {
     { to: '/associations', label: 'အသင်းများ', labelEn: 'Associations', icon: Building2 },
     { to: '/contacts', label: 'အသင်းဝင်ကျောင်းများ', labelEn: 'Member Schools', icon: Users },
     { to: '/chat', label: 'Chat ဆွေးနွေးခန်း', labelEn: 'Chat Room', icon: MessageSquare },
+    // v24.7: School Login / Portal was only linked from inside the Help
+    // page, so schools had to know the URL. It now has a menu item.
+    { to: '/school-login', label: 'ကျောင်းအကောင့်ဝင်ရန်', labelEn: 'School Login', icon: SchoolIcon },
     { to: '/help', label: 'အသုံးပြုနည်း', labelEn: 'How to Use', icon: HelpCircle },
   ];
 
@@ -80,7 +84,7 @@ export default function Layout() {
                 title="နောက်သို့ (Back)"
               >
                 <ArrowLeft className="w-4 h-4 text-sky-800 shrink-0" />
-                <span className="hidden xs:inline">နောက်သို့</span>
+                <span className="hidden sm:inline">နောက်သို့</span>
               </button>
             )}
 
@@ -171,7 +175,7 @@ export default function Layout() {
                   <div className="flex items-center gap-3 truncate">
                     <Icon
                       className={`w-4 h-4 shrink-0 ${
-                        isActive ? 'text-white' : 'text-sky-600 group-hover:text-sky-900'
+                        isActive ? 'text-sky-700' : 'text-sky-600 group-hover:text-sky-900'
                       }`}
                     />
                     <span className="truncate">{link.label}</span>
@@ -205,7 +209,7 @@ export default function Layout() {
                   <div className="flex items-center gap-3 truncate">
                     <Icon
                       className={`w-4 h-4 shrink-0 ${
-                        isActive ? 'text-white' : 'text-sky-600 group-hover:text-sky-900'
+                        isActive ? 'text-sky-700' : 'text-sky-600 group-hover:text-sky-900'
                       }`}
                     />
                     <span className="truncate">{link.label}</span>

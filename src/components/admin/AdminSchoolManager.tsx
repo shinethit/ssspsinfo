@@ -5,9 +5,10 @@ import {
   ArrowUpDown, ChevronLeft, ChevronRight, Printer, UserPlus, MapPin, CheckCircle2, XCircle, Plus
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { updateDoc, doc } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
 import { toast } from 'sonner';
+import { getGlobalAcademicYear } from '../../lib/academicYear';
+import { recordAnnualFeePayment } from '../../lib/finance';
+import { recordAuditLog } from '../../lib/audit';
 import { School, SchoolLevelItem } from '../../types';
 import { getUnifiedSchoolLevels } from '../../lib/schoolLevels';
 import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../../constants';
@@ -50,7 +51,7 @@ export default function AdminSchoolManager({
   const [feeModalSchool, setFeeModalSchool] = useState<School | null>(null);
   const [feeDate, setFeeDate] = useState(new Date().toISOString().split('T')[0]);
   const [feeAmount, setFeeAmount] = useState('');
-  const [feeAcademicYear, setFeeAcademicYear] = useState('၂၀၂၅-၂၀၂၆');
+  const [feeAcademicYear, setFeeAcademicYear] = useState(() => getGlobalAcademicYear());
   const [isSubmittingFee, setIsSubmittingFee] = useState(false);
 
   const filteredSchools = useMemo(() => {
@@ -103,15 +104,30 @@ export default function AdminSchoolManager({
     if (!feeModalSchool) return;
     try {
       setIsSubmittingFee(true);
-      const numericAmount = Number(String(feeAmount).replace(/[^0-9]/g, '')) || 200000;
+      // v24.7: no invented amount — an empty amount used to silently become
+      // 200,000 ကျပ်. And one write path now does both: the transaction AND
+      // the school flag (before, only the flag was written and the money
+      // never appeared in the transactions list).
+      const numericAmount = Number(String(feeAmount).replace(/[^0-9]/g, ''));
+      if (!numericAmount || numericAmount <= 0) {
+        toast.error('နှစ်စဉ်ကြေး ပမာဏ ထည့်သွင်းပေးပါ');
+        return;
+      }
+      const year = feeAcademicYear || getGlobalAcademicYear();
+      const { voucherNo } = await recordAnnualFeePayment({
+        school: feeModalSchool,
+        amount: numericAmount,
+        paidDate: feeDate,
+        academicYear: year,
+      });
+      await recordAuditLog({ action: 'create', entityType: 'transaction', entityId: feeModalSchool.id, entityName: feeModalSchool.name, details: `နှစ်စဉ်ကြေး ${numericAmount.toLocaleString('my-MM')} ကျပ် (${year}, ${voucherNo})` });
       const updates = {
         isAnnualFeePaid: true,
         feePaidDate: feeDate,
         feeAmount: numericAmount,
-        feeAcademicYear: feeAcademicYear || '၂၀၂၅-၂၀၂၆',
+        feeAcademicYear: year,
         updatedAt: new Date().toISOString(),
       };
-      await updateDoc(doc(db, 'schools', feeModalSchool.id), updates);
       toast.success(`"${feeModalSchool.name}" အတွက် နှစ်စဉ်ကြေး ပေးသွင်းမှု မှတ်တမ်းတင်ပြီးပါပြီ`);
       const updatedSchool = { ...feeModalSchool, ...updates };
       setFeeModalSchool(null);

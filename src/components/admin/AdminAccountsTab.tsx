@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { deleteDoc, doc, setDoc } from 'firebase/firestore';
 import { db, auth, firebaseConfig } from '../../lib/firebase';
 import { initializeApp, deleteApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword, signOut as secondarySignOut } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, signOut as secondarySignOut, deleteUser } from 'firebase/auth';
 import { toast } from 'sonner';
 import { confirmDialog } from '../../components/ConfirmModal';
 import { AdminUser, School } from '../../types';
@@ -35,12 +35,24 @@ export default function AdminAccountsTab({ admins, schools, isAdmin, onRefreshAd
       setAddingAdmin(true);
       const sa = initializeApp(firebaseConfig, 'sa_' + Date.now()); const sau = getAuth(sa);
       let nu = '';
-      try { const uc = await createUserWithEmailAndPassword(sau, ce, cp); nu = uc.user.uid; } catch (ae: any) { toast.error(mapFirebaseAuthError(ae.code)); return; } finally { try { await secondarySignOut(sau); await deleteApp(sa); } catch {} }
-      await setDoc(doc(db, 'admins', nu), { uid: nu, email: ce, name: newAdminName.trim() || 'အက်ဒမင်', role: newAdminRole, phone: newAdminPhone.trim(), phones: [newAdminPhone.trim(), ...extraAdminUserPhones.map(p => p.trim())].filter(Boolean), note: newAdminNote.trim(), addedBy: auth.currentUser?.email || 'Admin', createdAt: new Date().toISOString() });
+      try {
+        const uc = await createUserWithEmailAndPassword(sau, ce, cp); nu = uc.user.uid;
+        try {
+          await setDoc(doc(db, 'admins', nu), { uid: nu, email: ce, name: newAdminName.trim() || 'အက်ဒမင်', role: newAdminRole, phone: newAdminPhone.trim(), phones: [newAdminPhone.trim(), ...extraAdminUserPhones.map(p => p.trim())].filter(Boolean), note: newAdminNote.trim(), addedBy: auth.currentUser?.email || 'Admin', createdAt: new Date().toISOString() });
+        } catch (docErr) {
+          // v24.7: the admins-doc write failed — delete the just-created
+          // Auth user while still signed in on the secondary app, so it
+          // cannot linger (it could sign in but Login would reject it as
+          // not-an-admin).
+          try { if (sau.currentUser) await deleteUser(sau.currentUser); } catch { /* rollback failed; report below */ }
+          toast.error('Admin မှတ်တမ်း သိမ်း၍မရပါ — အကောင့် ပြန်ဖျက်ပြီးပါပြီ၊ ပြန်စမ်းပါ');
+          return;
+        }
+      } catch (ae: any) { toast.error(mapFirebaseAuthError(ae.code)); return; } finally { try { await secondarySignOut(sau); await deleteApp(sa); } catch {} }
       toast.success('အက်ဒမင် ခန့်အပ်ပြီးပါပြီ'); setNewAdminEmail(''); setNewAdminPassword(''); setNewAdminName(''); setNewAdminPhone(''); setExtraAdminUserPhones([]); setNewAdminNote(''); setNewAdminRole('moderator'); onRefreshAdmins();
     } catch (e) { toast.error('အမှားဖြစ်ပွားပါသည်'); } finally { setAddingAdmin(false); }
   };
-  const handleDeleteAdmin = async (a: AdminUser) => { if (!isAdmin) return; if (a.id === auth.currentUser?.uid) { toast.error('မိမိကိုယ်ကို ဖယ်ရှား၍မရပါ'); return; } if (!(await confirmDialog('ဖယ်ရှားရန် သေချာပါသလား?'))) return; try { await deleteDoc(doc(db, 'admins', a.id)); toast.success('ဖယ်ရှားပြီးပါပြီ'); onRefreshAdmins(); } catch (e) { toast.error('ဖယ်ရှား၍မရပါ'); } };
+  const handleDeleteAdmin = async (a: AdminUser) => { if (!isAdmin) return; if (a.id === auth.currentUser?.uid) { toast.error('မိမိကိုယ်ကို ဖယ်ရှား၍မရပါ'); return; } if (!(await confirmDialog('ဖယ်ရှားရန် သေချာပါသလား?'))) return; try { await deleteDoc(doc(db, 'admins', a.id)); toast.success('ဖယ်ရှားပြီးပါပြီ — Firebase Console > Authentication မှာ အဲဒီ email ရဲ့ အကောင့်ကိုလည်း ဖျက်ပေးပါ (App ထဲကနေ သူများအကောင့်ကို ဖျက်၍မရပါ)'); onRefreshAdmins(); } catch (e) { toast.error('ဖယ်ရှား၍မရပါ'); } };
 
   return (
     <div className="grid lg:grid-cols-2 gap-6 animate-in fade-in">
@@ -52,7 +64,7 @@ export default function AdminAccountsTab({ admins, schools, isAdmin, onRefreshAd
           <form onSubmit={handleAddAdmin} className="space-y-3">
             <input type="text" value={newAdminName} onChange={e => setNewAdminName(e.target.value)} placeholder="အမည် (ဥပမာ - ဦးအောင်)" className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none" />
             <input type="email" required value={newAdminEmail} onChange={e => setNewAdminEmail(e.target.value)} placeholder="Email လိပ်စာ *" className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none" />
-            <input type="text" required value={newAdminPassword} onChange={e => setNewAdminPassword(e.target.value)} placeholder="Password (အနည်းဆုံး ၆ လုံး) *" className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none" />
+            <input type="password" required value={newAdminPassword} onChange={e => setNewAdminPassword(e.target.value)} placeholder="Password (အနည်းဆုံး ၆ လုံး) *" className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none" />
             <select value={newAdminRole} onChange={e => setNewAdminRole(e.target.value as 'admin' | 'moderator')} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold outline-none">
               <option value="moderator">Moderator (ကန့်သတ်ခွင့်ပြုချက်)</option>
               <option value="admin">Admin (အခွင့်အရေး အပြည့်အစုံ)</option>

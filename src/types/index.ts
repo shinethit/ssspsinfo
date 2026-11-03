@@ -202,8 +202,8 @@ export interface School {
   city?: string;
   zone?: string;
   studentRange?: string; // e.g. '1-100', '101-300', '301-500', '501-1000', '1000+'
-  studentCount?: number; // optional exact student count
-  feeAmount?: number; // annual fee amount in MMK (e.g. 50000, 100000, 150000, 200000, 300000)
+  studentCount?: number | null; // optional exact student count
+  feeAmount?: number | null; // annual fee amount in MMK — null means "not recorded" (v24.7: never invent a default)
   feeAcademicYear?: string; // e.g. '၂၀၂၄-၂၀၂၅'
   feePaidDate?: string; // e.g. '2024-06-15'
   // School Phone numbers (1 or more)
@@ -390,7 +390,7 @@ export interface AuditLog {
   id: string;
   adminEmail: string;
   action: 'create' | 'update' | 'delete' | 'bulk_delete';
-  entityType: 'school' | 'announcement' | 'association' | 'ticker' | 'admin' | 'school_level';
+  entityType: 'school' | 'announcement' | 'association' | 'ticker' | 'admin' | 'school_level' | 'transaction' | 'request';
   entityId?: string;
   entityName?: string;
   details?: string;
@@ -507,6 +507,7 @@ export interface SchoolUpdateRequest {
   schoolId: string;
   schoolName: string;
   requestedBy: string; // Email or Name of the person requesting
+  requestedByUid?: string; // Firebase Auth uid of the requester (v24.7: lets a school read its own requests)
   contactPhone: string;
   changes: {
     field: string;
@@ -549,6 +550,7 @@ export interface Athlete {
   grade: string;
   rollNo: string;
   school: string;
+  schoolId?: string; // v24.7: the school's document id when known — the portal matches athletes by this instead of the free-text name
   gender: string;
   sports: string[]; // အားကစားအမျိုးအစားများ (Array)
   photoUrl?: string;

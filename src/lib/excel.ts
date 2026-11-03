@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { School } from '../types';
+import { getGlobalAcademicYear } from './academicYear';
 
 export const downloadSchoolTemplate = () => {
   const templateData = [
@@ -14,7 +15,7 @@ export const downloadSchoolTemplate = () => {
       'တိကျသော ကျောင်းသားဦးရေ': '120',
       'နှစ်စဉ်ကြေး ပမာဏ (ကျပ်)': '250000',
       'နှစ်စဉ်ကြေး (သွင်းပြီး / မသွင်းရသေး)': 'သွင်းပြီး',
-      'ပညာသင်နှစ်': '၂၀၂၄-၂၀၂၅',
+      'ပညာသင်နှစ်': getGlobalAcademicYear(),
       'ကျောင်းဖုန်း (၁)': '09123456789',
       'ကျောင်းဖုန်း (၂)': '09123456780',
       'နောက်ထပ် ကျောင်းဖုန်းများ': '08123456',
@@ -144,16 +145,10 @@ export const normalizeSchoolRow = (row: Record<string, any>) => {
       zone: cleanStr(row['zone'] || row['ဇုန်'] || row['ဇုံ'] || ''),
       studentRange: stdRange,
       studentCount: parseNumber(row['studentCount'] ?? row['တိကျသော ကျောင်းသားဦးရေ'] ?? row['ကျောင်းသားဦးရေ']),
-      feeAmount: explicitFee !== undefined ? explicitFee : (
-        stdRange === '601+' ? 1000000 :
-        stdRange === '401-600' ? 700000 :
-        stdRange === '301-400' ? 500000 :
-        stdRange === '251-300' ? 400000 :
-        stdRange === '201-250' ? 350000 :
-        stdRange === '151-200' ? 300000 :
-        stdRange === '101-150' ? 250000 : 200000
-      ),
-      feeAcademicYear: cleanStr(row['feeAcademicYear'] ?? row['ပညာသင်နှစ်'] ?? '၂၀၂၄-၂၀၂၅'),
+      // v24.7: no invented fee — when the row has no explicit amount the
+      // fee stays empty instead of silently becoming a tier default.
+      feeAmount: explicitFee !== undefined ? explicitFee : null,
+      feeAcademicYear: cleanStr(row['feeAcademicYear'] ?? row['ပညာသင်နှစ်'] ?? getGlobalAcademicYear()),
       isAnnualFeePaid: parseFeePaid(row['isAnnualFeePaid'] ?? row['နှစ်စဉ်ကြေး (ပေးပြီး / မပေးရသေး)'] ?? row['နှစ်စဉ်ကြေး'] ?? row['annualFee']),
       status: (row['status'] === 'under_review' || row['အခြေအနေ'] === 'စိစစ်ဆဲ' || row['အခြေအနေ'] === 'စစ်ဆေးဆဲ')
         ? ('under_review' as const)

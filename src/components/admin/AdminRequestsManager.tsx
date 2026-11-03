@@ -7,6 +7,14 @@ import { confirmDialog } from '../../components/ConfirmModal';
 import { CheckCircle2, XCircle, Clock, FileText, Check, X, MapPin } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../../constants';
+import { recordAuditLog } from '../../lib/audit';
+
+// Field names the School Portal can request changes for, shown in Burmese.
+const FIELD_LABELS: Record<string, string> = {
+  name: 'ကျောင်းအမည်',
+  level: 'ကျောင်းအဆင့်',
+  studentRange: 'ကျောင်းသားဦးရေ Range',
+};
 
 export default function AdminRequestsManager() {
   const [requests, setRequests] = useState<SchoolUpdateRequest[]>([]);
@@ -46,7 +54,8 @@ export default function AdminRequestsManager() {
 
       // 2. Mark request as approved
       await updateDoc(doc(db, 'school_update_requests', req.id), { status: 'approved' });
-      
+
+      await recordAuditLog({ action: 'update', entityType: 'request', entityId: req.schoolId, entityName: req.schoolName, details: `ပြင်ဆင်ခွင့် တောင်းဆိုမှု အတည်ပြုခြင်း (${req.changes.map(c => FIELD_LABELS[c.field] || c.field).join(', ')})` });
       toast.success('အတည်ပြုပြီး ကျောင်းအချက်အလက် Update လုပ်ပြီးပါပြီ');
       fetchRequests();
     } catch (err) {
@@ -58,6 +67,7 @@ export default function AdminRequestsManager() {
     if (!(await confirmDialog('ဤတောင်းဆိုချက်ကို ပယ်ဖျက်ရန် သေချာပါသလား?'))) return;
     try {
       await updateDoc(doc(db, 'school_update_requests', req.id), { status: 'rejected' });
+      await recordAuditLog({ action: 'update', entityType: 'request', entityId: req.schoolId, entityName: req.schoolName, details: 'ပြင်ဆင်ခွင့် တောင်းဆိုမှု ပယ်ဖျက်ခြင်း' });
       toast.success('တောင်းဆိုချက်ကို ပယ်ဖျက်လိုက်ပါပြီ');
       fetchRequests();
     } catch (err) {
@@ -67,7 +77,12 @@ export default function AdminRequestsManager() {
 
   const handleDelete = async (id: string) => {
     if (!(await confirmDialog('မှတ်တမ်းကို ဖျက်ရန် သေချာပါသလား?'))) return;
-    await deleteDoc(doc(db, 'school_update_requests', id));
+    try {
+      await deleteDoc(doc(db, 'school_update_requests', id));
+      toast.success('မှတ်တမ်း ဖျက်ပြီးပါပြီ');
+    } catch (err) {
+      toast.error('ဖျက်၍ မရပါ');
+    }
     fetchRequests();
   };
 
@@ -166,7 +181,7 @@ export default function AdminRequestsManager() {
                   <span className="text-xs font-bold text-slate-700">ပြင်ဆင်လိုသော အချက်အလက်များ:</span>
                   {req.changes.map((change, idx) => (
                     <div key={idx} className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-white p-2.5 rounded-lg border border-slate-200 text-sm">
-                      <div className="font-semibold text-slate-600">{change.field}</div>
+                      <div className="font-semibold text-slate-600">{FIELD_LABELS[change.field] || change.field}</div>
                       <div className="text-rose-600 line-through truncate">{change.oldValue || '(အလွတ်)'}</div>
                       <div className="text-emerald-700 font-bold truncate">➔ {change.newValue || '(အလွတ်)'}</div>
                     </div>

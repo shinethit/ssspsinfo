@@ -13,6 +13,7 @@ export default function Sports() {
   const [activeStatus, setActiveStatus] = useState<'upcoming' | 'ongoing' | 'finished'>('finished');
   const [events, setEvents] = useState<SportsEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [sportInfo, setSportInfo] = useState<SportInfo | null>(null);
   const [athletes, setAthletes] = useState<Athlete[]>([]);
   const [infoLoading, setInfoLoading] = useState(false);
@@ -22,6 +23,11 @@ export default function Sports() {
       const fetched = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as SportsEvent));
       fetched.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
       setEvents(fetched);
+      setLoading(false);
+    }, (err) => {
+      // v24.6: without this the page spun forever on a denied/failed read
+      console.error('Sports listener error:', err);
+      setLoadError(true);
       setLoading(false);
     });
     return () => unsubscribe();
@@ -37,7 +43,9 @@ export default function Sports() {
         
         const athleteSnap = await getDocs(collection(db, 'athletes')).catch(() => ({ docs: [] }));
         const allAthletes = athleteSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as Athlete));
-        setAthletes(allAthletes.filter((a: any) => a.sports.includes(activeSport)));
+        // v24.6: one athlete doc without a sports array used to throw here
+        // and leave the previous sport's list (or an empty list) on screen
+        setAthletes(allAthletes.filter((a: any) => Array.isArray(a.sports) && a.sports.includes(activeSport)));
       } catch (err) { console.error(err); }
       finally { setInfoLoading(false); }
     };
@@ -154,6 +162,10 @@ export default function Sports() {
 
           {loading ? (
             <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-sky-600" /></div>
+          ) : loadError ? (
+            <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 text-slate-500 font-semibold">
+              အားကစားပွဲစဉ်များ ဖတ်မရပါ။ အင်တာနက် စစ်ပြီး စာမျက်နှာကို ပြန်ဖွင့်ပါ။
+            </div>
           ) : filteredEvents.length === 0 ? (
             <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 text-slate-500 font-semibold">
               {activeSport} အတွက် {activeStatus === 'finished' ? 'ရလဒ်များ' : 'ပွဲစဉ်များ'} မရှိသေးပါ။

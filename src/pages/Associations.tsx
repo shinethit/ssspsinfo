@@ -29,9 +29,9 @@ export default function Associations() {
       const q = searchQuery.trim().toLowerCase();
       const matchSearch =
         !q ||
-        a.name.toLowerCase().includes(q) ||
+        (a.name || '').toLowerCase().includes(q) ||
         (a.township && a.township.toLowerCase().includes(q)) ||
-        (a.members && a.members.some(m => m.name.toLowerCase().includes(q) || m.role.toLowerCase().includes(q)));
+        (a.members && a.members.some(m => (m.name || '').toLowerCase().includes(q) || (m.role || '').toLowerCase().includes(q)));
 
       return matchTownship && matchSearch;
     }).sort((a, b) => {

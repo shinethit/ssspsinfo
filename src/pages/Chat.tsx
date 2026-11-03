@@ -4,11 +4,13 @@ import { db, auth } from '../lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { MessageSquare, Send, UserCircle, ArrowLeft } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 export default function Chat() {
   const navigate = useNavigate();
   const [messages, setMessages] = useState<any[]>([]);
   const [text, setText] = useState('');
+  const [loadError, setLoadError] = useState(false);
   const [user] = useAuthState(auth);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -16,6 +18,11 @@ export default function Chat() {
     const q = query(collection(db, 'messages'), orderBy('createdAt', 'desc'), limit(100));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse());
+    }, (err) => {
+      // v24.6: guests are denied this read by rules — without this the page
+      // wrongly showed "no messages yet" instead of a read error
+      console.error('Chat listener error:', err);
+      setLoadError(true);
     });
     return unsubscribe;
   }, []);
@@ -37,6 +44,9 @@ export default function Chat() {
       setText('');
     } catch (err) {
       console.error(err);
+      // v24.6: a failed send (e.g. >2000 chars, denied by rules) used to
+      // fail silently with the text still sitting in the box
+      toast.error('မက်ဆေ့ခ်ျ ပို့၍ မရပါ — စာလုံး ၂၀၀၀ ထက် မကျော်စေဘဲ ပြန်စမ်းပါ');
     }
   };
 
@@ -84,8 +94,17 @@ export default function Chat() {
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400 space-y-2">
               <MessageSquare className="w-10 h-10 text-slate-300" />
-              <p className="font-semibold text-sm">မက်ဆေ့ခ်ျ မရှိသေးပါ</p>
-              <p className="text-xs">ပထမဆုံး မက်ဆေ့ခ်ျကို စတင်ပေးပို့လိုက်ပါ။</p>
+              {loadError ? (
+                <>
+                  <p className="font-semibold text-sm">မက်ဆေ့ခ်ျများ ဖတ်မရပါ</p>
+                  <p className="text-xs">အကောင့်ဝင်ထားခြင်း စစ်ဆေးပြီး စာမျက်နှာကို ပြန်ဖွင့်ပါ။</p>
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold text-sm">မက်ဆေ့ခ်ျ မရှိသေးပါ</p>
+                  <p className="text-xs">ပထမဆုံး မက်ဆေ့ခ်ျကို စတင်ပေးပို့လိုက်ပါ။</p>
+                </>
+              )}
             </div>
           ) : (
             messages.map(msg => {
@@ -128,8 +147,9 @@ export default function Chat() {
               <input
                 type="text"
                 value={text}
+                maxLength={2000}
                 onChange={(e) => setText(e.target.value)}
-                placeholder="မက်ဆေ့ခ်ျ ရိုက်ထည့်ပါ..."
+                placeholder="မက်ဆေ့ခ်ျ ရိုက်ထည့်ပါ... (အများဆုံး စာလုံး ၂၀၀၀)"
                 className="flex-1 min-w-0 bg-white p-2.5 sm:p-3 rounded-xl border border-slate-300 text-sm focus:border-sky-500 focus:ring-2 focus:ring-sky-100 outline-hidden"
               />
               <button

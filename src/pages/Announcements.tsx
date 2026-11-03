@@ -59,7 +59,9 @@ export default function Announcements() {
         (a.body && a.body.toLowerCase().includes(q)) ||
         ((a as any).zone && (a as any).zone.toLowerCase().includes(q));
 
-      const matchZone = selectedZone === 'all' ? true : isSchoolInZone((a as any).zone, selectedZone);
+      // v24.6: a zone-less announcement applies to all zones — it used to be
+      // hidden under every specific zone filter and wrongly shown under "အခြား"
+      const matchZone = selectedZone === 'all' || !(a as any).zone ? true : isSchoolInZone((a as any).zone, selectedZone);
       return matchCategory && matchSearch && matchZone;
     });
 
@@ -79,6 +81,13 @@ export default function Announcements() {
   }, [selectedCategory, searchQuery, sortBy, selectedZone]);
 
   const totalPages = Math.ceil(filteredAnnouncements.length / itemsPerPage);
+
+  // v24.6: clamp the page when the list shrinks (e.g. admin deletes items)
+  // so a high page never shows a false "no announcements" empty state.
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) setCurrentPage(totalPages);
+  }, [totalPages, currentPage]);
+
   const currentItems = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
     return filteredAnnouncements.slice(start, start + itemsPerPage);
