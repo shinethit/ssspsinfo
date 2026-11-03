@@ -524,7 +524,7 @@ export default function Admin() {
             {activeTab === 'sports' && <AdminSportsManager schools={schools} />}
             {activeTab === 'documents' && <AdminDocumentManager />}
             {activeTab === 'gallery' && <AdminGalleryManager />}
-            {activeTab === 'finance' && <AdminFinanceManager schools={schools} />}
+            {activeTab === 'finance' && <AdminFinanceManager schools={schools} onSchoolsChange={fetchSchools} />}
             {activeTab === 'requests' && <AdminRequestsManager />}
           </div>
         </main>

@@ -18,13 +18,14 @@ export default defineConfig(() => {
     // Split the big main chunk (~998 kB): React + Firebase are large
     // libraries used on every page, so they get their own chunks that
     // browsers cache separately; the entry chunk stays under the warning limit.
-    // (Vite 8 runs on Rolldown, whose native chunk-grouping API is
-    // advancedChunks; the Rollup-style manualChunks function was ignored
-    // for the Firestore modules.)
+    // (Vite 8 runs on Rolldown. v24.14: `advancedChunks` is deprecated in
+    // favour of `codeSplitting` — same groups shape, so this is a rename
+    // only; the Rollup-style manualChunks function was ignored for the
+    // Firestore modules.)
     build: {
       rolldownOptions: {
         output: {
-          advancedChunks: {
+          codeSplitting: {
             groups: [
               { name: 'react-vendor', test: /[\\/]node_modules[\\/](react|react-dom|react-router-dom)[\\/]/ },
               // Firestore alone is ~400 kB, so it gets its own chunk;

@@ -6,10 +6,12 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
 import { getGlobalAcademicYear } from '../../lib/academicYear';
-import { recordAnnualFeePayment } from '../../lib/finance';
+import { recordAnnualFeePayment, findAnnualFeeTransaction, ANNUAL_FEE_TYPE } from '../../lib/finance';
 import { recordAuditLog } from '../../lib/audit';
-import { School, SchoolLevelItem } from '../../types';
+import { School, SchoolLevelItem, TransactionRecord } from '../../types';
 import { getUnifiedSchoolLevels } from '../../lib/schoolLevels';
 import { ZONE_FILTER_OPTIONS, isSchoolInZone } from '../../constants';
 import { downloadSchoolTemplate } from '../../lib/excel';
@@ -117,6 +119,25 @@ export default function AdminSchoolManager({
 
   const toggleGroup = (id: string) => {
     setCollapsedGroups(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  // v24.14: the per-school print button used to open the receipt with a null
+  // voucher, so the receipt re-derived a number that did not match the stored
+  // one. Look the stored annual-fee transaction up first (this manager does
+  // not load transactions) and pass its voucher; legacy flag-only payments
+  // (no transaction) still fall back to the derived number.
+  const handlePrintReceipt = async (school: School) => {
+    try {
+      const q = query(collection(db, 'transactions'), where('schoolId', '==', school.id), where('feeType', '==', ANNUAL_FEE_TYPE));
+      const snap = await getDocs(q);
+      const txs = snap.docs.map(d => ({ id: d.id, ...d.data() }) as TransactionRecord);
+      const tx = findAnnualFeeTransaction(txs, school.id, school.feeAcademicYear || getGlobalAcademicYear());
+      setReceiptVoucherNo(tx?.voucherNo ?? null);
+    } catch {
+      toast.error('voucher နံပါတ် ရှာမတွေ့ပါ — ခန့်မှန်းနံပါတ်နဲ့ ပြေစာထုတ်ပါမယ်');
+      setReceiptVoucherNo(null);
+    }
+    setReceiptSchool(school);
   };
 
   const handleConfirmFeePayment = async (e: React.FormEvent) => {
@@ -385,11 +406,7 @@ export default function AdminSchoolManager({
 
                           {school.isAnnualFeePaid && (
                             <button
-                              // v24.13 (F7): no stored voucher is known here
-                              // (this manager does not load transactions), so
-                              // the receipt falls back to the derived number
-                              // for legacy flag-only payments.
-                              onClick={() => { setReceiptVoucherNo(null); setReceiptSchool(school); }}
+                              onClick={() => handlePrintReceipt(school)}
                               className="p-2.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition cursor-pointer"
                               title="ပြေစာထုတ်ရန်"
                             >

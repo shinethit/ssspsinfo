@@ -14,7 +14,7 @@ import * as XLSX from 'xlsx';
 import AnnualFeeReceipt from './AnnualFeeReceipt';
 import { generateVoucherNo } from '../../utils/voucher';
 
-export default function AdminFinanceManager({ schools }: { schools: School[] }) {
+export default function AdminFinanceManager({ schools, onSchoolsChange }: { schools: School[]; onSchoolsChange?: () => void }) {
   const [search, setSearch] = useState('');
   const [zoneFilter, setZoneFilter] = useState<string>('all');
   
@@ -193,6 +193,10 @@ export default function AdminFinanceManager({ schools }: { schools: School[] }) 
       if (target) await recordAuditLog({ action: 'delete', entityType: 'transaction', entityId: target.schoolId, entityName: target.schoolName, details: `${target.feeType} ${Number(target.amount || 0).toLocaleString('my-MM')} ကျပ် (${target.paidDate}) ဖျက်ခြင်း${clearsFlag ? ' — ကျောင်း၏ သွင်းပြီးအမှတ် ပယ်ဖျက်ခြင်း' : ''}` });
       toast.success('မှတ်တမ်း ဖျက်ပြီးပါပြီ');
       fetchTransactions();
+      // v24.14: the school flag was cleared in Firestore above, but the
+      // schools list in Admin only refreshes on the next data sync — tell
+      // the parent to refetch now so the flag card updates at once.
+      if (clearsFlag) onSchoolsChange?.();
     } catch (err) {
       toast.error('ဖျက်၍ မရပါ');
     }
